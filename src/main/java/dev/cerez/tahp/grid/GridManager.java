@@ -129,46 +129,41 @@ public class GridManager implements Switch, StatusProfiler {
                 ? null
                 : position.breakEventPrice();
 
-        BigDecimal longPosition = positionQuantity.signum() > 0
-                        ? positionQuantity
-                        : BigDecimal.ZERO;
 
-        BigDecimal shortPosition = positionQuantity.signum() < 0
-                        ? positionQuantity.abs()
-                        : BigDecimal.ZERO;
-
-
-        BigDecimal availableBalance = balance.subtract(positionQuantity.multiply(currentPrice).divide(new BigDecimal(config.leverage), 12 , RoundingMode.HALF_EVEN));
-        List<OrderPreview> desiredOrders = createDesiredOrders(currentPrice, availableBalance, longPosition, shortPosition, breakEventPrice);
+        List<OrderPreview> desiredOrders = createDesiredOrders(currentPrice, balance, positionQuantity, breakEventPrice);
         reconcileOrders(ordersActive, desiredOrders);
         onUpdate = false;
     }
 
     private @NotNull List<OrderPreview> createDesiredOrders(@NotNull BigDecimal currentPrice,
-                                                            @NotNull BigDecimal availableQuote,
-                                                            @NotNull BigDecimal longPosition,
-                                                            @NotNull BigDecimal shortPosition,
+                                                            @NotNull BigDecimal balance,
+                                                            @NotNull BigDecimal position,
                                                             @Nullable BigDecimal breakEventPrice
     ) {
         List<OrderPreview> result = new ArrayList<>();
 
         if (config.typeGrid == TypeGrid.LONG || config.typeGrid == TypeGrid.BOTH) {
-            result.addAll(createReduceOrders(currentPrice, longPosition, breakEventPrice, SideOrder.SELL));
-            result.addAll(createOpenOrders(currentPrice, availableQuote, SideOrder.BUY));
+            result.addAll(createReduceOrders(currentPrice, position, breakEventPrice, SideOrder.SELL));
+            result.addAll(createOpenOrders(currentPrice, balance, position, SideOrder.BUY));
         }
 
         if (config.typeGrid == TypeGrid.SHORT || config.typeGrid == TypeGrid.BOTH) {
-            result.addAll(createReduceOrders(currentPrice, shortPosition, breakEventPrice, SideOrder.BUY));
-            result.addAll(createOpenOrders(currentPrice, availableQuote, SideOrder.SELL));
+            result.addAll(createReduceOrders(currentPrice, position, breakEventPrice, SideOrder.BUY));
+            result.addAll(createOpenOrders(currentPrice, balance, position, SideOrder.SELL));
         }
 
         return result;
     }
 
-    private @NotNull List<OrderPreview> createReduceOrders(@NotNull BigDecimal currentPrice, @NotNull BigDecimal positionQuantity, @Nullable BigDecimal breakEventPrice, @NotNull SideOrder side) {
+    private @NotNull List<OrderPreview> createReduceOrders(@NotNull BigDecimal currentPrice, @NotNull BigDecimal position, @Nullable BigDecimal breakEventPrice, @NotNull SideOrder side) {
         List<OrderPreview> result = new ArrayList<>();
-        if (positionQuantity.signum() <= 0) {
-            return result;
+        BigDecimal AmountPositionToClose;
+        if (SideOrder.BUY.equals(side)) {
+            // Si se está creando una orde de cierre en buy eso quiere decir que la posición es un short y por ente la cantidad en negativa
+            // No se usa ABS por qué puede ser una posición long dando como resultado posición negativa a la que cerrar
+            AmountPositionToClose = position.multiply(new BigDecimal("-1"));
+        }else {
+            AmountPositionToClose = position;
         }
 
         boolean isLong = side == SideOrder.BUY;
@@ -194,8 +189,8 @@ public class GridManager implements Switch, StatusProfiler {
                 }
             }
 
-            BigDecimal newUsedMargin = usedMargin.add(config.sizePerOrderBaseAsset);;
-            if (newUsedMargin.compareTo(positionQuantity) > 0) {
+            BigDecimal newUsedMargin = usedMargin.add(config.sizePerOrderBaseAsset);
+            if (newUsedMargin.compareTo(AmountPositionToClose) > 0) {
                 break;
             }
             usedMargin = newUsedMargin;
@@ -205,13 +200,17 @@ public class GridManager implements Switch, StatusProfiler {
         return result;
     }
 
-    private @NotNull List<OrderPreview> createOpenOrders(@NotNull BigDecimal currentPrice, @NotNull BigDecimal availableQuote, @NotNull SideOrder side) {
+    private @NotNull List<OrderPreview> createOpenOrders(@NotNull BigDecimal currentPrice, @NotNull BigDecimal balance, @NotNull BigDecimal position, @NotNull SideOrder side) {
         List<OrderPreview> result = new ArrayList<>();
-        if (availableQuote.signum() <= 0) {
-            return result;
+        BigDecimal availableQuote;
+        boolean isLong = side == SideOrder.BUY;
+        if (isLong) {
+            availableQuote = balance.subtract(position.multiply(currentPrice).divide(new BigDecimal(config.leverage), 12 , RoundingMode.HALF_EVEN));
+        }else {
+            availableQuote = balance.add(position.multiply(currentPrice).divide(new BigDecimal(config.leverage), 12 , RoundingMode.HALF_EVEN));
         }
         BigDecimal leverage = BigDecimal.valueOf(config.leverage);
-        boolean isLong = side == SideOrder.BUY;
+
         int direction = isLong ? -1 : 1;
         BigDecimal usedMargin = BigDecimal.ZERO;
         Symbol symbols = connector.fGetAllSymbols().get(symbol);
@@ -338,6 +337,8 @@ public class GridManager implements Switch, StatusProfiler {
         private int leverage;
         private boolean logsEndPoints;
         private int amountPriceOffset;
+        @Builder.Default
+        private int amountLevesExtraInverse = 0;
     }
 
     public enum TypeGrid {
