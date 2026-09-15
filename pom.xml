@@ -35,7 +35,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>dev.cerez.tahp.Main</mainClass>
+                            <mainClass>dev.cerez.titan.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
