@@ -10,10 +10,12 @@ import dev.cerez.tahp.connector.model.SideOrder;
 import dev.cerez.tahp.connector.model.StatusOrder;
 import dev.cerez.tahp.connector.model.Symbol;
 import dev.cerez.tahp.discord.StatusProfiler;
+import dev.cerez.tahp.utils.Configurable;
 import dev.cerez.tahp.utils.Switch;
 import dev.cerez.tahp.utils.Utils;
 import dev.cerez.tahp.utils.WaitableSet;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.Setter;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
@@ -27,10 +29,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
-public class GridManager implements Switch, StatusProfiler {
+public class GridManager implements Switch, StatusProfiler, Configurable<GridManager.GridManagerConfig> {
 
     private final BinanceConnector connector = new BinanceConnector();
-
+    @Getter
     private final GridManagerConfig config;
     private final String symbol;
 
@@ -46,7 +48,7 @@ public class GridManager implements Switch, StatusProfiler {
         this.symbol = config.baseAsset + config.quoteAsset;
 
         connector.start();
-        connector.setLogEndpoint(config.logsEndPoints);
+        connector.getConfig().setLogsRequest(config.logsEndPoints);
     }
 
     @Override
@@ -144,12 +146,12 @@ public class GridManager implements Switch, StatusProfiler {
 
         if (config.typeGrid == TypeGrid.LONG || config.typeGrid == TypeGrid.BOTH) {
             result.addAll(createReduceOrders(currentPrice, position, breakEventPrice, SideOrder.SELL));
-            result.addAll(createOpenOrders(currentPrice, balance, position, SideOrder.BUY));
+            result.addAll(createOpenOrders(currentPrice, position, balance, SideOrder.BUY));
         }
 
         if (config.typeGrid == TypeGrid.SHORT || config.typeGrid == TypeGrid.BOTH) {
             result.addAll(createReduceOrders(currentPrice, position, breakEventPrice, SideOrder.BUY));
-            result.addAll(createOpenOrders(currentPrice, balance, position, SideOrder.SELL));
+            result.addAll(createOpenOrders(currentPrice, position, balance, SideOrder.SELL));
         }
 
         return result;
@@ -200,7 +202,7 @@ public class GridManager implements Switch, StatusProfiler {
         return result;
     }
 
-    private @NotNull List<OrderPreview> createOpenOrders(@NotNull BigDecimal currentPrice, @NotNull BigDecimal balance, @NotNull BigDecimal position, @NotNull SideOrder side) {
+    private @NotNull List<OrderPreview> createOpenOrders(@NotNull BigDecimal currentPrice, @NotNull BigDecimal position, @NotNull BigDecimal balance, @NotNull SideOrder side) {
         List<OrderPreview> result = new ArrayList<>();
         BigDecimal availableQuote;
         boolean isLong = side == SideOrder.BUY;
@@ -224,8 +226,8 @@ public class GridManager implements Switch, StatusProfiler {
             BigDecimal notional = config.sizePerOrderBaseAsset.multiply(price);
             BigDecimal orderMargin = notional.divide(leverage, 12, RoundingMode.CEILING);
             BigDecimal newUsedMargin = usedMargin.add(orderMargin);
-
-            if (newUsedMargin.compareTo(availableQuote) > 0) {
+            // dejar un margen del 10%
+            if (newUsedMargin.compareTo(availableQuote.multiply(new BigDecimal("0.9"))) > 0) {
                 break;
             }
             usedMargin = newUsedMargin;
@@ -259,7 +261,6 @@ public class GridManager implements Switch, StatusProfiler {
             }
         }
 
-
         // Cancelar orden
         for (BinanceConnector.FutureOrder current : currentOrders)
             if (!keptOrders.contains(current.nameOrder())) {
@@ -276,7 +277,11 @@ public class GridManager implements Switch, StatusProfiler {
         }
 
         // Asegurarsé que las ordenes ya están canceladas
-        waitForCancel.awaitEmpty();
+        try {
+            waitForCancel.awaitEmpty(5, TimeUnit.SECONDS);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
 
         // Enviar orden
         boolean retry = false;

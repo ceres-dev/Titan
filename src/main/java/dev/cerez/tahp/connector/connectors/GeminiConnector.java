@@ -19,6 +19,10 @@ public final class GeminiConnector extends BaseConnector implements AutoCloseabl
     private static final String BASE_HTTPS = "https://api.gemini.com";
     private static final String BASE_WWS = "wss://ws.gemini.com";
 
+    public GeminiConnector() {
+        super(ConnectorConfig.builder().build());
+    }
+
     @Override
     @NotNull
     public String sGetHTTPS() {
@@ -32,7 +36,7 @@ public final class GeminiConnector extends BaseConnector implements AutoCloseabl
     }
 
     @Override
-    protected void handleStreamRaw(@NotNull String wwsURL, @NotNull String contentToParse) {
+    protected void handleStreamRawExpress(@NotNull String wwsURL, @NotNull String contentToParse) {
         String[] split = contentToParse.split("\"");
         if (split.length == 33) {
             BookTickDouble bookTickDouble = new BookTickDouble(
@@ -51,6 +55,11 @@ public final class GeminiConnector extends BaseConnector implements AutoCloseabl
             waitingForPong = false;
             telemetry.setCurrentDeltaDelayPingPongNanoTime(System.nanoTime() - delayPingPongNanoTime);
         }
+    }
+
+    @Override
+    protected void handleStreamRaw(@NotNull String wwsURL, @NotNull JsonNode node) {
+
     }
 
     @Override

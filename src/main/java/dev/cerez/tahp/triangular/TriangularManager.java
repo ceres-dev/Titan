@@ -8,12 +8,14 @@ import dev.cerez.tahp.connector.model.Symbol;
 import dev.cerez.tahp.connector.model.Volume24H;
 import dev.cerez.tahp.discord.StatusProfiler;
 import dev.cerez.tahp.triangular.engine.SearchTriangularEngine;
+import dev.cerez.tahp.triangular.engine.engines.SearchTriangularEngineCPP;
+import dev.cerez.tahp.triangular.engine.engines.SearchTriangularEngineJava;
+import dev.cerez.tahp.utils.Configurable;
 import dev.cerez.tahp.utils.Switch;
 import dev.cerez.tahp.triangular.utils.TriangularArbitrageOpportunity;
-import dev.cerez.tahp.utils.Telemetry;
-import lombok.Builder;
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
+import dev.cerez.tahp.utils.telemtry.Telemetry;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 import org.jetbrains.annotations.Blocking;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -24,25 +26,28 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
-@RequiredArgsConstructor
-public class TriangularManager implements Switch, StatusProfiler {
 
+public class TriangularManager implements Switch, StatusProfiler, Configurable<TriangularManager.TriangularManagerConfig> {
+
+    @Getter
+    private final TriangularManagerConfig config;
     private final Connector exchangeApi;
-    private final ManagerConfig config;
     private final Consumer<SearchTriangularEngine.OnOpportunities> onUpdate;
+    private final SearchTriangularEngine engine;
 
     private volatile boolean started = false;
 
-    @Nullable private SearchTriangularEngine engine = null;
     @Nullable private Telemetry telemetry;
 
     @Nullable private Map<String, Symbol> allSymbolsMap = null;
     @Nullable private Consumer<BookTickDouble> streamListener = null;
 
-    @Contract(value = "_ -> this")
-    public TriangularManager setEngine(@NotNull SearchTriangularEngine engine) {
-        this.engine = engine;
-        return this;
+    @SneakyThrows
+    public TriangularManager(TriangularManagerConfig config, Connector exchangeApi, Consumer<SearchTriangularEngine.OnOpportunities> onUpdate) {
+        this.config = config;
+        this.exchangeApi = exchangeApi;
+        this.onUpdate = onUpdate;
+        this.engine = config.getEngine().getConstructor(SearchTriangularEngine.EngineConfig.class).newInstance(config);
     }
 
     @Contract(value = "_ -> this")
@@ -57,7 +62,7 @@ public class TriangularManager implements Switch, StatusProfiler {
             return;
         }
         started = true;
-        if (engine == null) throw new IllegalStateException("Engine is not setting");
+        if (config.getEngine() == null) throw new IllegalStateException("Engine is not setting");
         CompletableFuture<Map<String, Symbol>> allSymbolsMapFuture = CompletableFuture.supplyAsync(
                 exchangeApi::sGetAllSymbols
         );
@@ -243,10 +248,14 @@ public class TriangularManager implements Switch, StatusProfiler {
             double volumeUsdt
     ) {}
 
-    @Data
-    @Builder
-    public static final class ManagerConfig {
+    @EqualsAndHashCode(callSuper = true)
+    @SuperBuilder
+    @Getter
+    @Setter
+    @ToString
+    public static class TriangularManagerConfig extends SearchTriangularEngine.EngineConfig {
         @Builder.Default public int maxSymbols = 1500;
         @Builder.Default public Set<String> banAssets = Set.of();
+        @Builder.Default public final Class<? extends SearchTriangularEngine> engine = SearchTriangularEngineJava.class;
     }
 }

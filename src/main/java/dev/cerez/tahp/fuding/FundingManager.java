@@ -6,6 +6,7 @@ import dev.cerez.tahp.connector.connectors.BinanceConnector;
 import dev.cerez.tahp.connector.model.SideOrder;
 import dev.cerez.tahp.discord.StatusProfiler;
 import dev.cerez.tahp.io.IOdata;
+import dev.cerez.tahp.utils.Configurable;
 import dev.cerez.tahp.utils.Switch;
 import dev.cerez.tahp.utils.Utils;
 import lombok.Builder;
@@ -24,8 +25,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 @Getter
-public class FundingManager implements Switch, StatusProfiler {
+public class FundingManager implements Switch, StatusProfiler, Configurable<FundingManager.FundingManagerConfig> {
 
+    @Getter
     private final FundingManagerConfig config;
     private final BinanceConnector connector = new BinanceConnector();
     private final InputUser inputUser = new InputUser();
@@ -40,7 +42,7 @@ public class FundingManager implements Switch, StatusProfiler {
 
     public FundingManager(@NotNull FundingManagerConfig config) {
         PersistenData data = IOdata.loadPersistenDataFundingManager(new PersistenData(this));
-        connector.setLogEndpoint(config.logsEndPoints);
+        connector.getConfig().setLogsRequest(config.logsEndPoints);
         connector.start();
         Log.info("Config use: %s", config);
         if (data.isActive) {
@@ -83,7 +85,7 @@ public class FundingManager implements Switch, StatusProfiler {
         Log.info("Checks <green>Ok");
         if (config.isLogsEndPoints()){
             Log.info("Logs de EndPoints Activado");
-            connector.setLogEndpoint(true);
+            connector.getConfig().setLogsRequest(true);
         }
         Log.info("Iniciando...");
         status = Status.STARTING;

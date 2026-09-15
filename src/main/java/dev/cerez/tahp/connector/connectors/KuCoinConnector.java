@@ -15,6 +15,10 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
     private static final String BASE_HTTPS = "https://api.kucoin.com";
     private static final String BASE_WWS = "wss://ws-api-spot.kucoin.com";
 
+    public KuCoinConnector() {
+        super(ConnectorConfig.builder().build());
+    }
+
     @Override
     @NotNull
     public String sGetHTTPS() {
@@ -28,7 +32,7 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
     }
 
     @Override
-    protected void handleStreamRaw(@NotNull String wwsURL, @NotNull String contentToParse) {
+    protected void handleStreamRawExpress(@NotNull String wwsURL, @NotNull String contentToParse) {
 
         String[] split = contentToParse.split("\"");
 
@@ -50,6 +54,11 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
             waitingForPong = false;
             telemetry.setCurrentDeltaDelayPingPongNanoTime(System.nanoTime() - delayPingPongNanoTime);
         }
+    }
+
+    @Override
+    protected void handleStreamRaw(@NotNull String wwsURL, @NotNull JsonNode node) {
+
     }
 
     @Override

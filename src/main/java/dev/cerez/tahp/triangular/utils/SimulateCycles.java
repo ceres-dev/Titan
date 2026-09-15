@@ -67,7 +67,7 @@ public class SimulateCycles {
     }
 
     private double roundDownToStepSize(double amount, double stepSize) {
-        return (int) (amount *  (1 /stepSize)) * stepSize;
+        return (int) (amount *  (Math.pow(stepSize, -1))) * stepSize;
     }
 
     public record SimulationResult(

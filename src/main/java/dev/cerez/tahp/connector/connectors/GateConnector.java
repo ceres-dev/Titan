@@ -18,23 +18,23 @@ public final class GateConnector extends BaseConnector implements AutoCloseable 
     private static final String BASE_TESTNET_WWS = "wss://ws-testnet.gate.com/v4/ws/spot";
 
     public GateConnector(boolean isTestNet) {
-        super(isTestNet);
+        super(ConnectorConfig.builder().isTestNet(isTestNet).build());
     }
 
     @Override
     @NotNull
     public String sGetHTTPS() {
-        return isTestNet ? BASE_TESTNET_HTTPS : BASE_HTTPS;
+        return config.isTestNet() ? BASE_TESTNET_HTTPS : BASE_HTTPS;
     }
 
     @Override
     @NotNull
     public String sGetWWS() {
-        return isTestNet ? BASE_TESTNET_WWS : BASE_WWS;
+        return config.isTestNet() ? BASE_TESTNET_WWS : BASE_WWS;
     }
 
     @Override
-    protected void handleStreamRaw(@NotNull String wwsURL, @NotNull String contentToParse) {
+    protected void handleStreamRawExpress(@NotNull String wwsURL, @NotNull String contentToParse) {
         String[] split = contentToParse.split("\"");
 
         // Longitud del ticker book
@@ -54,6 +54,11 @@ public final class GateConnector extends BaseConnector implements AutoCloseable 
             waitingForPong = false;
             telemetry.setCurrentDeltaDelayPingPongNanoTime(System.nanoTime() - delayPingPongNanoTime);
         }
+    }
+
+    @Override
+    protected void handleStreamRaw(@NotNull String wwsURL, @NotNull JsonNode node) {
+
     }
 
     @Override

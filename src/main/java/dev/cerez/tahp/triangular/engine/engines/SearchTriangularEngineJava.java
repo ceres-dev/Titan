@@ -5,6 +5,7 @@ import dev.cerez.tahp.connector.model.BookTickDouble;
 import dev.cerez.tahp.connector.model.Symbol;
 import dev.cerez.tahp.triangular.engine.SearchTriangularEngine;
 import dev.cerez.tahp.triangular.engine.model.NameAsset;
+import dev.cerez.tahp.triangular.engine.model.StackArrayListFixed;
 import dev.cerez.tahp.triangular.utils.SimulateCycles;
 import dev.cerez.tahp.triangular.utils.TriangularArbitrageOpportunity;
 import lombok.SneakyThrows;
@@ -29,7 +30,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
             set.add(values.getQuoteAsset());
             set.add(values.getBaseAsset());
         }
-        this.outgoingByFromArray = new ArbitrageEdge[set.size()][engineConfig.getMaxCycleLength()];
+        this.outgoingByFromArray = new ArbitrageEdge[set.size()][config.getMaxCycleLength()];
         set.clear();
         super.configure(allSymbolMap, liveTickers);
 
@@ -66,7 +67,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
             detectTriangularPrev = false;
         }
 
-        if (outgoingByFromAsset.size() < engineConfig.getMinCycleLength()) {
+        if (outgoingByFromAsset.size() < config.getMinCycleLength()) {
             return List.of();
         }
 
@@ -87,9 +88,9 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
         }
 
         for (NameAsset startAsset : startAssets) {
-            List<ArbitrageEdge> path = new LinkedList<>();
+            List<ArbitrageEdge> path = new StackArrayListFixed<>(new ArbitrageEdge[config.getMaxCycleLength()]);
             List<NameAsset> visitedAssets = new LinkedList<>();
-            visitedAssets.add(startAsset);
+            visitedAssets.addLast(startAsset);
 
             searchCyclesFrom(
                     startAsset,
@@ -148,8 +149,8 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
                 continue;
             }
 
-            double sellRate = bid * (1.0 - engineConfig.getDefaultFeeRate());
-            double buyRate = (1.0 / ask) * (1.0 - engineConfig.getDefaultFeeRate());
+            double sellRate = bid * (1.0 - config.getDefaultFeeRate());
+            double buyRate = (1.0 / ask) * (1.0 - config.getDefaultFeeRate());
 
             NameAsset baseAssetName = nameAssetCache.computeIfAbsent(baseAsset, NameAssetIndexed::new);
             NameAsset quoteAssetName = nameAssetCache.computeIfAbsent(quoteAsset, NameAssetIndexed::new);
@@ -208,7 +209,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
         NameAsset baseAssetName = nameAssetCache.computeIfAbsent(baseAsset, NameAssetIndexed::new);
         NameAsset quoteAssetName = nameAssetCache.computeIfAbsent(quoteAsset, NameAssetIndexed::new);
 
-        double sellRate = bid * (1.0 - engineConfig.getDefaultFeeRate());
+        double sellRate = bid * (1.0 - config.getDefaultFeeRate());
         if (sellRate > 0.0) {
             upsertEdge(
                     updatedTicker.symbol(),
@@ -223,7 +224,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
             );
         }
 
-        double buyRate = (1.0 / ask) * (1.0 - engineConfig.getDefaultFeeRate());
+        double buyRate = (1.0 / ask) * (1.0 - config.getDefaultFeeRate());
         if (buyRate > 0.0) {
             upsertEdge(
                     updatedTicker.symbol(),
@@ -244,13 +245,13 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
     private void addEdge(@NotNull ArbitrageEdge edge) {
         ArrayList<ArbitrageEdge> outgoing = this.outgoingByFromAsset.computeIfAbsent(edge.getFromAsset(), key -> {
             ArrayList<ArbitrageEdge> list = new ArrayList<>(3);
-            outgoingByFromArray[key.getIndex()] = list.toArray(new ArbitrageEdge[0]);
+            outgoingByFromArray[key.hashCode()] = list.toArray(new ArbitrageEdge[0]);
             return list;
         });
 
         synchronized (outgoing) {
             outgoing.add(edge);
-            outgoingByFromArray[edge.getFromAsset().getIndex()] = outgoing.toArray(new ArbitrageEdge[0]);
+            outgoingByFromArray[edge.getFromAsset().hashCode()] = outgoing.toArray(new ArbitrageEdge[0]);
         }
     }
 
@@ -271,7 +272,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
     ) {
         ArrayList<ArbitrageEdge> outgoing = outgoingByFromAsset.computeIfAbsent(fromAsset, key -> {
             ArrayList<ArbitrageEdge> list = new ArrayList<>(3);
-            outgoingByFromArray[key.getIndex()] = list.toArray(new ArbitrageEdge[0]);
+            outgoingByFromArray[key.hashCode()] = list.toArray(new ArbitrageEdge[0]);
             return list;
         });
         synchronized (outgoing) {
@@ -298,7 +299,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
                     stepSize
             );
             outgoing.add(edge);
-            outgoingByFromArray[fromAsset.getIndex()] = outgoing.toArray(new ArbitrageEdge[0]);
+            outgoingByFromArray[fromAsset.hashCode()] = outgoing.toArray(new ArbitrageEdge[0]);
         }
     }
 
@@ -307,7 +308,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
             synchronized (outgoing) {
                 outgoing.removeIf(edge -> {
                     boolean b = symbol.equals(edge.getSymbol());
-                    outgoingByFromArray[edge.getFromAsset().getIndex()] = null;
+                    outgoingByFromArray[edge.getFromAsset().hashCode()] = null;
                     return b;
                 });
             }
@@ -317,7 +318,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
     private void searchCyclesFrom(
             @NotNull NameAsset startAsset,
             @NotNull NameAsset currentAsset,
-            @NotNull ArbitrageEdge[][] outgoingByFromAsset,
+            @NotNull ArbitrageEdge[] @NotNull [] outgoingByFromAsset,
             @NotNull List<ArbitrageEdge> path,
             @NotNull IntegerAtomic sizePath,
             @NotNull List<NameAsset> visitedAssets,
@@ -325,7 +326,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
             @NotNull LinkedList<TriangularArbitrageOpportunity> opportunities
     ) {
 
-        ArbitrageEdge[] outgoing = outgoingByFromAsset[currentAsset.getIndex()];
+        ArbitrageEdge[] outgoing = outgoingByFromAsset[currentAsset.hashCode()];
         if (outgoing == null) {
             return;
         }
@@ -334,10 +335,11 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
         for (ArbitrageEdge edge : outgoing) {
 
             if (edge == null) continue;
+            // Compara la dirección de memoria
+            // No existen dos asset con el mismo nombre
+            if (startAsset == edge.getToAsset()) {
 
-            if (startAsset.equals(edge.getToAsset())) {
-
-                if (nextLength < engineConfig.getMinCycleLength() || nextLength > engineConfig.getMaxCycleLength()) {
+                if (nextLength < config.getMinCycleLength() || nextLength > config.getMaxCycleLength()) {
                     continue;
                 }
 
@@ -356,7 +358,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
                 continue;
             }
 
-            if (nextLength >= engineConfig.getMaxCycleLength()) {
+            if (nextLength >= config.getMaxCycleLength()) {
                 continue;
             }
 
@@ -384,7 +386,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
     }
 
     private @Nullable TriangularArbitrageOpportunity buildOpportunityFromEdges(@NotNull List<ArbitrageEdge> cycleEdges) {
-        int cycleLength = engineConfig.getMaxCycleLength();
+        int cycleLength = config.getMaxCycleLength();
 //        if (cycleLength < MIN_CYCLE_LENGTH || cycleLength > MAX_CYCLE_LENGTH) {
 //            return null;
 //        }
@@ -423,8 +425,8 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
 
         SimulateCycles.SimulationResult simulationResult =
                 SimulateCycles.simulateCycleWithStepSize(cycleEdges,
-                        engineConfig.getDefaultStartAmount(),
-                        engineConfig.getDefaultFeeRate()
+                        config.getDefaultStartAmount(),
+                        config.getDefaultFeeRate()
                 );
         if (simulationResult == null) {
             return null;

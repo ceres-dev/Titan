@@ -16,7 +16,7 @@ public class TestFunding {
     @SuppressWarnings("resource")
     public Result run(FundingManager.FundingManagerConfig config) {
         BinanceConnector connector = new BinanceConnector();
-        connector.setLogEndpoint(config.isLogsEndPoints());
+        connector.getConfig().setLogsRequest(config.isLogsEndPoints());
         connector.start();
         String baseAsset = config.getBaseAsset();
         String quotAsset = config.getQuoteAsset();

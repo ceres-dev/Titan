@@ -11,36 +11,17 @@ public class NameAsset {
     private final String name;
     private final int hashPrimitive;
     private final Integer hashObject;
-    private final int index;
-    public int hashOffset;
 
     private static int i;
 
     @Contract(pure = true)
-    public NameAsset(@NotNull String name, Integer index) {
+    public NameAsset(@NotNull String name) {
         this.name = name;
         this.hashPrimitive = name.hashCode();
         this.hashObject = hashPrimitive;
-        this.index = index;
-    }
-
-    public NameAsset(String name) {
-        this(name, -1);
-    }
-
-    public void moveOffset() {
-        this.hashOffset++;
-    }
-
-    public int getHashPrimitive(){
-        return this.index;
     }
 
     public Integer cacheInteger = -1;
-
-    public Integer getHashObject(){
-        return cacheInteger == -1 ? cacheInteger = this.index : cacheInteger;
-    }
 
     @Override
     public boolean equals(Object o) {
@@ -51,8 +32,4 @@ public class NameAsset {
         return false;
     }
 
-    @Override
-    public int hashCode() {
-        return index;
-    }
 }

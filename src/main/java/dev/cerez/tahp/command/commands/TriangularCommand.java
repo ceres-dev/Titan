@@ -9,7 +9,7 @@ import dev.cerez.tahp.triangular.engine.SearchTriangularEngine;
 import dev.cerez.tahp.triangular.engine.engines.SearchTriangularEngineJava;
 import dev.cerez.tahp.triangular.ExecutorCycles;
 import dev.cerez.tahp.triangular.utils.Loader;
-import dev.cerez.tahp.utils.Telemetry;
+import dev.cerez.tahp.utils.telemtry.Telemetry;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -24,34 +24,30 @@ public class TriangularCommand extends BaseCommand {
     public void execute(@NotNull List<String> args) {
         Log.info("Starting...");
         long startTime = System.currentTimeMillis();
-        int maxSymbols = 1000;
         ExecutorCycles.ExecutorCyclesConfig configExecutor = ExecutorCycles.ExecutorCyclesConfig.builder()
                 .maxLag(20L)
                 .minProfit(0.1d)
                 .isTest(true)
                 .build();
-        SearchTriangularEngine.EngineConfig engineConfig = SearchTriangularEngine.EngineConfig.builder()
-                .maxSymbols(maxSymbols)
-                .maxCycleLength(5)
-                .minCycleLength(4)
-                .build();
         Telemetry.TelemetryConfig telemetryConfig = Telemetry.TelemetryConfig.builder()
                 .maxDelaysDeltaComputeNanoTime(500)
                 .stepsAddDelayComputeNanoTime(10)
                 .build();
-        TriangularManager.ManagerConfig managerConfig = TriangularManager.ManagerConfig.builder()
-                .maxSymbols(maxSymbols)
+        TriangularManager.TriangularManagerConfig triangularManagerConfig = TriangularManager.TriangularManagerConfig.builder()
+                .maxSymbols(900)
                 .banAssets(Set.of("TRY"))
+                .maxCycleLength(4)
+                .minCycleLength(3)
+                .engine(SearchTriangularEngineJava.class)
                 .build();
 
         Connector connector =           new BinanceConnector();
         Telemetry telemetry =           new Telemetry(telemetryConfig);
         Loader loader =                 new Loader();
         ExecutorCycles executorCycles = new ExecutorCycles(configExecutor, connector);
-        SearchTriangularEngine engine = new SearchTriangularEngineJava(engineConfig);
 
         connector.setTelemetry(telemetry);
-        new TriangularManager(connector, managerConfig, executorCycles::onOpportunities).setEngine(engine).setTelemetry(telemetry).start();
+        new TriangularManager(triangularManagerConfig, connector, executorCycles::onOpportunities).setTelemetry(telemetry).start();
         Log.info("<green>Ready! %.2fs", (System.currentTimeMillis() - startTime)/1000d);
         loader.printLoader(telemetry);
     }

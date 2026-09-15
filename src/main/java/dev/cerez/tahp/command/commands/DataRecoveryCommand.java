@@ -20,13 +20,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.LockSupport;
 
 public class DataRecoveryCommand extends BaseCommand {
     public DataRecoveryCommand() {
         super("dataRecovery", "dr");
     }
+
+    private final Executor executor = Executors.newFixedThreadPool(6);
 
     @SneakyThrows
     @Override
@@ -59,16 +61,24 @@ public class DataRecoveryCommand extends BaseCommand {
             total.addAll(prevRecopile);
 
             long date = System.currentTimeMillis();
-            Map<String, FundingData> newData = new HashMap<>();
+            Map<String, FundingData> newData = new ConcurrentHashMap<>();
+            CountDownLatch countDownLatch = new CountDownLatch(total.size());
             for (BinanceConnector.FundingRate fundingRate : total) {
-                BigDecimal maxBorrowable;
-                try {
-                    maxBorrowable = connector.mGetMaxAmountBorrowable(null, fundingRate.symbol().replace("USDT", ""));
-                } catch (SystemNotEnoughAssetException e) {
-                    maxBorrowable = new BigDecimal("-1");
-                }
-                newData.put(fundingRate.symbol(), new FundingData(date, fundingRate.nextFundingRate(), maxBorrowable));
+                executor.execute(() -> {
+                    BigDecimal maxBorrowable;
+                    try {
+                        maxBorrowable = connector.mGetMaxAmountBorrowable(null, fundingRate.symbol().replace("USDT", ""));
+                    } catch (SystemNotEnoughAssetException e) {
+                        maxBorrowable = new BigDecimal("-1");
+                    }
+                    newData.put(fundingRate.symbol(), new FundingData(date, fundingRate.nextFundingRate(), maxBorrowable));
+                    countDownLatch.countDown();
+                });
             }
+            if (!countDownLatch.await(5,  TimeUnit.MINUTES)){
+                Log.warning("Excedió el tiempo máximo de las request");
+            }
+
             fundingDataStorage.save(newData);
             Log.info("Datos guardas symbols=%s", total.stream().map(BinanceConnector.FundingRate::symbol).toList());
             LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(10));

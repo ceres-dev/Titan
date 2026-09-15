@@ -49,7 +49,15 @@ public final class BinanceConnector extends BaseConnector {
     private String listenKey = null;
 
     public BinanceConnector() {
-        super(Main.IS_TESTNET);
+        super(ConnectorConfig.builder()
+                .isTestNet(Main.IS_TESTNET)
+                .maxStreamsPerSubscribe(100)
+                .build()
+        );
+    }
+
+    public BinanceConnector(ConnectorConfig config) {
+        super(config);
     }
 
     @Override
@@ -60,9 +68,8 @@ public final class BinanceConnector extends BaseConnector {
 
     @SneakyThrows
     @Override
-    protected void handleStreamRaw(@NotNull String wwsURL, @NotNull String contentToParse) {
+    protected void handleStreamRawExpress(@NotNull String wwsURL, @NotNull String contentToParse) {
         String[] split = contentToParse.split("\"");
-
         // Parsing express del book
         if (split.length == 29) {
             BookTickDouble bookTickDouble = new BookTickDouble(
@@ -77,14 +84,14 @@ public final class BinanceConnector extends BaseConnector {
         }
 
         // Longitud del Pong
-        if (23 == split.length && telemetry != null) {
+        if (25 == split.length && telemetry != null) {
             waitingForPong = false;
             telemetry.setCurrentDeltaDelayPingPongNanoTime(System.nanoTime() - delayPingPongNanoTime);
-            return;
         }
+    }
 
-        // Paring de otras requests
-        JsonNode node = mapper.readTree(contentToParse);
+    @Override
+    protected void handleStreamRaw(@NotNull String wwsURL, @NotNull JsonNode node) {
         String stream;
         if (node.has("stream")) {
             stream = node.get("stream").asText();
@@ -103,6 +110,7 @@ public final class BinanceConnector extends BaseConnector {
 
     @Override
     public void start(){
+        initWebSocket(config.isTestNet() ? BASE_TESTNET_WWS : BASE_WWS);
         super.start();
         fStartUserData();
     }
@@ -117,12 +125,13 @@ public final class BinanceConnector extends BaseConnector {
 
     @Override
     protected @Nullable String getPingPayload(@NotNull String wwsURL) {
-        return BASE_WWS.equals(wwsURL) || BASE_TESTNET_WWS.equals(wwsURL) ? """
-                {
-                  "id": "%s",
-                  "method": "ping"
-                }
-                """.formatted(UUID.randomUUID().toString()) : null;
+        return null;
+//                BASE_WWS.equals(wwsURL) || BASE_TESTNET_WWS.equals(wwsURL) ? """
+//                {
+//                  "id": "%s",
+//                  "method": "ping"
+//                }
+//                """.formatted(UUID.randomUUID().toString()) : null;
     }
 
     @Contract(value = " -> new", pure = true)
@@ -260,12 +269,12 @@ public final class BinanceConnector extends BaseConnector {
 
     @Override
     public @NotNull String sGetHTTPS() {
-        return isTestNet ? BASE_TESTNET_HTTPS : BASE_HTTPS;
+        return config.isTestNet() ? BASE_TESTNET_HTTPS : BASE_HTTPS;
     }
 
     @Override
     public @NotNull String sGetWWS() {
-        return isTestNet ? BASE_TESTNET_WWS_STREAM : BASE_WWS_STREAM;
+        return config.isTestNet() ? BASE_TESTNET_WWS_STREAM : BASE_WWS_STREAM;
     }
 
     public static class BinanceKeys extends Keys {
@@ -399,7 +408,7 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     private @NotNull String fGetHttps(){
-        return isTestNet ? BASE_TESTNET_HTTPS_FUTURE : BASE_HTTPS_FUTURE;
+        return config.isTestNet() ? BASE_TESTNET_HTTPS_FUTURE : BASE_HTTPS_FUTURE;
     }
 
     public @NotNull String fGetWWS(){

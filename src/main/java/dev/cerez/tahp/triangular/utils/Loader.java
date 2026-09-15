@@ -1,6 +1,6 @@
 package dev.cerez.tahp.triangular.utils;
 
-import dev.cerez.tahp.utils.Telemetry;
+import dev.cerez.tahp.utils.telemtry.Telemetry;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -10,8 +10,6 @@ import java.util.concurrent.locks.LockSupport;
 
 @RequiredArgsConstructor
 public class Loader{
-
-    private final AtomicInteger counterUpdate = new AtomicInteger(0);
 
     @Getter
     private final String labelRaw = " %.0fu/s Computo: %.2fms Ping: %.2fms ";

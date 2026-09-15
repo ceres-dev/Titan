@@ -1,7 +1,8 @@
-package dev.cerez.tahp.utils;
+package dev.cerez.tahp.utils.telemtry;
 
 import dev.cerez.tahp.connector.BaseConnector;
 import dev.cerez.tahp.triangular.utils.TriangularArbitrageOpportunity;
+import dev.cerez.tahp.utils.Configurable;
 import lombok.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -17,8 +18,9 @@ import java.util.concurrent.locks.LockSupport;
 @Data
 @Getter(AccessLevel.NONE)
 @Setter(AccessLevel.NONE)
-public class Telemetry {
+public class Telemetry implements TelemetryConnector, Configurable<Telemetry.TelemetryConfig> {
 
+    @Getter
     private final TelemetryConfig config;
     private final Executor executor = Executors.newSingleThreadExecutor();
 
@@ -29,9 +31,6 @@ public class Telemetry {
     private long totalUpdateCounter = 0;
     private int updateCounterPrev = 0;
     private int updateCounterCurrentInFrameTime = 0;
-
-    @Setter
-    private long currentDeltaDelayPingPongNanoTime = -1;
 
     public Telemetry(TelemetryConfig telemetryConfig) {
         this.config = telemetryConfig;
@@ -92,6 +91,12 @@ public class Telemetry {
         opportunities.addAll(onOpportunities);
     }
 
+    /*Connector*/
+
+    @Setter
+    private long currentDeltaDelayPingPongNanoTime = -1;
+
+    @Override
     public void addRequestConnector(BaseConnector.Method method, String request) {
         if (config.mode != Mode.FULL){
             return;

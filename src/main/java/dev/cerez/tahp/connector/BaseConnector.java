@@ -1,5 +1,6 @@
 package dev.cerez.tahp.connector;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.cerez.tahp.Log;
@@ -9,7 +10,8 @@ import dev.cerez.tahp.connector.exception.NotSetApiKeysException;
 import dev.cerez.tahp.connector.model.BookTickDouble;
 import dev.cerez.tahp.connector.model.Symbol;
 import dev.cerez.tahp.io.IOdata;
-import dev.cerez.tahp.utils.Telemetry;
+import dev.cerez.tahp.utils.telemtry.TelemetryConnector;
+import lombok.Builder;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -40,20 +42,19 @@ import java.util.function.Consumer;
 public abstract class BaseConnector implements Connector {
 
     protected static final int MAX_STREAMS_PER_SUBSCRIBE = 100;
-    protected static final int TIMEOUT = 30;
-    protected static final int COOLDOWN_MS = 1_000;
+//    protected static final int TIMEOUT = 30;
+    protected static final int COOLDOWN_MS = 5_000;
 
     @NotNull  protected final ObjectMapper mapper = new ObjectMapper();
     @NotNull  protected final HttpClient clientHttp = HttpClient.newHttpClient();
     @NotNull  protected final HashMap<String, Symbol> cachedSymbols = new HashMap<>();
     @NotNull  protected final ExecutorService executor = Executors.newFixedThreadPool(8);
-    @NotNull  protected final Map<String, Set<String>> pendingRequest = new HashMap<>();
-    @NotNull  protected final Map<String, WebSocket> webSockets = new HashMap<>();
-    @NotNull  protected final Map<String, Boolean> isStartWebSockets = new HashMap<>();
+    @NotNull  protected final Map<String, WebSocketContainer> webSockets = new HashMap<>();
+    @Getter
+    @NotNull  protected final ConnectorConfig config;
 
-              protected final boolean isTestNet;
     @Nullable protected       Keys apiKey;
-    @Setter   protected       Telemetry telemetry;
+    @Setter   protected       TelemetryConnector telemetry;
 
     @NotNull  private final Object streamIncomingLock = new Object();
     @NotNull  private final StringBuilder streamIncomingMessage = new StringBuilder();
@@ -64,18 +65,11 @@ public abstract class BaseConnector implements Connector {
     protected volatile long deltaClienteToServer = 0;
     protected volatile boolean runLoopers = false;
 
-    @Getter
-    @Setter
-    protected boolean logEndpoint = false;
     @Setter
     protected Consumer<BookTickDouble> consumerBookTicker;
 
-    public BaseConnector() {
-        this.isTestNet = false;
-    }
-
-    public BaseConnector(boolean isTestNet) {
-        this.isTestNet = isTestNet;
+    public BaseConnector(@NotNull ConnectorConfig config) {
+        this.config = config;
     }
 
     public void invalidateCache() {
@@ -101,15 +95,10 @@ public abstract class BaseConnector implements Connector {
 
     @Override
     public void stop() {
-        for (Map.Entry<String, Boolean> entry : isStartWebSockets.entrySet()) {
-            entry.setValue(false);
+        for (Map.Entry<String, WebSocketContainer> entry : webSockets.entrySet()) {
+            entry.getValue().getWebSocket().sendClose(0, "The program has ended.");;
         }
-        for (Map.Entry<String, WebSocket> entry : webSockets.entrySet()) {
-            entry.getValue().sendClose(0, "The program has ended.");
-        }
-        isStartWebSockets.clear();
         webSockets.clear();
-        pendingRequest.clear();
         stopLoopers();
     }
 
@@ -140,10 +129,12 @@ public abstract class BaseConnector implements Connector {
     public void stopLoopers(){
         this.runLoopers = false;
     }
+    private String lastRequestWebSocker = null;
 
     public void initWebSocket(String wwsURL) {
-        if (webSockets.containsKey(wwsURL) && isStartWebSockets.get(wwsURL)) return;
-        webSockets.put(wwsURL, clientHttp.newWebSocketBuilder()
+        WebSocketContainer container = webSockets.computeIfAbsent(wwsURL, WebSocketContainer::new);
+        if (container.isOpen()) return;
+        container.setWebSocket(clientHttp.newWebSocketBuilder()
                 .buildAsync(URI.create(wwsURL), new WebSocket.Listener() {
                     @Override
                     public void onOpen(WebSocket webSocket) {
@@ -156,7 +147,12 @@ public abstract class BaseConnector implements Connector {
                     public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
                         String contentToParse = accumulateMessage(data, last, streamIncomingLock, streamIncomingMessage);
                         if (contentToParse != null) {
-                            handleStreamRaw(wwsURL, contentToParse);
+                            handleStreamRawExpress(wwsURL, contentToParse);
+                            try {
+                                handleStreamRaw(wwsURL, mapper.readTree(contentToParse));
+                            } catch (JsonProcessingException ignored) {
+                                Log.warning("JSON Parsing failed: " + contentToParse);
+                            }
                         }
                         webSocket.request(1);
                         return WebSocket.Listener.super.onText(webSocket, data, last);
@@ -165,31 +161,29 @@ public abstract class BaseConnector implements Connector {
                     @Override
                     @SuppressWarnings("CallToPrintStackTrace")
                     public void onError(WebSocket webSocket, Throwable error) {
-                        Log.error("WebSocket@%s error: ".formatted(wwsURL));
+                        Log.error("WebSocket@%s error: reason=%s cause=%s".formatted(wwsURL, error.getMessage(), error.getCause()));
                         error.printStackTrace();
                         WebSocket.Listener.super.onError(webSocket, error);
                     }
 
                     @Override
                     public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-                        Log.warning("WebSocket@%s closed: Code=%d Reason=%s".formatted(wwsURL, statusCode, reason));
-                        isStartWebSockets.put(wwsURL, false);
+                        Log.error("WebSocket@%s closed: Code=%d Reason=%s LastRequest=%s".formatted(wwsURL, statusCode, reason, lastRequestWebSocker));
                         return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
                     }
                 }).join());
-        isStartWebSockets.put(wwsURL, true);
-        for (String request : pendingRequest.getOrDefault(wwsURL, Collections.emptySet())) {
+        for (String request : container.getPendingRequest()) {
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(COOLDOWN_MS));
             sendWebSocket(request);
         }
         executor.execute(() -> {
-            while (isStartWebSockets.containsKey(wwsURL) && isStartWebSockets.get(wwsURL)) {
+            while (webSockets.containsKey(wwsURL) && webSockets.get(wwsURL).isOpen()) {
                 String ping = getPingPayload(wwsURL);
                 if (ping == null){
                     return;
                 }
                 if (webSockets.containsKey(wwsURL)) {
-                    sendWebSocket(ping);
+                    sendWebSocket(wwsURL, ping);
                     waitingForPong = true;
                     delayPingPongNanoTime = System.nanoTime();
                 }
@@ -202,10 +196,14 @@ public abstract class BaseConnector implements Connector {
         sendWebSocket(sGetWWS(), content);
     }
 
+    @SuppressWarnings("DataFlowIssue")
     public void sendWebSocket(String wwsURL, String content) {
         if (savePendingRequest(wwsURL, content)) return;
-        if (logEndpoint) Log.info("wws=%s@%s", wwsURL, content);
-        webSockets.get(wwsURL).sendText(content.replaceAll("\\s", ""), true);
+        if (config.isLogsRequest()) Log.info("wws=%s@%s", wwsURL, content);
+        lastRequestWebSocker = content;
+        WebSocketContainer container = webSockets.get(wwsURL);
+        container.setLastRequest(content);
+        container.getWebSocket().sendText(content.replaceAll("\\s", ""), true);
     }
 
     protected @NotNull JsonNode sendSignedRequest(@NotNull Method method,
@@ -247,7 +245,7 @@ public abstract class BaseConnector implements Connector {
                     .header("X-MBX-APIKEY", apiKey.key)
                     .method(method.name(), HttpRequest.BodyPublishers.noBody())
                     .build();
-            if (logEndpoint && !getBlackListEndpointLog().contains(endpoint)) Log.info("https=%s %s", method, finalUrl);
+            if (config.isLogsRequest() && !getBlackListEndpointLog().contains(endpoint)) Log.info("https=%s %s", method, finalUrl);
             JsonNode jsonRaw = null;
             try {
                 HttpResponse<String> response = clientHttp.send(request, HttpResponse.BodyHandlers.ofString());
@@ -305,7 +303,7 @@ public abstract class BaseConnector implements Connector {
                 .uri(URI.create(finalUrl))
                 .method(method.toString(), HttpRequest.BodyPublishers.noBody())
                 .build();
-        if (logEndpoint && !getBlackListEndpointLog().contains(endpoint)) Log.info("https=%s %s", method, finalUrl);
+        if (config.isLogsRequest() && !getBlackListEndpointLog().contains(endpoint)) Log.info("https=%s@%s", method, finalUrl);
         String jsonRaw = null;
         if (telemetry != null) telemetry.addRequestConnector(method, finalUrl);
         try {
@@ -389,10 +387,11 @@ public abstract class BaseConnector implements Connector {
     }
 
     protected boolean savePendingRequest(@NotNull String wwsURL, @NotNull String content) {
-        if (webSockets.containsKey(wwsURL) && isStartWebSockets.getOrDefault(wwsURL, false)) {
+        WebSocketContainer container = webSockets.computeIfAbsent(wwsURL, WebSocketContainer::new);
+        if (container.isOpen()) {
             return false;
         } else {
-            pendingRequest.computeIfAbsent(wwsURL, (k) -> new HashSet<>()).add(content);
+            container.getPendingRequest().add(content);
             return true;
         }
     }
@@ -416,8 +415,11 @@ public abstract class BaseConnector implements Connector {
         }
     }
 
-    protected abstract void handleStreamRaw(@NotNull String wwsURL, @NotNull String contentToParse);
+    protected abstract void handleStreamRawExpress(@NotNull String wwsURL, @NotNull String contentToParse);
 
+    protected abstract void handleStreamRaw(@NotNull String wwsURL, @NotNull JsonNode node);
+
+    @Deprecated // No es un método muy genérico para estar aqui
     protected abstract void subscribeBookTickerBatch(@NotNull List<String> symbols);
 
     protected abstract @Nullable String getPingPayload(@NotNull String wwsURL);
@@ -439,5 +441,32 @@ public abstract class BaseConnector implements Connector {
     public abstract static class Keys{
         @NotNull private final String key;
         @NotNull private final String secret;
+    }
+
+    @Data
+    public static class WebSocketContainer{
+        private final String wwsURL;
+        @Nullable
+        private WebSocket webSocket = null;
+        @Nullable
+        private String lastRequest = null;
+        private final List<String> pendingRequest = Collections.synchronizedList(new LinkedList<>());
+
+        public boolean isClosed(){
+            return webSocket == null || webSocket.isInputClosed() || webSocket.isOutputClosed();
+        }
+
+        public boolean isOpen(){
+            return !isClosed();
+        }
+    }
+
+    @Builder
+    @Data
+    public static class ConnectorConfig{
+        @Builder.Default private int maxStreamsPerSubscribe = 200;
+        @Builder.Default private long cooldownMsPerRequest = 1_000;
+        @Builder.Default private boolean isTestNet = true;
+        @Builder.Default private boolean logsRequest = false;
     }
 }

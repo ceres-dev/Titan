@@ -5,7 +5,9 @@ import dev.cerez.tahp.connector.model.BookTickDouble;
 import dev.cerez.tahp.connector.model.Symbol;
 import dev.cerez.tahp.triangular.engine.model.NameAsset;
 import dev.cerez.tahp.triangular.utils.TriangularArbitrageOpportunity;
+import dev.cerez.tahp.utils.Configurable;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -14,11 +16,12 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @RequiredArgsConstructor
-public abstract class SearchTriangularEngine {
+public abstract class SearchTriangularEngine implements Configurable<SearchTriangularEngine.EngineConfig> {
 
     public static final double PROFIT_EPSILON = 1e-12;
 
-    protected final EngineConfig engineConfig;
+    @Getter
+    protected final EngineConfig config;
     protected final ConcurrentMap<String, TriangularArbitrageOpportunity> lastTriangular = new ConcurrentHashMap<>();
     protected final ConcurrentMap<String, BookTickDouble> liveTickers = new ConcurrentHashMap<>();
     protected final ConcurrentMap<String, NameAssetIndexed> nameAssetCache = new ConcurrentHashMap<>();
@@ -72,7 +75,7 @@ public abstract class SearchTriangularEngine {
         int preferredIndex = -1;
         int i = 0;
         for (ArbitrageEdge edge : cycleEdges) {
-            if (engineConfig.getPreferredStartAsset().equals(edge.getFromAsset().getName())) {
+            if (config.getPreferredStartAsset().equals(edge.getFromAsset().getName())) {
                 preferredIndex = i;
                 break;
             }
@@ -133,18 +136,27 @@ public abstract class SearchTriangularEngine {
         private static final AtomicInteger indexCurrent = new AtomicInteger(0);
         private static final ConcurrentMap<String, Integer> indexes = new ConcurrentHashMap<>();
 
+        private final int index;
+
         public NameAssetIndexed(String asset) {
-            super(asset, indexes.computeIfAbsent(asset, (a) -> indexCurrent.getAndIncrement()));
+            super(asset);
+            if (indexes.containsKey(asset)) throw new IllegalCallerException("No se puede dos instancia con asset iguales");
+            this.index = indexes.computeIfAbsent(asset, (a) -> indexCurrent.getAndIncrement());
         }
 
         public static int currentIndex() {
             return indexCurrent.get();
         }
+
+        @Override
+        public int hashCode() {
+            return index;
+        }
     }
 
     @Data
-    @Builder
-    public static final class EngineConfig {
+    @SuperBuilder
+    public static class EngineConfig {
         @Builder.Default public int maxSymbols = 1500;
         @Builder.Default public double defaultFeeRate = 0.001;
         @Builder.Default public double defaultStartAmount = 10d;

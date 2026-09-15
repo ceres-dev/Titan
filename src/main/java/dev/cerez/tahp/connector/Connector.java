@@ -2,7 +2,8 @@ package dev.cerez.tahp.connector;
 
 import dev.cerez.tahp.connector.model.*;
 import dev.cerez.tahp.utils.Switch;
-import dev.cerez.tahp.utils.Telemetryable;
+import dev.cerez.tahp.utils.telemtry.TelemetryConnector;
+import dev.cerez.tahp.utils.telemtry.Telemetryable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -11,7 +12,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.function.Consumer;
 
-public interface Connector extends Switch, AutoCloseable, Telemetryable {
+public interface Connector extends Switch, AutoCloseable, Telemetryable<TelemetryConnector> {
 
     @NotNull Map<String, Symbol> sGetAllSymbols();
 

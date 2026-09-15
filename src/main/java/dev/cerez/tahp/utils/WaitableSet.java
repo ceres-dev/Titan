@@ -1,8 +1,12 @@
 package dev.cerez.tahp.utils;
 
+import org.jetbrains.annotations.NotNull;
+
+import java.sql.Time;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -65,15 +69,30 @@ public class WaitableSet<T> {
         }
     }
 
-    public void awaitEmpty() {
+    public void awaitEmpty() throws InterruptedException {
         lock.lock();
         try {
             while (!elements.isEmpty()) {
                 emptyCondition.await();
             }
-        } catch (InterruptedException ignored) {
+        } finally {
+            lock.unlock();
+        }
+    }
 
-        }finally {
+    @SuppressWarnings("UnusedReturnValue")
+    public boolean awaitEmpty(long timeout, @NotNull TimeUnit timeUnite) throws InterruptedException {
+        lock.lock();
+        try {
+            long remaining = timeUnite.toNanos(timeout);
+
+            while (!elements.isEmpty() && remaining > 0) {
+                remaining = emptyCondition.awaitNanos(remaining);
+            }
+            boolean result = elements.isEmpty();
+            elements.clear();
+            return result;
+        } finally {
             lock.unlock();
         }
     }

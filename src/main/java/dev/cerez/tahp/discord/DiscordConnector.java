@@ -2,6 +2,7 @@ package dev.cerez.tahp.discord;
 
 import dev.cerez.tahp.Main;
 import dev.cerez.tahp.io.IOdata;
+import dev.cerez.tahp.utils.Configurable;
 import dev.cerez.tahp.utils.Switch;
 import lombok.*;
 import net.dv8tion.jda.api.JDA;
@@ -13,9 +14,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 @RequiredArgsConstructor
-public class DiscordConnector implements Switch {
+public class DiscordConnector implements Switch, Configurable<DiscordConnector.DiscordConfig> {
 
     private final @NotNull String token;
+    @Getter
     private final @NotNull DiscordConfig config;
     private final @NotNull JDA jda;
 
@@ -37,7 +39,7 @@ public class DiscordConnector implements Switch {
         isStarted = true;
         Main.executor.execute(() -> {
             while (isStarted) {
-                LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(2));
+                LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(4));
                 if (statusProfiler == null) continue;
                 StatusProfiler.PresenceProfile presenceProfiler = statusProfiler.getPresenceProfile();
                 jda.getPresence().setStatus(presenceProfiler.onlineStatus());
