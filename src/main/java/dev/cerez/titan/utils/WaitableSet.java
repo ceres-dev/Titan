@@ -1,5 +1,7 @@
 package dev.cerez.titan.utils;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
@@ -9,6 +11,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+@ToString
+@EqualsAndHashCode
 public class WaitableSet<T> {
 
     private final Set<T> elements = new HashSet<>();

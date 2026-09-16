@@ -4,11 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.Main;
 import dev.cerez.titan.connector.connectors.exception.BinanceApiException;
 import dev.cerez.titan.connector.connectors.exception.BinanceDefaultApiException;
-import dev.cerez.titan.connector.connectors.exception.binance.PostOnlyRejectException;
-import dev.cerez.titan.connector.connectors.exception.binance.SystemNotEnoughAssetException;
+import dev.cerez.titan.connector.connectors.exception.binance.*;
 import dev.cerez.titan.connector.exception.ApiException;
-import dev.cerez.titan.connector.connectors.exception.binance.ReduceOnlyRejectException;
-import dev.cerez.titan.connector.connectors.exception.binance.UnknownOrderException;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.model.*;
@@ -290,6 +287,7 @@ public final class BinanceConnector extends BaseConnector {
             String msg = "Error: Code=%d Message=%s Request=%s Method=%s".formatted(code, response.get("msg").asText(), request.uri().toString(), request.method());
             if (code != 200) switch (code) {
                 case -2011 -> throw new UnknownOrderException(code, msg, request);
+                case -2019 -> throw new MarginNotSufficienException(code, msg, request);
                 case -2022 -> throw new ReduceOnlyRejectException(code, msg, request);
                 case -5022 -> throw new PostOnlyRejectException(code, msg, request);
                 case -3045 -> throw new SystemNotEnoughAssetException(code, msg, request);
@@ -459,7 +457,12 @@ public final class BinanceConnector extends BaseConnector {
         sendSignedRequest(fGetHttps(), Method.POST, "/fapi/v1/order", params);
     }
 
-    public void fSendOrderToLimit(@NotNull String symbol, @NotNull SideOrder sideOrder, @NotNull BigDecimal amountBase, @Nullable String nameOrder, @NotNull BigDecimal price, boolean reduceOnly) throws PostOnlyRejectException, ReduceOnlyRejectException {
+    public void fSendOrderToLimit(@NotNull String symbol,
+                                  @NotNull SideOrder sideOrder, @NotNull BigDecimal amountBase,
+                                  @Nullable String nameOrder,
+                                  @NotNull BigDecimal price,
+                                  boolean reduceOnly
+    ) throws PostOnlyRejectException, ReduceOnlyRejectException, MarginNotSufficienException {
         Map<String, Object> params = new HashMap<>();
         Symbol s = fGetAllSymbols().get(symbol);
         params.put("symbol", symbol.toUpperCase(Locale.US));
@@ -495,7 +498,8 @@ public final class BinanceConnector extends BaseConnector {
             if (node.get("symbol").asText().equals(symbol.toUpperCase(Locale.US))) {
                 return new FuturePosition(
                         new BigDecimal(node.get("positionAmt").asText()),
-                        new BigDecimal(node.get("breakEvenPrice").asText())
+                        new BigDecimal(node.get("entryPrice").asText()),
+                        new BigDecimal(node.get("unRealizedProfit").asText())
                 );
             }
         }
@@ -918,7 +922,7 @@ public final class BinanceConnector extends BaseConnector {
 
     public record Convert(double fromMin, double fromMax, double toMin, double toMax) {}
 
-    public record FuturePosition(BigDecimal quantity, BigDecimal breakEventPrice) {}
+    public record FuturePosition(@NotNull BigDecimal quantity, @NotNull BigDecimal entryPriceAvg, @NotNull BigDecimal pnlUnrealize) {}
 
     public record BookTick(BigDecimal bidPrice, BigDecimal bidQty, BigDecimal askPrice, BigDecimal askQty){}
 

@@ -6,7 +6,9 @@ import dev.cerez.titan.discord.DiscordConnector;
 import lombok.Getter;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class Main {
 
@@ -18,7 +20,7 @@ public class Main {
     private static final Main instance = new Main();
     private static final CommandHander commandHandler = new CommandHander();
 
-    public static final Executor executor = Executors.newFixedThreadPool(8);
+    public static final ScheduledExecutorService executor = Executors.newScheduledThreadPool(16);
     public static final boolean IS_TESTNET = false;
 
     @Getter
