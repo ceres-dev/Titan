@@ -8,10 +8,12 @@ import dev.cerez.titan.connector.connectors.exception.binance.MarginNotSufficien
 import dev.cerez.titan.connector.connectors.exception.binance.PostOnlyRejectException;
 import dev.cerez.titan.connector.connectors.exception.binance.ReduceOnlyRejectException;
 import dev.cerez.titan.connector.connectors.exception.binance.UnknownOrderException;
+import dev.cerez.titan.connector.model.OrderResult;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.discord.StatusProfiler;
+import dev.cerez.titan.grid.model.SidePosition;
 import dev.cerez.titan.utils.Configurable;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.Utils;
@@ -157,70 +159,123 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
                                                             @Nullable BigDecimal entryPriceAvg
     ) {
         List<OrderPreview> result = new ArrayList<>();
+        CreateOrdersParameter parameter = new CreateOrdersParameter(currentPrice, position, entryPriceAvg);
+        SidePosition sidePosition = Utils.toPosition(position);
+        switch (config.typeGrid){
+            case LONG, SHORT -> {
+                SideOrder side = config.typeGrid == TypeGrid.LONG
+                        ? SideOrder.BUY
+                        : SideOrder.SELL;
 
-        if (config.typeGrid == TypeGrid.LONG || config.typeGrid == TypeGrid.BOTH) {
-            List<OrderPreview> open = createOpenOrders(currentPrice, position, balance, entryPriceAvg, SideOrder.BUY);
-            result.addAll(open);
-            result.addAll(createReduceOrders(currentPrice, position, entryPriceAvg, open.size(), SideOrder.SELL));
-        }
+                // Si la posición es inversa a la estrategia. Primero crea las orders de reducción y se obtiene el levelUse
+                // para pasárselo a createOpenOrders. En caso contrario primero se crea las órdenes de incrementos y luego
+                // las órdenes de reducción
+                boolean isPositionInverse = !Utils.isEqualSide(side, sidePosition);
+                int levelOffset;
+                if (isPositionInverse) {
+                    CreateOrdersResult reduceOrdersResult = createReduceOrders(parameter, null);
+                    result.addAll(reduceOrdersResult.orders());
+                    levelOffset = reduceOrdersResult.levesUse();
+                }else {
+                    levelOffset = 0;
+                }
 
-        if (config.typeGrid == TypeGrid.SHORT || config.typeGrid == TypeGrid.BOTH) {
-            List<OrderPreview> open = createOpenOrders(currentPrice, position, balance, entryPriceAvg, SideOrder.SELL);
-            result.addAll(open);
-            result.addAll(createReduceOrders(currentPrice, position, entryPriceAvg, open.size(), SideOrder.BUY));
+                CreateOrdersResult increaseOrdersRsult = createOpenOrders(parameter, balance, side, levelOffset);
+                result.addAll(increaseOrdersRsult.orders());
+
+                if (!isPositionInverse) result.addAll(createReduceOrders(parameter, increaseOrdersRsult.amountOrders()).orders());
+
+            }
+            case BOTH -> {
+                switch (sidePosition){
+                    case NOTHING -> {
+                        result.addAll(createOpenOrders(parameter, balance, SideOrder.BUY, 0).orders());
+                        result.addAll(createOpenOrders(parameter, balance, SideOrder.SELL, 0).orders());
+                    }
+                    case LONG, SHORT -> {
+                        CreateOrdersParameter parameterWithoutPosicion = new CreateOrdersParameter(currentPrice, BigDecimal.ZERO, entryPriceAvg);
+
+                        CreateOrdersResult increaseOrders;
+                        CreateOrdersResult reduceOrders;
+                        CreateOrdersResult inverseOrders;
+                        if (sidePosition == SidePosition.LONG){
+                            // Long
+                            increaseOrders = createOpenOrders(parameter, balance, SideOrder.BUY, 0);
+                            reduceOrders   = createReduceOrders(parameter, increaseOrders.amountOrders());
+                            inverseOrders  = createOpenOrders(parameterWithoutPosicion, balance, SideOrder.SELL, reduceOrders.levesUse());
+                        }else {
+                            // Short
+                            increaseOrders = createOpenOrders(parameter, balance, SideOrder.SELL, 0);
+                            reduceOrders   = createReduceOrders(parameter, increaseOrders.amountOrders());
+                            inverseOrders  = createOpenOrders(parameterWithoutPosicion, balance, SideOrder.BUY, increaseOrders.levesUse());
+                        }
+                        result.addAll(increaseOrders.orders());
+                        result.addAll(reduceOrders.orders());
+                        result.addAll(inverseOrders.orders());
+                    }
+                }
+            }
         }
 
         return result;
     }
 
-    private @NotNull List<OrderPreview> createReduceOrders(@NotNull BigDecimal currentPrice,
-                                                           @NotNull BigDecimal position,
-                                                           @Nullable BigDecimal entryProceAvg,
-                                                           int opens,
-                                                           @NotNull SideOrder side
+    private @NotNull CreateOrdersResult createReduceOrders(@NotNull CreateOrdersParameter createOrdersParameter,
+                                                           @Nullable Integer increaseOrdersAmount
     ) {
+        BigDecimal currentPrice = createOrdersParameter.currentPrice();
+        BigDecimal position = createOrdersParameter.position();
+        BigDecimal entryPriceAvg = createOrdersParameter.entryPriceAvg();
         List<OrderPreview> result = new ArrayList<>();
-        boolean isLong = side == SideOrder.BUY;
+        if (position.signum() == 0) {
+            return new CreateOrdersResult(result, 0, 0, null);
+        }
+        // Si la posición es negativa es un short y requiere órdenes de compra para cerrarla
+        boolean isBuy = position.signum() == -1;
+        SideOrder side = Utils.toSide(position).inverse();
 
         BigDecimal AmountPositionToClose;
-        if (isLong) {
-            // Si se está creando una orde de cierre en buy eso quiere decir que la posición es un short y por ente la cantidad en negativa
+        if (isBuy) {
+            // Si se está creando una orde de cierre en compra eso quiere decir que la posición es un short y por ente la cantidad en negativa
             // No se usa ABS por qué puede ser una posición long dando como resultado posición negativa a la que cerrar
             AmountPositionToClose = position.multiply(new BigDecimal("-1"));
         }else {
             AmountPositionToClose = position;
         }
 
-        int direction = isLong ? -1 : 1;
+        int direction = isBuy ? -1 : 1;
         BigDecimal usedMargin = BigDecimal.ZERO;
         Symbol symbols = connector.fGetAllSymbols().get(symbol);
         boolean isFirstProfit = true;
+        int levelUse = 0;
         for (int i = 1; ; i++) {
+            levelUse++;
             BigDecimal targetPrice = gridPrice(
                     currentPrice,
                     config.stepSize,
-                    direction * i + (isLong ? 1 : 0)
-            ).add((isLong ? BigDecimal.ZERO : symbols.getPriceStepSize()).multiply(new BigDecimal(config.amountPriceOffset)));
+                    direction * i + (isBuy ? 1 : 0)
+            ).add((isBuy ? BigDecimal.ZERO : symbols.getPriceStepSize()).multiply(new BigDecimal(config.amountPriceOffset)));
             // Evitar crear una nueva orden en el mismo precio de se realizó el último filled
             if (lastOrderFilled != null && lastOrderFilled.price().compareTo(targetPrice) == 0) {
                 continue;
             }
 
-            if (entryProceAvg != null) {
-                if (isLong) {
-                    if (entryProceAvg.compareTo(targetPrice) < 0) continue;
+            if (entryPriceAvg != null) {
+                if (isBuy) {
+                    if (entryPriceAvg.compareTo(targetPrice) < 0) continue;
                 }else {
-                    if (entryProceAvg.compareTo(targetPrice) > 0) continue;
+                    if (entryPriceAvg.compareTo(targetPrice) > 0) continue;
                 }
             }
             BigDecimal sizeOrder = config.sizePerOrderBaseAsset.multiply(
-                    isFirstProfit ?
+                    isFirstProfit && increaseOrdersAmount != null ?
                             // Crear una orden de cierre más grande, ya que se está quedando sin órdenes de margen
-                    new BigDecimal(Math.max(1, 5 - opens)) :
+                    new BigDecimal(Math.max(1, 5 - increaseOrdersAmount)) :
                     new BigDecimal("1")
             );
             BigDecimal newUsedMargin = usedMargin.add(sizeOrder);
             if (newUsedMargin.compareTo(AmountPositionToClose) > 0) {
+                levelUse--;
                 break;
             }
             isFirstProfit = false;
@@ -228,18 +283,22 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
             result.add(new OrderPreview(targetPrice, side, sizeOrder, true, Utils.uuidToBase36(UUID.randomUUID())));
         }
 
-        return result;
+
+        return new CreateOrdersResult(result, levelUse, result.size(), side);
     }
 
-    private @NotNull List<OrderPreview> createOpenOrders(@NotNull BigDecimal currentPrice,
-                                                         @NotNull BigDecimal position,
+    private @NotNull CreateOrdersResult createOpenOrders(@NotNull CreateOrdersParameter createOrdersParameter,
                                                          @NotNull BigDecimal balance,
-                                                         @NotNull BigDecimal entryPriceAvg,
-                                                         @NotNull SideOrder side
+                                                         @NotNull SideOrder side,
+                                                         int offsetLevel
     ) {
+        BigDecimal currentPrice = createOrdersParameter.currentPrice();
+        BigDecimal position = createOrdersParameter.position();
+        BigDecimal entryPriceAvg = createOrdersParameter.entryPriceAvg();
         List<OrderPreview> result = new ArrayList<>();
         BigDecimal availableQuote;
         boolean isLongOrder = side == SideOrder.BUY;
+
         if (isLongOrder) {
             availableQuote = balance.subtract(position.multiply(currentPrice).divide(new BigDecimal(config.leverage), 12 , RoundingMode.HALF_EVEN));
         }else {
@@ -250,8 +309,10 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
         int direction = isLongOrder ? -1 : 1;
         BigDecimal usedMargin = BigDecimal.ZERO;
         Symbol symbols = connector.fGetAllSymbols().get(symbol);
-        for (int i = 1; ; i++) {
-            BigDecimal price = gridPrice(
+        int levelUse = 0;
+        for (int i = 1 + offsetLevel; ; i++) {
+            levelUse++;
+            BigDecimal targetPrice = gridPrice(
                     currentPrice,
                     config.stepSize,
                     direction * i + (side == SideOrder.BUY ? 1 : 0)
@@ -259,28 +320,32 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
             ).add((isLongOrder ? BigDecimal.ZERO : symbols.getPriceStepSize()).multiply(new BigDecimal(config.amountPriceOffset)));
             // Si la posición es long, pero intenta enviar una orden de venta debe estar por encima del entryPriceAvg
             if (position.signum() == 1 && !isLongOrder) {
-                // Si es menor el precio es menor, omitir
-                if (price.compareTo(entryPriceAvg) < 0) continue;
+                if (targetPrice.compareTo(entryPriceAvg) < 0) continue;
             }
             // Si la posición es short, pero intenta enviar una orden de compra debe estar por debajo del entryPriceAvg
             if (position.signum() == -1 && isLongOrder) {
-                // Si es mayor el precio es menor, omitir
-                if (price.compareTo(entryPriceAvg) > 0) continue;
+                if (targetPrice.compareTo(entryPriceAvg) > 0) continue;
             }
-            if (lastOrderFilled != null && lastOrderFilled.price().compareTo(price) == 0 && lastOrderFilled.sideOrder() == side) continue;
-            BigDecimal notional = config.sizePerOrderBaseAsset.multiply(price);
+            if (lastOrderFilled != null && lastOrderFilled.price().compareTo(targetPrice) == 0 && lastOrderFilled.sideOrder() == side) continue;
+            BigDecimal notional = config.sizePerOrderBaseAsset.multiply(targetPrice);
             BigDecimal orderMargin = notional.divide(leverage, 12, RoundingMode.CEILING);
             BigDecimal newUsedMargin = usedMargin.add(orderMargin);
             // dejar un margen del 10%
             if (newUsedMargin.compareTo(availableQuote.multiply(new BigDecimal("0.9"))) > 0) {
+                levelUse--;
                 break;
             }
+
             usedMargin = newUsedMargin;
-            result.add(new OrderPreview(price, side, config.sizePerOrderBaseAsset, false, Utils.uuidToBase36(UUID.randomUUID())));
+            result.add(new OrderPreview(targetPrice, side, config.sizePerOrderBaseAsset, false, Utils.uuidToBase36(UUID.randomUUID())));
         }
 
-        return result;
+        return new CreateOrdersResult(result, levelUse, result.size(), side);
     }
+
+    private record CreateOrdersResult(@NotNull List<OrderPreview> orders, int levesUse, int amountOrders, SideOrder sideOrder) {}
+    //TODO: Hacer una clase builder donde el computerize las ordenes
+    private record CreateOrdersParameter(@NotNull BigDecimal currentPrice, @NotNull BigDecimal position, @Nullable BigDecimal entryPriceAvg){}
 
     private void reconcileOrders(@NotNull List<BinanceConnector.FutureOrder> currentOrders, @NotNull List<OrderPreview> desiredOrders) {
         Set<String> keptOrders = new HashSet<>();
