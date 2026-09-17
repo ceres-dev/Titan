@@ -231,15 +231,17 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
         int direction = isBuy ? -1 : 1;
         BigDecimal usedMargin = BigDecimal.ZERO;
         Symbol symbols = connector.fGetAllSymbols().get(symbol);
+        BigDecimal priceOffset = (isBuy ? BigDecimal.ZERO : symbols.getPriceStepSize()).multiply(new BigDecimal(config.amountPriceOffset));
         boolean isFirstProfit = true;
         int levelUse = 0;
-        for (int i = 1; ; i++) {
+        for (int i = 0; ; i++) {
             levelUse++;
             BigDecimal targetPrice = gridPrice(
-                    currentPrice,
+                    currentPrice.subtract(priceOffset),
                     config.stepSize,
-                    direction * i + (isBuy ? 1 : 0)
-            ).add((isBuy ? BigDecimal.ZERO : symbols.getPriceStepSize()).multiply(new BigDecimal(config.amountPriceOffset)));
+                    direction * i,
+                    isBuy
+            ).add(priceOffset);
             // Evitar crear una nueva orden en el mismo precio de se realizó el último filled
             if (lastOrderFilled != null && lastOrderFilled.price().compareTo(targetPrice) == 0) {
                 continue;
@@ -282,33 +284,34 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
         BigDecimal entryPriceAvg = createOrdersParameter.entryPriceAvg();
         List<OrderPreview> result = new ArrayList<>();
         BigDecimal availableQuote;
-        boolean isLongOrder = side == SideOrder.BUY;
+        boolean isBuyOrder = side == SideOrder.BUY;
 
-        if (isLongOrder) {
+        if (isBuyOrder) {
             availableQuote = balance.subtract(position.multiply(currentPrice).divide(new BigDecimal(config.leverage), 12 , RoundingMode.HALF_EVEN));
         }else {
             availableQuote = balance.add(position.multiply(currentPrice).divide(new BigDecimal(config.leverage), 12 , RoundingMode.HALF_EVEN));
         }
         BigDecimal leverage = BigDecimal.valueOf(config.leverage);
 
-        int direction = isLongOrder ? -1 : 1;
+        int direction = isBuyOrder ? -1 : 1;
         BigDecimal usedMargin = BigDecimal.ZERO;
         Symbol symbols = connector.fGetAllSymbols().get(symbol);
+        BigDecimal priceOffset = (isBuyOrder ? BigDecimal.ZERO : symbols.getPriceStepSize()).multiply(new BigDecimal(config.amountPriceOffset));
         int levelUse = 0;
-        for (int i = 1 + offsetLevel; ; i++) {
+        for (int i = offsetLevel; ; i++) {
             levelUse++;
             BigDecimal targetPrice = gridPrice(
-                    currentPrice,
+                    currentPrice.subtract(priceOffset),
                     config.stepSize,
-                    direction * i + (side == SideOrder.BUY ? 1 : 0)
-                    // En caso de que sea una orden de venta agrega un offset en el precio
-            ).add((isLongOrder ? BigDecimal.ZERO : symbols.getPriceStepSize()).multiply(new BigDecimal(config.amountPriceOffset)));
+                    direction * i,
+                    isBuyOrder
+            ).add(priceOffset);
             // Si la posición es long, pero intenta enviar una orden de venta debe estar por encima del entryPriceAvg
-            if (position.signum() == 1 && !isLongOrder) {
+            if (position.signum() == 1 && !isBuyOrder) {
                 if (targetPrice.compareTo(entryPriceAvg) < 0) continue;
             }
             // Si la posición es short, pero intenta enviar una orden de compra debe estar por debajo del entryPriceAvg
-            if (position.signum() == -1 && isLongOrder) {
+            if (position.signum() == -1 && isBuyOrder) {
                 if (targetPrice.compareTo(entryPriceAvg) > 0) continue;
             }
             if (lastOrderFilled != null && lastOrderFilled.price().compareTo(targetPrice) == 0 && lastOrderFilled.sideOrder() == side) continue;
@@ -413,9 +416,9 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
     }
 
 
-    private static @NotNull BigDecimal gridPrice(@NotNull BigDecimal currentPrice, @NotNull BigDecimal stepSize,int level) {
-        BigDecimal base = currentPrice.divide(stepSize, 0, RoundingMode.FLOOR).multiply(stepSize);
-        return base.add(stepSize.multiply( BigDecimal.valueOf(level)));
+    private static @NotNull BigDecimal gridPrice(@NotNull BigDecimal currentPrice, @NotNull BigDecimal stepSize,int level, boolean isBuy) {
+        BigDecimal base = currentPrice.divide(stepSize, 0, isBuy ? RoundingMode.FLOOR : RoundingMode.CEILING).multiply(stepSize);
+        return base.add(stepSize.multiply(BigDecimal.valueOf(level)));
     }
 
     private record OrderPreview(

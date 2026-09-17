@@ -96,6 +96,7 @@ public final class BinanceConnector extends BaseConnector {
             stream = "";
         }
         String key = wwsURL + (stream.isEmpty() ? "" : "@") + stream;
+
         Consumer<JsonNode> consumer = consumerStreamsMap.get(key);
         if (consumer == null) return;
         if (node.has("data")) {
@@ -110,9 +111,9 @@ public final class BinanceConnector extends BaseConnector {
         initWebSocket(config.isTestNet() ? BASE_TESTNET_WWS : BASE_WWS);
         initWebSocket(this.fGetWWS());
         initWebSocket(this.sGetWWS());
-        initWebSocket(this.uGetWWS());
         super.start();
         fStartUserData();
+        initWebSocket(this.uGetWWS());
     }
 
     @Override
