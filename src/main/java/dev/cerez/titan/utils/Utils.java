@@ -1,8 +1,8 @@
 package dev.cerez.titan.utils;
 
 import dev.cerez.titan.connector.model.SideOrder;
-import dev.cerez.titan.grid.GridManager;
-import dev.cerez.titan.grid.model.SidePosition;
+import dev.cerez.titan.strategy.grid.GridManager;
+import dev.cerez.titan.strategy.grid.model.SidePosition;
 import lombok.experimental.UtilityClass;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;

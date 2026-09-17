@@ -4,10 +4,10 @@ import dev.cerez.titan.Log;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.triangular.TriangularManager;
-import dev.cerez.titan.triangular.engine.engines.SearchTriangularEngineJava;
-import dev.cerez.titan.triangular.ExecutorCycles;
-import dev.cerez.titan.triangular.utils.Loader;
+import dev.cerez.titan.strategy.triangular.TriangularManager;
+import dev.cerez.titan.strategy.triangular.engine.engines.SearchTriangularEngineJava;
+import dev.cerez.titan.strategy.triangular.ExecutorCycles;
+import dev.cerez.titan.strategy.triangular.utils.Loader;
 import dev.cerez.titan.utils.telemtry.Telemetry;
 import org.jetbrains.annotations.NotNull;
 

@@ -3,7 +3,7 @@ package dev.cerez.titan.command.commands;
 import dev.cerez.titan.Main;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.discord.DiscordConnector;
-import dev.cerez.titan.grid.GridManager;
+import dev.cerez.titan.strategy.grid.GridManager;
 import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 

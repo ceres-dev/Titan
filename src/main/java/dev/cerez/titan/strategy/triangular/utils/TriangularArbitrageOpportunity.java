@@ -1,6 +1,6 @@
-package dev.cerez.titan.triangular.utils;
+package dev.cerez.titan.strategy.triangular.utils;
 
-import dev.cerez.titan.triangular.engine.SearchTriangularEngine;
+import dev.cerez.titan.strategy.triangular.engine.SearchTriangularEngine;
 import lombok.Data;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;

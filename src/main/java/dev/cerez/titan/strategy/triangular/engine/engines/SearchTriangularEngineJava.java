@@ -1,13 +1,13 @@
-package dev.cerez.titan.triangular.engine.engines;
+package dev.cerez.titan.strategy.triangular.engine.engines;
 
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
-import dev.cerez.titan.triangular.engine.SearchTriangularEngine;
-import dev.cerez.titan.triangular.engine.model.NameAsset;
-import dev.cerez.titan.triangular.engine.model.StackArrayListFixed;
-import dev.cerez.titan.triangular.utils.SimulateCycles;
-import dev.cerez.titan.triangular.utils.TriangularArbitrageOpportunity;
+import dev.cerez.titan.strategy.triangular.engine.SearchTriangularEngine;
+import dev.cerez.titan.strategy.triangular.engine.model.NameAsset;
+import dev.cerez.titan.strategy.triangular.engine.model.StackArrayListFixed;
+import dev.cerez.titan.strategy.triangular.utils.SimulateCycles;
+import dev.cerez.titan.strategy.triangular.utils.TriangularArbitrageOpportunity;
 import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

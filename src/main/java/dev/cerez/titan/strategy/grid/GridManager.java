@@ -1,4 +1,4 @@
-package dev.cerez.titan.grid;
+package dev.cerez.titan.strategy.grid;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.Log;
@@ -12,7 +12,7 @@ import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.discord.StatusProfiler;
-import dev.cerez.titan.grid.model.SidePosition;
+import dev.cerez.titan.strategy.grid.model.SidePosition;
 import dev.cerez.titan.utils.Configurable;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.Utils;

@@ -1,4 +1,4 @@
-package dev.cerez.titan.fuding;
+package dev.cerez.titan.strategy.fuding;
 
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import lombok.Getter;

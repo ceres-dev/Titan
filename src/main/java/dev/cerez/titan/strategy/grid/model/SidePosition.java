@@ -1,6 +1,5 @@
-package dev.cerez.titan.grid.model;
+package dev.cerez.titan.strategy.grid.model;
 
-import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.utils.Side;
 
 public enum SidePosition implements Side<SidePosition> {

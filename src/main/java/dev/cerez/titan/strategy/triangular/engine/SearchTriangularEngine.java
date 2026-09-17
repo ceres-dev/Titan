@@ -1,10 +1,10 @@
-package dev.cerez.titan.triangular.engine;
+package dev.cerez.titan.strategy.triangular.engine;
 
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
-import dev.cerez.titan.triangular.engine.model.NameAsset;
-import dev.cerez.titan.triangular.utils.TriangularArbitrageOpportunity;
+import dev.cerez.titan.strategy.triangular.engine.model.NameAsset;
+import dev.cerez.titan.strategy.triangular.utils.TriangularArbitrageOpportunity;
 import dev.cerez.titan.utils.Configurable;
 import lombok.*;
 import lombok.experimental.SuperBuilder;

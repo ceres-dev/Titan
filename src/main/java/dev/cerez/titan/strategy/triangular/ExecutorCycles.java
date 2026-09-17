@@ -1,4 +1,4 @@
-package dev.cerez.titan.triangular;
+package dev.cerez.titan.strategy.triangular;
 
 import dev.cerez.titan.Log;
 import dev.cerez.titan.connector.exception.ApiException;
@@ -6,8 +6,8 @@ import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.model.OrderResult;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.Symbol;
-import dev.cerez.titan.triangular.engine.SearchTriangularEngine;
-import dev.cerez.titan.triangular.utils.TriangularArbitrageOpportunity;
+import dev.cerez.titan.strategy.triangular.engine.SearchTriangularEngine;
+import dev.cerez.titan.strategy.triangular.utils.TriangularArbitrageOpportunity;
 import dev.cerez.titan.utils.Utils;
 import lombok.Builder;
 import lombok.Getter;

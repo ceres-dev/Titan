@@ -1,4 +1,4 @@
-package dev.cerez.titan.triangular.utils;
+package dev.cerez.titan.strategy.triangular.utils;
 
 import dev.cerez.titan.utils.telemtry.Telemetry;
 import lombok.Getter;

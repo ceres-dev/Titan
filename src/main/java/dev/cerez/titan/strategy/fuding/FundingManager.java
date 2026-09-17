@@ -1,4 +1,4 @@
-package dev.cerez.titan.fuding;
+package dev.cerez.titan.strategy.fuding;
 
 import dev.cerez.titan.Log;
 import dev.cerez.titan.command.InputUser;

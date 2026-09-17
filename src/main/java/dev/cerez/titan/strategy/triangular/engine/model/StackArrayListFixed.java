@@ -1,4 +1,4 @@
-package dev.cerez.titan.triangular.engine.model;
+package dev.cerez.titan.strategy.triangular.engine.model;
 
 import org.jetbrains.annotations.NotNull;
 
