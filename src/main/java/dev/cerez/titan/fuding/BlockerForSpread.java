@@ -29,19 +29,12 @@ public class BlockerForSpread {
 
     @Blocking
     public void waitEntrySpred(BigDecimal target) {
-        startWebSockets();
         waitSpread(target, true);
     }
 
     @Blocking
     public void waitExitSpread(BigDecimal target) {
-        startWebSockets();
         waitSpread(target, false);
-    }
-
-    private void startWebSockets() {
-        connector.initWebSocket(connector.fGetWWS());
-        connector.initWebSocket(connector.sGetWWS());
     }
 
     private void waitSpread(BigDecimal target, boolean entry) {

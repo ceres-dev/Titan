@@ -1,6 +1,7 @@
 package dev.cerez.titan.utils;
 
 import dev.cerez.titan.connector.model.SideOrder;
+import dev.cerez.titan.grid.GridManager;
 import dev.cerez.titan.grid.model.SidePosition;
 import lombok.experimental.UtilityClass;
 import org.jetbrains.annotations.Contract;
@@ -50,6 +51,26 @@ public class Utils {
             return SideOrder.BUY;
         }
         if (value.signum() == -1){
+            return SideOrder.SELL;
+        }
+        throw new IllegalArgumentException();
+    }
+
+    public SideOrder toSide(GridManager.TypeGrid typeGrid) {
+        if (typeGrid == GridManager.TypeGrid.LONG) {
+            return SideOrder.BUY;
+        }
+        if (typeGrid == GridManager.TypeGrid.SHORT) {
+            return SideOrder.SELL;
+        }
+        throw new IllegalArgumentException();
+    }
+
+    public SideOrder toSide(SidePosition  sidePosition) {
+        if (sidePosition == SidePosition.LONG) {
+            return SideOrder.BUY;
+        }
+        if (sidePosition == SidePosition.SHORT) {
             return SideOrder.SELL;
         }
         throw new IllegalArgumentException();

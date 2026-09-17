@@ -194,19 +194,22 @@ public final class GateConnector extends BaseConnector implements AutoCloseable 
     }
 
     @Override
-    public void unsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener) {
-
+    public void wsSubscribeBookTicker(@NotNull Consumer<BookTickDouble> consumer, @NotNull Collection<String> symbols) {
+        this.consumerBookTicker = consumer;
+        splitStream(symbols, symbol -> {
+            if (symbol.isEmpty()) {
+                return;
+            }
+            String json = """
+            {"time":%d,"channel":"spot.book_ticker","event":"subscribe","payload": [%s]}
+            """.formatted(System.currentTimeMillis(), String.join(",", symbol.stream().map(s -> "\"" + s + "\"").toList()));
+            sendWebSocket(json);
+        });
     }
 
     @Override
-    protected void subscribeBookTickerBatch(@NotNull List<String> symbols) {
-        if (symbols.isEmpty()) {
-            return;
-        }
-        String json = """
-            {"time":%d,"channel":"spot.book_ticker","event":"subscribe","payload": [%s]}
-            """.formatted(System.currentTimeMillis(), String.join(",", symbols.stream().map(s -> "\"" + s + "\"").toList()));
-        sendWebSocket(json);
+    public void wsUnsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener) {
+
     }
 
     @Override

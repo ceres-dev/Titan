@@ -77,16 +77,6 @@ public abstract class BaseConnector implements Connector {
     }
 
     @Override
-    public void subscribeBookTicker(@NotNull Collection<String> symbols) {
-        List<String> streams = new ArrayList<>(symbols);
-        for (int i = 0; i < streams.size(); i += MAX_STREAMS_PER_SUBSCRIBE) {
-            int end = Math.min(i + MAX_STREAMS_PER_SUBSCRIBE, streams.size());
-            subscribeBookTickerBatch(streams.subList(i, end));
-            if (webSockets.get(sGetWWS()) != null) LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(COOLDOWN_MS));
-        }
-    }
-
-    @Override
     public void start(){
         loadApikey();
         initWebSocket(sGetWWS());
@@ -131,7 +121,7 @@ public abstract class BaseConnector implements Connector {
     }
     private String lastRequestWebSocker = null;
 
-    public void initWebSocket(String wwsURL) {
+    protected void initWebSocket(String wwsURL) {
         WebSocketContainer container = webSockets.computeIfAbsent(wwsURL, WebSocketContainer::new);
         if (container.isOpen()) return;
         container.setWebSocket(clientHttp.newWebSocketBuilder()
@@ -386,6 +376,15 @@ public abstract class BaseConnector implements Connector {
         return integerPart + (double) decimalPart / divisor;
     }
 
+    protected  <T> void splitStream(Collection<T> streams, Consumer<List<T>> consumer){
+        List<T> streamsList = new ArrayList<>(streams);
+        for (int i = 0; i < streamsList.size(); i += config.maxStreamsPerSubscribe) {
+            int end = Math.min(i + config.maxStreamsPerSubscribe, streamsList.size());
+            consumer.accept(streamsList.subList(i, end));
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(COOLDOWN_MS));
+        }
+    }
+
     protected boolean savePendingRequest(@NotNull String wwsURL, @NotNull String content) {
         WebSocketContainer container = webSockets.computeIfAbsent(wwsURL, WebSocketContainer::new);
         if (container.isOpen()) {
@@ -418,9 +417,6 @@ public abstract class BaseConnector implements Connector {
     protected abstract void handleStreamRawExpress(@NotNull String wwsURL, @NotNull String contentToParse);
 
     protected abstract void handleStreamRaw(@NotNull String wwsURL, @NotNull JsonNode node);
-
-    @Deprecated // No es un método muy genérico para estar aqui
-    protected abstract void subscribeBookTickerBatch(@NotNull List<String> symbols);
 
     protected abstract @Nullable String getPingPayload(@NotNull String wwsURL);
 

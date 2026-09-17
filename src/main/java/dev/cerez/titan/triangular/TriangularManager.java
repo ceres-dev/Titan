@@ -84,8 +84,7 @@ public class TriangularManager implements Switch, StatusProfiler, Configurable<T
             engine.configure(allSymbolsMap, tickersMap);
             Log.info("<green>Engine Ready: %s.", engine.getClass().getName());
             Log.info("Starting Api...");
-            exchangeApi.setConsumerBookTicker(streamListener = this::onBookTickerUpdate);
-            exchangeApi.subscribeBookTicker(symbolsToSubscribe);
+            exchangeApi.wsSubscribeBookTicker(streamListener = this::onBookTickerUpdate, symbolsToSubscribe);
             exchangeApi.start();
             Log.info("<green>Connector Running: %s", exchangeApi.getClass().getName());
         } catch (InterruptedException e) {
@@ -105,7 +104,7 @@ public class TriangularManager implements Switch, StatusProfiler, Configurable<T
         started = false;
         Consumer<BookTickDouble> listener = streamListener;
         if (listener != null) {
-            exchangeApi.unsubscribeBookTicker(listener);
+            exchangeApi.wsUnsubscribeBookTicker(listener);
         }
         exchangeApi.stop();
         streamListener = null;

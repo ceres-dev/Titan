@@ -180,23 +180,26 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
         return System.currentTimeMillis();
     }
 
-    @Override
-    public void unsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener) {
-
-    }
-
     private final Random random = new Random();
 
     @Override
-    protected void subscribeBookTickerBatch(@NotNull List<String> symbols) {
-        String json = """
+    public void wsSubscribeBookTicker(@NotNull Consumer<BookTickDouble> consumer, @NotNull Collection<String> symbols) {
+        this.consumerBookTicker = consumer;
+        splitStream(symbols, symbol -> {
+            String json = """
             {
               "id":"%s",
               "type":"subscribe",
               "topic":"/spotMarket/level1:%s",
               "response":true}
             """.formatted(random.nextInt(), String.join(",", symbols));
-        sendWebSocket(json);
+            sendWebSocket(json);
+        });
+    }
+
+    @Override
+    public void wsUnsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener) {
+
     }
 
     @Override

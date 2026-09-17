@@ -185,19 +185,22 @@ public final class GeminiConnector extends BaseConnector implements AutoCloseabl
     private final AtomicInteger id = new AtomicInteger();
 
     @Override
-    protected void subscribeBookTickerBatch(@NotNull List<String> symbols) {
-        String params = symbols.stream()
-                .map(s -> "\"" + s + "@bookTicker\"")
-                .collect(Collectors.joining(","));
+    public void wsSubscribeBookTicker(@NotNull Consumer<BookTickDouble> consumer, @NotNull Collection<String> symbols) {
+        this.consumerBookTicker = consumer;
+        splitStream(symbols, symbol -> {
+            String params = symbols.stream()
+                    .map(s -> "\"" + s + "@bookTicker\"")
+                    .collect(Collectors.joining(","));
 
-        String json = """
-        {"id":"%d", "method":"SUBSCRIBE","params":[%s]}
-        """.formatted(id.incrementAndGet(), params);
-        sendWebSocket(json);
+            String json = """
+            {"id":"%d", "method":"SUBSCRIBE","params":[%s]}
+            """.formatted(id.incrementAndGet(), params);
+            sendWebSocket(json);
+        });
     }
 
     @Override
-    public void unsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener) {
+    public void wsUnsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener) {
 
     }
 

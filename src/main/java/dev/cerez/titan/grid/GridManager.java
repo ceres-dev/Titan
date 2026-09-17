@@ -8,7 +8,6 @@ import dev.cerez.titan.connector.connectors.exception.binance.MarginNotSufficien
 import dev.cerez.titan.connector.connectors.exception.binance.PostOnlyRejectException;
 import dev.cerez.titan.connector.connectors.exception.binance.ReduceOnlyRejectException;
 import dev.cerez.titan.connector.connectors.exception.binance.UnknownOrderException;
-import dev.cerez.titan.connector.model.OrderResult;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
 import dev.cerez.titan.connector.model.Symbol;
@@ -76,11 +75,10 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
 
         connector.fGetAllSymbols();
         connector.fSetLeverage(symbol, config.leverage);
-        connector.initWebSocket(connector.uGetWWS());
 
         Log.info("Balance disponible %.4f %s", connector.fGetBalance().get(config.quoteAsset), config.quoteAsset);
         updateGrid();
-        connector.uEventOrderTradeUpdate(payload -> {
+        connector.wuEventOrderTradeUpdate(payload -> {
             JsonNode node = payload.get("o");
             StatusOrder statusOrder = StatusOrder.parse(node.get("x").asText());
             String nameOrder = node.get("c").asText();
@@ -149,6 +147,7 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
                 ? balance
                 // En caso de que tenga una posición con PNL negativo se descuenta del margen usable
                 : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO));
+
         List<OrderPreview> desiredOrders = createDesiredOrders(currentPrice, balanceUse, positionQuantity, entryPriceAvg);
         reconcileOrders(ordersActive, desiredOrders);
     }
@@ -163,55 +162,41 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
         SidePosition sidePosition = Utils.toPosition(position);
         switch (config.typeGrid){
             case LONG, SHORT -> {
-                SideOrder side = config.typeGrid == TypeGrid.LONG
-                        ? SideOrder.BUY
-                        : SideOrder.SELL;
+                SideOrder sideConfig = Utils.toSide(config.typeGrid);
 
                 // Si la posición es inversa a la estrategia. Primero crea las orders de reducción y se obtiene el levelUse
-                // para pasárselo a createOpenOrders. En caso contrario primero se crea las órdenes de incrementos y luego
-                // las órdenes de reducción
-                boolean isPositionInverse = !Utils.isEqualSide(side, sidePosition);
+                // para pasárselo a createOpenOrders. En caso contrario primero se crea las órdenes de incremento y luego
+                // crea las órdenes de reducción
+                boolean isPositionEqualSide = Utils.isEqualSide(sideConfig, sidePosition);
                 int levelOffset;
-                if (isPositionInverse) {
+                if (isPositionEqualSide) {
+                    levelOffset = 0;
+                }else {
                     CreateOrdersResult reduceOrdersResult = createReduceOrders(parameter, null);
                     result.addAll(reduceOrdersResult.orders());
                     levelOffset = reduceOrdersResult.levesUse();
-                }else {
-                    levelOffset = 0;
                 }
 
-                CreateOrdersResult increaseOrdersRsult = createOpenOrders(parameter, balance, side, levelOffset);
+                CreateOrdersResult increaseOrdersRsult = createOpenOrders(parameter, balance, sideConfig, levelOffset);
                 result.addAll(increaseOrdersRsult.orders());
 
-                if (!isPositionInverse) result.addAll(createReduceOrders(parameter, increaseOrdersRsult.amountOrders()).orders());
+                if (isPositionEqualSide) result.addAll(createReduceOrders(parameter, increaseOrdersRsult.amountOrders()).orders());
 
             }
             case BOTH -> {
                 switch (sidePosition){
-                    case NOTHING -> {
-                        result.addAll(createOpenOrders(parameter, balance, SideOrder.BUY, 0).orders());
-                        result.addAll(createOpenOrders(parameter, balance, SideOrder.SELL, 0).orders());
-                    }
                     case LONG, SHORT -> {
                         CreateOrdersParameter parameterWithoutPosicion = new CreateOrdersParameter(currentPrice, BigDecimal.ZERO, entryPriceAvg);
-
-                        CreateOrdersResult increaseOrders;
-                        CreateOrdersResult reduceOrders;
-                        CreateOrdersResult inverseOrders;
-                        if (sidePosition == SidePosition.LONG){
-                            // Long
-                            increaseOrders = createOpenOrders(parameter, balance, SideOrder.BUY, 0);
-                            reduceOrders   = createReduceOrders(parameter, increaseOrders.amountOrders());
-                            inverseOrders  = createOpenOrders(parameterWithoutPosicion, balance, SideOrder.SELL, reduceOrders.levesUse());
-                        }else {
-                            // Short
-                            increaseOrders = createOpenOrders(parameter, balance, SideOrder.SELL, 0);
-                            reduceOrders   = createReduceOrders(parameter, increaseOrders.amountOrders());
-                            inverseOrders  = createOpenOrders(parameterWithoutPosicion, balance, SideOrder.BUY, increaseOrders.levesUse());
-                        }
+                        CreateOrdersResult increaseOrders = createOpenOrders(parameter, balance, Utils.toSide(sidePosition), 0);
+                        CreateOrdersResult reduceOrders = createReduceOrders(parameter, increaseOrders.amountOrders());
+                        CreateOrdersResult inverseOrders = createOpenOrders(parameterWithoutPosicion, balance, Utils.toSide(sidePosition).inverse(), reduceOrders.levesUse());
                         result.addAll(increaseOrders.orders());
                         result.addAll(reduceOrders.orders());
                         result.addAll(inverseOrders.orders());
+                    }
+                    case NOTHING -> {
+                        result.addAll(createOpenOrders(parameter, balance, SideOrder.BUY, 0).orders());
+                        result.addAll(createOpenOrders(parameter, balance, SideOrder.SELL, 0).orders());
                     }
                 }
             }

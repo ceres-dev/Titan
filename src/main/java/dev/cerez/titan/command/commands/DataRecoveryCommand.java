@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import dev.cerez.titan.Log;
+import dev.cerez.titan.Main;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.connectors.exception.binance.SystemNotEnoughAssetException;
@@ -30,6 +31,8 @@ public class DataRecoveryCommand extends BaseCommand {
 
     private final Executor executor = Executors.newFixedThreadPool(6);
 
+    // TODO: crear una clase más organizada
+
     @SneakyThrows
     @Override
     public void execute(@NotNull List<String> args) {
@@ -41,48 +44,54 @@ public class DataRecoveryCommand extends BaseCommand {
         Map<String, FundingData> data = fundingDataStorage.loadLatest();
         Map<String, Symbol> spotSymbol = connector.sGetAllSymbols();
         Map<String, Symbol> futureSymbol = connector.sGetAllSymbols();
-        while (true) {
-            Map<String, BinanceConnector.FundingRate> funding = connector.fGetFundingRate();
+        executor.execute(() -> {
+            try {
+                while (true) {
+                    Map<String, BinanceConnector.FundingRate> funding = connector.fGetFundingRate();
 
-            List<BinanceConnector.FundingRate> top35 = funding.values().stream()
-                    .filter(f -> f.symbol().endsWith("USDT"))
-                    .filter(f -> spotSymbol.containsKey(f.symbol()))
-                    .filter(f -> futureSymbol.containsKey(f.symbol()))
-                    .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRate))
-                    .limit(35)
-                    .toList();
-            Set<String> symbolRecopile = data.keySet();
-            List<BinanceConnector.FundingRate> prevRecopile = funding.values().stream()
-                    .filter(f ->  symbolRecopile.contains(f.symbol()))
-                    .toList();
+                    List<BinanceConnector.FundingRate> top35 = funding.values().stream()
+                            .filter(f -> f.symbol().endsWith("USDT"))
+                            .filter(f -> spotSymbol.containsKey(f.symbol()))
+                            .filter(f -> futureSymbol.containsKey(f.symbol()))
+                            .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRate))
+                            .limit(35)
+                            .toList();
+                    Set<String> symbolRecopile = data.keySet();
+                    List<BinanceConnector.FundingRate> prevRecopile = funding.values().stream()
+                            .filter(f ->  symbolRecopile.contains(f.symbol()))
+                            .toList();
 
-            Set<BinanceConnector.FundingRate> total = new HashSet<>();
-            total.addAll(top35);
-            total.addAll(prevRecopile);
+                    Set<BinanceConnector.FundingRate> total = new HashSet<>();
+                    total.addAll(top35);
+                    total.addAll(prevRecopile);
 
-            long date = System.currentTimeMillis();
-            Map<String, FundingData> newData = new ConcurrentHashMap<>();
-            CountDownLatch countDownLatch = new CountDownLatch(total.size());
-            for (BinanceConnector.FundingRate fundingRate : total) {
-                executor.execute(() -> {
-                    BigDecimal maxBorrowable;
-                    try {
-                        maxBorrowable = connector.mGetMaxAmountBorrowable(null, fundingRate.symbol().replace("USDT", ""));
-                    } catch (SystemNotEnoughAssetException e) {
-                        maxBorrowable = new BigDecimal("-1");
+                    long date = System.currentTimeMillis();
+                    Map<String, FundingData> newData = new ConcurrentHashMap<>();
+                    CountDownLatch countDownLatch = new CountDownLatch(total.size());
+                    for (BinanceConnector.FundingRate fundingRate : total) {
+                        executor.execute(() -> {
+                            BigDecimal maxBorrowable;
+                            try {
+                                maxBorrowable = connector.mGetMaxAmountBorrowable(null, fundingRate.symbol().replace("USDT", ""));
+                            } catch (SystemNotEnoughAssetException e) {
+                                maxBorrowable = new BigDecimal("-1");
+                            }
+                            newData.put(fundingRate.symbol(), new FundingData(date, fundingRate.nextFundingRate(), maxBorrowable));
+                            countDownLatch.countDown();
+                        });
                     }
-                    newData.put(fundingRate.symbol(), new FundingData(date, fundingRate.nextFundingRate(), maxBorrowable));
-                    countDownLatch.countDown();
-                });
-            }
-            if (!countDownLatch.await(5,  TimeUnit.MINUTES)){
-                Log.warning("Excedió el tiempo máximo de las request");
-            }
+                    if (!countDownLatch.await(5,  TimeUnit.MINUTES)){
+                        Log.warning("Excedió el tiempo máximo de las request");
+                    }
 
-            fundingDataStorage.save(newData);
-            Log.info("Datos guardas symbols=%s", total.stream().map(BinanceConnector.FundingRate::symbol).toList());
-            LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(10));
-        }
+                    fundingDataStorage.save(newData);
+                    Log.info("Datos guardas symbols=%s", total.stream().map(BinanceConnector.FundingRate::symbol).toList());
+                    LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(10));
+                }
+            }catch (Exception ignored) {
+
+            }
+        });
     }
 
     private static class FundingDataStorage {

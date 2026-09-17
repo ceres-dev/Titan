@@ -108,6 +108,9 @@ public final class BinanceConnector extends BaseConnector {
     @Override
     public void start(){
         initWebSocket(config.isTestNet() ? BASE_TESTNET_WWS : BASE_WWS);
+        initWebSocket(this.fGetWWS());
+        initWebSocket(this.sGetWWS());
+        initWebSocket(this.uGetWWS());
         super.start();
         fStartUserData();
     }
@@ -244,24 +247,27 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     @Override
-    public void unsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener) {
-
-    }
-
-    @Override
-    protected void subscribeBookTickerBatch(@NotNull List<String> streams) {
-        if (streams.isEmpty()) {
-            return;
-        }
-        UUID uuid = UUID.randomUUID();
-        String params = streams.stream()
-                .map(s -> "\"" + s.toLowerCase(Locale.US) + "@bookTicker\"")
-                .collect(Collectors.joining(","));
-        String json = """
+    public void wsSubscribeBookTicker(@NotNull Consumer<BookTickDouble> consumer, @NotNull Collection<String> symbols) {
+        consumerBookTicker = consumer;
+        splitStream(symbols, symbol -> {
+            if (symbol.isEmpty()) {
+                return;
+            }
+            UUID uuid = UUID.randomUUID();
+            String params = symbol.stream()
+                    .map(s -> "\"" + s.toLowerCase(Locale.US) + "@bookTicker\"")
+                    .collect(Collectors.joining(","));
+            String json = """
                 {"method": "SUBSCRIBE","params": [%s],"id": "%s"}
                 """.formatted(params, uuid.toString().replace("-", ""));
 
-        sendWebSocket(json);
+            sendWebSocket(json);
+        });
+    }
+
+    @Override
+    public void wsUnsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener) {
+
     }
 
     @Override
@@ -697,7 +703,7 @@ public final class BinanceConnector extends BaseConnector {
                 """.formatted(stream, uuid.toString().replace("-", "")));
     }
 
-    public void uEventOrderTradeUpdate(Consumer<JsonNode> consumer, boolean muliThreading){
+    public void wuEventOrderTradeUpdate(Consumer<JsonNode> consumer, boolean muliThreading){
         addConsumerStreams(uGetWWS(), (payload) -> {
             if (payload.get("e").asText().equals("ORDER_TRADE_UPDATE")) {
                 consumer.accept(payload);

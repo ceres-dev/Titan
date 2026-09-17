@@ -31,11 +31,10 @@ public interface Connector extends Switch, AutoCloseable, Telemetryable<Telemetr
 
     @NotNull Long getTimeSever();
 
-    void setConsumerBookTicker(@NotNull Consumer<BookTickDouble> symbol);
 
-    void subscribeBookTicker(@NotNull Collection<String> symbols);
+    void wsSubscribeBookTicker(@NotNull Consumer<BookTickDouble> consumer, @NotNull Collection<String> symbols);
 
-    void unsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener);
+    void wsUnsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener);
 
     default void close(){
         stop();
