@@ -26,7 +26,7 @@ public class GridCommand extends BaseCommand {
                 .sizePerOrderBaseAsset(new BigDecimal("0.01"))
                 .leverage(5)
                 .logsEndPoints(false)
-                .typeGrid(GridManager.TypeGrid.LONG)
+                .sideGrid(GridManager.SideGrid.LONG)
                 .amountPriceOffset(15)
                 .build();
         GridManager manager = new GridManager(config);

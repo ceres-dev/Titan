@@ -56,11 +56,11 @@ public class Utils {
         throw new IllegalArgumentException();
     }
 
-    public SideOrder toSide(GridManager.TypeGrid typeGrid) {
-        if (typeGrid == GridManager.TypeGrid.LONG) {
+    public SideOrder toSide(GridManager.SideGrid sideGrid) {
+        if (sideGrid == GridManager.SideGrid.LONG) {
             return SideOrder.BUY;
         }
-        if (typeGrid == GridManager.TypeGrid.SHORT) {
+        if (sideGrid == GridManager.SideGrid.SHORT) {
             return SideOrder.SELL;
         }
         throw new IllegalArgumentException();

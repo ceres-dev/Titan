@@ -12,6 +12,10 @@ import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.discord.StatusProfiler;
+import dev.cerez.titan.strategy.grid.attribute.ApplyAttributes;
+import dev.cerez.titan.strategy.grid.attribute.attributes.OffsetOrderPrice;
+import dev.cerez.titan.strategy.grid.model.Context;
+import dev.cerez.titan.strategy.grid.model.OrderPreview;
 import dev.cerez.titan.strategy.grid.model.SidePosition;
 import dev.cerez.titan.utils.Configurable;
 import dev.cerez.titan.utils.Switch;
@@ -42,16 +46,18 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
     private boolean isStarted = false;
     @Nullable
     private BinanceConnector.FutureOrder lastOrderFilled = null;
-    @NotNull
-    private final WaitableSet<String> waitForCancel = new WaitableSet<>();
-    @NotNull
-    private final HashSet<String> forOpen = new HashSet<>();
-
+    @NotNull private final WaitableSet<String> waitForCancel = new WaitableSet<>();
+    @NotNull private final HashSet<String> forOpen = new HashSet<>();
+    @NotNull private final PriceAlarm priceAlarm;
+    @NotNull private final GridBuilder gridBuilder;
+    @NotNull private final ApplyAttributes applyAttributes;
 
     public GridManager(GridManagerConfig config) {
         this.config = config;
         this.symbol = config.baseAsset + config.quoteAsset;
-
+        this.priceAlarm = new PriceAlarm(connector, symbol);
+        this.gridBuilder = new GridBuilder(config);
+        this.applyAttributes = new ApplyAttributes(gridBuilder);
         connector.start();
         connector.getConfig().setLogsRequest(config.logsEndPoints);
     }
@@ -76,6 +82,8 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
         connector.fGetAllSymbols();
         connector.fSetLeverage(symbol, config.leverage);
 
+        applyAttributes.add(new OffsetOrderPrice(new BigDecimal("0.15")));
+
         Log.info("Balance disponible %.4f %s", connector.fGetBalance().get(config.quoteAsset), config.quoteAsset);
         updateGrid();
         connector.wuEventOrderTradeUpdate(payload -> {
@@ -89,22 +97,12 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
                 case NEW -> {
                     if (forOpen.remove(nameOrder)) return;
                 }
-                case FILLED -> Main.executor.schedule(this::updateGrid, 5, TimeUnit.SECONDS);
             }
             updateGrid();
         }, true);
-//        connector.wfCreateBookTicker(new Consumer<BinanceConnector.BookTick>() {
-//            private BigDecimal lastTick = BigDecimal.ZERO;
-//
-//            @Override
-//            public void accept(BinanceConnector.BookTick bookTick) {
-//
-//            }
-//        }, symbol);
         Main.executor.execute(() -> {
             while (isStarted) {
                 // Para actualizar la gráfica periódicamente para detectar cambios en el precio
-                // TODO: Actualizar cuando el precio cambie cada x porcentaje
                 LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(1));
                 updateGrid();
             }
@@ -115,6 +113,7 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
     public void stop() {
         if (!isStarted) return;
         isStarted = false;
+        applyAttributes.clear();
         connector.fCloseUserData();
         connector.fCancelOrderAll(symbol);
     }
@@ -139,17 +138,19 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
                         ? BigDecimal.ZERO
                         : position.quantity();
 
-        BigDecimal entryPriceAvg = position == null
-                ? null
-                : position.entryPriceAvg();
-
         BigDecimal balanceUse = position == null
                 ? balance
                 // En caso de que tenga una posición con PNL negativo se descuenta del margen usable
-                : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO));
+                : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO)).multiply(new BigDecimal(config.getLeverage()));
 
-        List<OrderPreview> desiredOrders = createDesiredOrders(currentPrice, balanceUse, positionQuantity, entryPriceAvg);
-        reconcileOrders(ordersActive, desiredOrders);
+//        List<OrderPreview> desiredOrders = createDesiredOrders(currentPrice, balanceUse, positionQuantity, entryPriceAvg);
+        Context context = new Context(balanceUse, positionQuantity, currentPrice, config);
+
+
+        System.out.println(applyAttributes.apply(context, gridBuilder.buildGrid(context)));
+        System.out.println(gridBuilder.buildGrid(context));
+        System.exit(0);
+//        reconcileOrders(ordersActive, desiredOrders);
     }
 
     private @NotNull List<OrderPreview> createDesiredOrders(@NotNull BigDecimal currentPrice,
@@ -160,9 +161,9 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
         List<OrderPreview> result = new ArrayList<>();
         CreateOrdersParameter parameter = new CreateOrdersParameter(currentPrice, position, entryPriceAvg);
         SidePosition sidePosition = Utils.toPosition(position);
-        switch (config.typeGrid){
+        switch (config.sideGrid){
             case LONG, SHORT -> {
-                SideOrder sideConfig = Utils.toSide(config.typeGrid);
+                SideOrder sideConfig = Utils.toSide(config.sideGrid);
 
                 // Si la posición es inversa a la estrategia. Primero crea las orders de reducción y se obtiene el levelUse
                 // para pasárselo a createOpenOrders. En caso contrario primero se crea las órdenes de incremento y luego
@@ -180,7 +181,7 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
                 CreateOrdersResult increaseOrdersRsult = createOpenOrders(parameter, balance, sideConfig, levelOffset);
                 result.addAll(increaseOrdersRsult.orders());
 
-                if (isPositionEqualSide) result.addAll(createReduceOrders(parameter, increaseOrdersRsult.amountOrders()).orders());
+                if (isPositionEqualSide) result.addAll(createReduceOrders(parameter, increaseOrdersRsult.amountOrders() - 5).orders() );
 
             }
             case BOTH -> {
@@ -188,7 +189,7 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
                     case LONG, SHORT -> {
                         CreateOrdersParameter parameterWithoutPosicion = new CreateOrdersParameter(currentPrice, BigDecimal.ZERO, entryPriceAvg);
                         CreateOrdersResult increaseOrders = createOpenOrders(parameter, balance, Utils.toSide(sidePosition), 0);
-                        CreateOrdersResult reduceOrders = createReduceOrders(parameter, increaseOrders.amountOrders());
+                        CreateOrdersResult reduceOrders = createReduceOrders(parameter, increaseOrders.amountOrders() - 5);
                         CreateOrdersResult inverseOrders = createOpenOrders(parameterWithoutPosicion, balance, Utils.toSide(sidePosition).inverse(), reduceOrders.levesUse());
                         result.addAll(increaseOrders.orders());
                         result.addAll(reduceOrders.orders());
@@ -206,7 +207,7 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
     }
 
     private @NotNull CreateOrdersResult createReduceOrders(@NotNull CreateOrdersParameter createOrdersParameter,
-                                                           @Nullable Integer increaseOrdersAmount
+                                                           @Nullable Integer timesAmountFirstOrder
     ) {
         BigDecimal currentPrice = createOrdersParameter.currentPrice();
         BigDecimal position = createOrdersParameter.position();
@@ -232,6 +233,12 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
         BigDecimal usedMargin = BigDecimal.ZERO;
         Symbol symbols = connector.fGetAllSymbols().get(symbol);
         BigDecimal priceOffset = (isBuy ? BigDecimal.ZERO : symbols.getPriceStepSize()).multiply(new BigDecimal(config.amountPriceOffset));
+        priceAlarm.addAlarm(isBuy, gridPrice(
+                currentPrice.subtract(priceOffset),
+                config.stepSize,
+                direction * -1,
+                isBuy
+        ).add(priceOffset), this::updateGrid);
         boolean isFirstProfit = true;
         int levelUse = 0;
         for (int i = 0; ; i++) {
@@ -255,10 +262,10 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
                 }
             }
             BigDecimal sizeOrder = config.sizePerOrderBaseAsset.multiply(
-                    isFirstProfit && increaseOrdersAmount != null ?
+                    isFirstProfit && timesAmountFirstOrder != null ?
                             // Crear una orden de cierre más grande, ya que se está quedando sin órdenes de margen
-                    new BigDecimal(Math.max(1, 5 - increaseOrdersAmount)) :
-                    new BigDecimal("1")
+                    new BigDecimal(Math.max(1, timesAmountFirstOrder)) :
+                    BigDecimal.ONE
             );
             BigDecimal newUsedMargin = usedMargin.add(sizeOrder);
             if (newUsedMargin.compareTo(AmountPositionToClose) > 0) {
@@ -297,6 +304,12 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
         BigDecimal usedMargin = BigDecimal.ZERO;
         Symbol symbols = connector.fGetAllSymbols().get(symbol);
         BigDecimal priceOffset = (isBuyOrder ? BigDecimal.ZERO : symbols.getPriceStepSize()).multiply(new BigDecimal(config.amountPriceOffset));
+        priceAlarm.addAlarm(isBuyOrder, gridPrice(
+                currentPrice.subtract(priceOffset),
+                config.stepSize,
+                direction * -1,
+                isBuyOrder
+        ).add(priceOffset), this::updateGrid);
         int levelUse = 0;
         for (int i = offsetLevel; ; i++) {
             levelUse++;
@@ -372,7 +385,7 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
             }
         }
 
-        // Asegurarsé que las ordenes ya están canceladas
+        // Se espera para asegurarsé de que las ordenes ya están canceladas
         try {
             waitForCancel.awaitEmpty(5, TimeUnit.SECONDS);
         } catch (InterruptedException ignored) {
@@ -385,11 +398,11 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
         for (OrderPreview order : ordersToCreate) {
             try {
                 connector.fSendOrderToLimit(symbol,
-                        order.sideOrder(),
-                        order.amountBaseAsset(),
-                        order.nameOrder(),
-                        order.price(),
-                        order.reduceOnly()
+                        order.getSideOrder(),
+                        order.getAmountBaseAsset(),
+                        order.getNameOrder(),
+                        order.getPrice(),
+                        order.isReduceOnly()
                 );
                 // Puede fallar si justo hay movimiento brusco en el precio
                 // para evitar eso se vuelve a recalcular en el nuevo precio
@@ -400,8 +413,8 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
 
             Log.info(
                     "Orden enviada %s<reset> @ %.4f qty: %.4f %s reduceOnly=%s",
-                    order.sideOrder() == SideOrder.BUY ? "<green>BUY" : "<red>SELL",
-                    order.price(), order.amountBaseAsset(), order.nameOrder(), order.reduceOnly()
+                    order.getSideOrder() == SideOrder.BUY ? "<green>BUY" : "<red>SELL",
+                    order.getPrice(), order.getAmountBaseAsset(), order.getNameOrder(), order.isReduceOnly()
             );
         }
         // Se vuelve a intentar
@@ -409,25 +422,17 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
     }
 
     private boolean sameOrder(@NotNull OrderPreview preview, @NotNull BinanceConnector.FutureOrder order) {
-        return preview.sideOrder() == order.sideOrder() &&
-                preview.amountBaseAsset().compareTo(order.amountBaseAsset()) == 0 &&
-                preview.price().compareTo(order.price()) == 0 &&
-                preview.reduceOnly() == order.reduceOnly();
+        return preview.getSideOrder() == order.sideOrder() &&
+                preview.getAmountBaseAsset().compareTo(order.amountBaseAsset()) == 0 &&
+                preview.getPrice().compareTo(order.price()) == 0 &&
+                preview.isReduceOnly() == order.reduceOnly();
     }
 
 
-    private static @NotNull BigDecimal gridPrice(@NotNull BigDecimal currentPrice, @NotNull BigDecimal stepSize,int level, boolean isBuy) {
+    private static @NotNull BigDecimal gridPrice(@NotNull BigDecimal currentPrice, @NotNull BigDecimal stepSize, int level, boolean isBuy) {
         BigDecimal base = currentPrice.divide(stepSize, 0, isBuy ? RoundingMode.FLOOR : RoundingMode.CEILING).multiply(stepSize);
         return base.add(stepSize.multiply(BigDecimal.valueOf(level)));
     }
-
-    private record OrderPreview(
-            BigDecimal price,
-            SideOrder sideOrder,
-            BigDecimal amountBaseAsset,
-            boolean reduceOnly,
-            String nameOrder
-    ) {}
 
     @Builder
     @Data
@@ -436,13 +441,13 @@ public class GridManager implements Switch, StatusProfiler, Configurable<GridMan
         private final String quoteAsset;
         private BigDecimal stepSize;
         private BigDecimal sizePerOrderBaseAsset;
-        private TypeGrid typeGrid;
+        private SideGrid sideGrid;
         private int leverage;
         private boolean logsEndPoints;
         private int amountPriceOffset;
     }
 
-    public enum TypeGrid {
+    public enum SideGrid {
         LONG,
         SHORT,
         BOTH

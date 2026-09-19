@@ -58,7 +58,7 @@ public abstract class BaseConnector implements Connector {
 
     @NotNull  private final Object streamIncomingLock = new Object();
     @NotNull  private final StringBuilder streamIncomingMessage = new StringBuilder();
-    @NotNull  protected final HashMap<String, Consumer<JsonNode>> consumerStreamsMap = new HashMap<>();
+    @NotNull  protected final HashMap<String, Set<Consumer<JsonNode>>> consumerStreamsMap = new HashMap<>();
 
     protected volatile boolean waitingForPong = false;
     protected volatile long delayPingPongNanoTime = -1;
@@ -407,10 +407,11 @@ public abstract class BaseConnector implements Connector {
     }
 
     protected void addConsumerStreams(@NotNull String key, @NotNull Consumer<JsonNode> consumer, boolean muliThreading) {
+        Thread.currentThread().getStackTrace();
         if (muliThreading) {
-            consumerStreamsMap.put(key, (json) -> executor.execute(() -> consumer.accept(json)));
+            consumerStreamsMap.computeIfAbsent(key, k -> new HashSet<>()).add((json) -> executor.execute(() -> consumer.accept(json)));
         }else {
-            consumerStreamsMap.put(key, consumer);
+            consumerStreamsMap.computeIfAbsent(key, k -> new HashSet<>()).add(consumer);
         }
     }
 

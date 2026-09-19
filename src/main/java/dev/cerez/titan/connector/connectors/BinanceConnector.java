@@ -97,12 +97,12 @@ public final class BinanceConnector extends BaseConnector {
         }
         String key = wwsURL + (stream.isEmpty() ? "" : "@") + stream;
 
-        Consumer<JsonNode> consumer = consumerStreamsMap.get(key);
-        if (consumer == null) return;
+        Set<Consumer<JsonNode>> consumerSet = consumerStreamsMap.computeIfAbsent(key, k -> new HashSet<>());
+        if (consumerSet.isEmpty()) return;
         if (node.has("data")) {
-            consumer.accept(node.get("data"));
+            consumerSet.forEach(c -> c.accept(node.get("data")));
         }else {
-            consumer.accept(node);
+            consumerSet.forEach(c -> c.accept(node));
         }
     }
 
@@ -707,6 +707,7 @@ public final class BinanceConnector extends BaseConnector {
     public void wuEventOrderTradeUpdate(Consumer<JsonNode> consumer, boolean muliThreading){
         addConsumerStreams(uGetWWS(), (payload) -> {
             if (payload.get("e").asText().equals("ORDER_TRADE_UPDATE")) {
+                // TODO: transformar a objeto
                 consumer.accept(payload);
             }
         }, muliThreading);
@@ -800,7 +801,7 @@ public final class BinanceConnector extends BaseConnector {
         return false;
     }
 
-    public BigDecimal mGetMaxBorrowable(@Nullable String symbol, @NotNull String asset) {
+    public BigDecimal mGetMaxLimitBorrowable(@Nullable String symbol, @NotNull String asset) {
         Map<String, Object> params = new HashMap<>();
         if (symbol != null) params.put("isolatedSymbol", symbol.toUpperCase(Locale.US));
         params.put("asset", asset.toUpperCase(Locale.US));

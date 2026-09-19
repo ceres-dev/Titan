@@ -2,13 +2,13 @@ package dev.cerez.titan;
 
 import dev.cerez.titan.command.CommandHander;
 import dev.cerez.titan.command.commands.*;
+import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.discord.DiscordConnector;
 import lombok.Getter;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.Comparator;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.LockSupport;
 
 public class Main {
 
@@ -41,6 +41,11 @@ public class Main {
             Main.getInstance().getDiscordConnector().sendMessage("Error Critico: " + e.getMessage());
             e.printStackTrace();
         }
+//        BinanceConnector connector = new BinanceConnector();
+//        connector.start();
+//        LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
+//        connector.fGetFundingRate().values().stream().min(Comparator.comparingDouble(f -> f.nextFundingRate().doubleValue())).ifPresent(System.out::println);
+
 
         // TODO: code -1021 reenviar la solicitud
     }
