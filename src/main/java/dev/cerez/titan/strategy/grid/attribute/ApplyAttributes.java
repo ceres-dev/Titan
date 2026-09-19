@@ -33,8 +33,8 @@ public class ApplyAttributes {
         List<OrderPreview> orders = new LinkedList<>(originalOrderPreviews);
         for (BaseAttribute attribute : attributes) {
             Function<AttributeContext, Boolean> condition = attribute.getCondition();
-            List<OrderPreview> buys = orders.stream().filter(OrderPreview::isBuy).sorted(Comparator.comparing(OrderPreview::getPrice)).toList();
-            List<OrderPreview> sells = orders.stream().filter(OrderPreview::isSell).sorted(Comparator.comparing(OrderPreview::getPrice).reversed()).toList();
+            List<OrderPreview> buys = orders.stream().filter(OrderPreview::isBuy).sorted(Comparator.comparing(OrderPreview::getPrice).reversed()).toList();
+            List<OrderPreview> sells = orders.stream().filter(OrderPreview::isSell).sorted(Comparator.comparing(OrderPreview::getPrice)).toList();
             AttributeContext attributeContext;
 
             List<OrderPreview> use = new ArrayList<>(orders.size());
@@ -64,7 +64,7 @@ public class ApplyAttributes {
                     }
                 }
             }
-            attributeContext = new AttributeContext(use, buys, sells, context);
+            attributeContext = new AttributeContext(use, unuse, buys, sells, context);
 
             if (condition != null){
                 if (!condition.apply(attributeContext)){
@@ -73,7 +73,6 @@ public class ApplyAttributes {
             }
             // Set para evitar duplicado
             Set<OrderPreview> result = new HashSet<>(attribute.apply(attributeContext));
-            result.addAll(unuse);
             orders = gridBuilder.validateGrid(context, result.stream().toList());
         }
         return orders;

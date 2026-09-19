@@ -43,6 +43,10 @@ public class PriceAlarm implements Switch {
         alarms.clear();
     }
 
+    public void clear() {
+        alarms.clear();
+    }
+
 
     private record Alarm(boolean forBuy, @NotNull BigDecimal price, @NotNull Runnable runnable) {}
 }

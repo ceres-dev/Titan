@@ -14,6 +14,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * @author Chat GPT
+ */
+
 public class GridBuilder {
 
     private static final BigDecimal MARGEN = new BigDecimal("0.9");
@@ -54,11 +58,9 @@ public class GridBuilder {
             }else {
                 BigDecimal spent = BigDecimal.ZERO;
                 int level = 0;
-                System.out.println(amountPerOrderBaseAsset + " @ " + currentPrice);
                 while (true) {
                     BigDecimal price = buyGridPrice(currentPrice, level);
                     BigDecimal orderCost = price.multiply(amountPerOrderBaseAsset);
-                    System.out.println(spent.add(orderCost) + " = " + spent + " " + orderCost);
                     if (spent.add(orderCost).compareTo(buyBudget) > 0) {
                         break;
                     }
