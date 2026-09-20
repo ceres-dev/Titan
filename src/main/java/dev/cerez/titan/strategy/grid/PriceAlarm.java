@@ -2,6 +2,7 @@ package dev.cerez.titan.strategy.grid;
 
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.utils.Switch;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
@@ -10,6 +11,9 @@ import java.util.HashSet;
 
 @RequiredArgsConstructor
 public class PriceAlarm implements Switch {
+
+    @Getter
+    private boolean running = false;
     private final BinanceConnector connector;
     private final String symbol;
     private final HashSet<Alarm> alarms = new HashSet<>();
@@ -20,6 +24,8 @@ public class PriceAlarm implements Switch {
 
     @Override
     public void start() {
+        if (running) return;
+        running = true;
         connector.wfCreateBookTicker((bookTick -> {
             for (Alarm alarm : alarms) {
                 if (alarm.forBuy){
@@ -39,6 +45,8 @@ public class PriceAlarm implements Switch {
 
     @Override
     public void stop() {
+        if (!running) return;
+        running = false;
         connector.wfRemoveBookTicker(symbol);
         alarms.clear();
     }

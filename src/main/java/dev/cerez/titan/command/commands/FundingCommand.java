@@ -3,6 +3,7 @@ package dev.cerez.titan.command.commands;
 import dev.cerez.titan.Log;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.command.InputUser;
+import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.strategy.fuding.BlockerForSpread;
 import dev.cerez.titan.strategy.fuding.FundingManager;
@@ -66,10 +67,10 @@ public class FundingCommand extends BaseCommand {
                 }
             }
             case "configure" -> {
-                this.fundingManager = new FundingManager(configBuilder.build());
+                this.fundingManager = new FundingManager(configBuilder.build(), new BinanceConnector());
             }
             case "startNow" -> {
-                if (fundingManager.isStarted()) {
+                if (fundingManager.isRunning()) {
                     Log.error("Ya esta iniciado");
                     return;
                 }
@@ -80,7 +81,7 @@ public class FundingCommand extends BaseCommand {
                 fundingManager.start();
             }
             case "start" -> {
-                if (fundingManager.isStarted()) {
+                if (fundingManager.isRunning()) {
                     Log.error("Ya esta iniciado");
                     return;
                 }
@@ -96,7 +97,7 @@ public class FundingCommand extends BaseCommand {
                     Log.error("No se a creado el gesto aún");
                     return;
                 }
-                if (!fundingManager.isStarted()) {
+                if (!fundingManager.isRunning()) {
                     Log.error("No esta iniciado");
                     return;
                 }
@@ -109,7 +110,7 @@ public class FundingCommand extends BaseCommand {
                     Log.error("No se a creado el gesto aún");
                     return;
                 }
-                if (!fundingManager.isStarted()) {
+                if (!fundingManager.isRunning()) {
                     Log.error("No esta iniciado");
                     return;
                 }

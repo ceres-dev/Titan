@@ -5,4 +5,6 @@ public interface Switch {
     void start();
 
     void stop();
+
+    boolean isRunning();
 }

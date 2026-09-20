@@ -31,7 +31,7 @@ public class CheckFundingCommand extends BaseCommand {
                 .quoteAsset("USDT")
                 .logsEndPoints(true)
                 .build();
-        String baseAsset = args.getFirst();
+        String baseAsset = args.get(0);
         String quotAsset = args.get(1);
         Log.info("Checking funding for symbol: " + baseAsset + quotAsset);
 

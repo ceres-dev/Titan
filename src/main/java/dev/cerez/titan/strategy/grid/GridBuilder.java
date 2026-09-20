@@ -3,6 +3,7 @@ package dev.cerez.titan.strategy.grid;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.strategy.grid.model.Context;
 import dev.cerez.titan.strategy.grid.model.OrderPreview;
+import dev.cerez.titan.strategy.grid.model.SideGrid;
 import dev.cerez.titan.utils.Utils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -23,11 +24,11 @@ public class GridBuilder {
     private static final BigDecimal MARGEN = new BigDecimal("0.9");
 
     private final GridManager.GridManagerConfig config;
-    private final GridManager.SideGrid grid;
+    private final SideGrid grid;
     private final BigDecimal stepSize;
     private final BigDecimal amountPerOrderBaseAsset;
 
-    public GridBuilder(GridManager.GridManagerConfig config) {
+    public GridBuilder(GridManager.@NotNull GridManagerConfig config) {
         this.config = config;
         this.grid = config.getSideGrid();
         this.stepSize = config.getStepSize();
@@ -211,7 +212,7 @@ public class GridBuilder {
         else sells.add(order);
     }
 
-    private boolean isSideAllowed(GridManager.@NotNull SideGrid grid, SideOrder side, BigDecimal position) {
+    private boolean isSideAllowed(@NotNull SideGrid grid, SideOrder side, BigDecimal position) {
         return switch (grid) {
             case LONG -> side == SideOrder.BUY
                     || (side == SideOrder.SELL && position.signum() > 0);
@@ -221,7 +222,7 @@ public class GridBuilder {
         };
     }
 
-    private boolean isReduceOnly(@NotNull GridManager.SideGrid grid, @NotNull SideOrder side, @NotNull BigDecimal position) {
+    private boolean isReduceOnly(@NotNull SideGrid grid, @NotNull SideOrder side, @NotNull BigDecimal position) {
         return switch (grid) {
             case LONG -> side == SideOrder.SELL;
             case SHORT -> side == SideOrder.BUY;
@@ -242,18 +243,6 @@ public class GridBuilder {
             @NotNull BigDecimal currentPrice
     ) {
         if (isReduceOnly(grid, side, position)) return BigDecimal.ZERO;
-
-        /*
-         * En BOTH con posición 0 ambos lados podrían abrir.
-         * Dividimos el capital para evitar permitir 2x balance.
-         */
-//        if (grid == GridManager.TypeGrid.BOTH && position.signum() == 0) {
-//            return balanceUsdt.divide(
-//                    BigDecimal.TWO,
-//                    8,
-//                    RoundingMode.DOWN
-//            );
-//        }
         if (side == SideOrder.BUY) {
             return balanceUsdt.subtract(position.multiply(currentPrice));
         }else {
@@ -274,7 +263,7 @@ public class GridBuilder {
              */
             BigDecimal allowedAmount = positionBaseAsset.abs();
             while (sumAmount(orders).compareTo(allowedAmount) > 0 && !orders.isEmpty()) {
-                orders.removeFirst();
+                orders.remove(0);
             }
         }else {
             /*
@@ -282,7 +271,7 @@ public class GridBuilder {
              * limitamos el margen total.
              */
             while (sumMargin(orders).compareTo(budgetUsdt) > 0 && !orders.isEmpty()) {
-                orders.removeFirst();
+                orders.remove(0);
             }
         }
     }

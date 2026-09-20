@@ -3,15 +3,15 @@ package dev.cerez.titan;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.UtilityClass;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Locale;
 
 @UtilityClass
 public class Log {
 
-    private static final Logger LOGGER = LogManager.getLogger(Log.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger("Titan");
 
     public static synchronized void info(String message, Object... o) {
         LOGGER.info(formatColor(String.format(message, o) + "<reset>"));

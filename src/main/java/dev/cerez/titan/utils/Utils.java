@@ -2,6 +2,7 @@ package dev.cerez.titan.utils;
 
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.strategy.grid.GridManager;
+import dev.cerez.titan.strategy.grid.model.SideGrid;
 import dev.cerez.titan.strategy.grid.model.SidePosition;
 import lombok.experimental.UtilityClass;
 import org.jetbrains.annotations.Contract;
@@ -10,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.UUID;
+import java.util.concurrent.ThreadFactory;
 
 @UtilityClass
 public class Utils {
@@ -56,11 +58,11 @@ public class Utils {
         throw new IllegalArgumentException();
     }
 
-    public SideOrder toSide(GridManager.SideGrid sideGrid) {
-        if (sideGrid == GridManager.SideGrid.LONG) {
+    public SideOrder toSide(SideGrid sideGrid) {
+        if (sideGrid == SideGrid.LONG) {
             return SideOrder.BUY;
         }
-        if (sideGrid == GridManager.SideGrid.SHORT) {
+        if (sideGrid == SideGrid.SHORT) {
             return SideOrder.SELL;
         }
         throw new IllegalArgumentException();
@@ -74,6 +76,19 @@ public class Utils {
             return SideOrder.SELL;
         }
         throw new IllegalArgumentException();
+    }
+
+    public ThreadFactory getThreadFactory() {
+        String className = StackWalker.getInstance()
+                .walk(stack -> stack
+                        .skip(1)
+                        .findFirst()
+                        .map(StackWalker.StackFrame::getClassName)
+                        .orElse("Unknown"));
+
+        return Thread.ofVirtual()
+                .name(className + "-", 0)
+                .factory();
     }
 
 }

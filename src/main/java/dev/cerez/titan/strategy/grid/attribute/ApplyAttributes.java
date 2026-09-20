@@ -1,9 +1,9 @@
 package dev.cerez.titan.strategy.grid.attribute;
 
 import dev.cerez.titan.strategy.grid.GridBuilder;
-import dev.cerez.titan.strategy.grid.GridManager;
 import dev.cerez.titan.strategy.grid.model.Context;
 import dev.cerez.titan.strategy.grid.model.OrderPreview;
+import dev.cerez.titan.strategy.grid.model.SideGrid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -39,15 +39,15 @@ public class ApplyAttributes {
 
             List<OrderPreview> use = new ArrayList<>(orders.size());
             List<OrderPreview> unuse = new ArrayList<>(orders.size());
-            GridManager.SideGrid sideGrid = context.config().getSideGrid();
+            SideGrid sideGrid = context.config().getSideGrid();
             SideAffected sideAffected = attribute.getSideAffected();
 
-            if (sideAffected == SideAffected.BOTH || sideGrid == GridManager.SideGrid.BOTH){
+            if (sideAffected == SideAffected.BOTH || sideGrid == SideGrid.BOTH){
                 use.addAll(buys);
                 use.addAll(sells);
             }else {
                 if (sideAffected == SideAffected.FAVOR) {
-                    if (sideGrid == GridManager.SideGrid.LONG) {
+                    if (sideGrid == SideGrid.LONG) {
                         use.addAll(buys);
                         unuse.addAll(sells);
                     }else {
@@ -55,7 +55,7 @@ public class ApplyAttributes {
                         unuse.addAll(buys);
                     }
                 }else {
-                    if (sideGrid == GridManager.SideGrid.LONG) {
+                    if (sideGrid == SideGrid.LONG) {
                         use.addAll(sells);
                         unuse.addAll(buys);
                     }else {

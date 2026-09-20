@@ -20,8 +20,8 @@ public class DiscordConnector implements Switch, Configurable<DiscordConnector.D
     @Getter
     private final @NotNull DiscordConfig config;
     private final @NotNull JDA jda;
-
-    private boolean isStarted = false;
+    @Getter
+    private boolean running = false;
     @Getter @Setter
     private StatusProfiler statusProfiler = null;
 
@@ -36,9 +36,9 @@ public class DiscordConnector implements Switch, Configurable<DiscordConnector.D
     @Override
     public void start() {
         jda.awaitReady();
-        isStarted = true;
+        running = true;
         Main.executor.execute(() -> {
-            while (isStarted) {
+            while (running) {
                 LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(4));
                 if (statusProfiler == null) continue;
                 StatusProfiler.PresenceProfile presenceProfiler = statusProfiler.getPresenceProfile();
@@ -52,7 +52,7 @@ public class DiscordConnector implements Switch, Configurable<DiscordConnector.D
     @Override
     public void stop() {
         jda.shutdown();
-        isStarted = false;
+        running = false;
     }
 
     public void sendMessage(String message) {

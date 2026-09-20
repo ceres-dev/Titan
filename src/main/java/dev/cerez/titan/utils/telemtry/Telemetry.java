@@ -3,6 +3,7 @@ package dev.cerez.titan.utils.telemtry;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.strategy.triangular.utils.TriangularArbitrageOpportunity;
 import dev.cerez.titan.utils.Configurable;
+import dev.cerez.titan.utils.Utils;
 import lombok.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -22,7 +23,7 @@ public class Telemetry implements TelemetryConnector, Configurable<Telemetry.Tel
 
     @Getter
     private final TelemetryConfig config;
-    private final Executor executor = Executors.newSingleThreadExecutor();
+    private final Executor executor = Executors.newSingleThreadExecutor(Utils.getThreadFactory());
 
     @NotNull
     private LinkedList<Long> deltaDelayComputeNanoTimeList = new LinkedList<>();

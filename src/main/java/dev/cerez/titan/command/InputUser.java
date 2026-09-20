@@ -9,7 +9,7 @@ public class InputUser {
     @Blocking
     public String in(String label){
         Scanner sc = new Scanner(System.in);
-        System.out.printf("\u001B[38;2;0;255;255m%s > \u001B[0m", label);
+        System.out.printf(label);
         return sc.nextLine();
     }
 

@@ -1,6 +1,7 @@
 package dev.cerez.titan.strategy.triangular;
 
 import dev.cerez.titan.Log;
+import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.model.AssetRate;
 import dev.cerez.titan.connector.model.BookTickDouble;
@@ -9,6 +10,7 @@ import dev.cerez.titan.connector.model.Volume24H;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.strategy.triangular.engine.SearchTriangularEngine;
 import dev.cerez.titan.strategy.triangular.engine.engines.SearchTriangularEngineJava;
+import dev.cerez.titan.utils.BaseManager;
 import dev.cerez.titan.utils.Configurable;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.strategy.triangular.utils.TriangularArbitrageOpportunity;
@@ -26,47 +28,33 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 
-public class TriangularManager implements Switch, StatusProfiler, Configurable<TriangularManager.TriangularManagerConfig> {
+public class TriangularManager extends BaseManager<TriangularManager.TriangularManagerConfig, Connector> implements StatusProfiler {
 
-    @Getter
-    private final TriangularManagerConfig config;
-    private final Connector exchangeApi;
-    private final Consumer<SearchTriangularEngine.OnOpportunities> onUpdate;
-    private final SearchTriangularEngine engine;
+    @Setter @Nullable private SearchTriangularEngine engine;
+    @Setter @Nullable private Consumer<SearchTriangularEngine.OnOpportunities> onUpdate;
+    @Setter @Nullable private Telemetry telemetry;
 
-    private volatile boolean started = false;
-
-    @Nullable private Telemetry telemetry;
+    private volatile boolean running = false;
 
     @Nullable private Map<String, Symbol> allSymbolsMap = null;
     @Nullable private Consumer<BookTickDouble> streamListener = null;
 
     @SneakyThrows
-    public TriangularManager(TriangularManagerConfig config, Connector exchangeApi, Consumer<SearchTriangularEngine.OnOpportunities> onUpdate) {
-        this.config = config;
-        this.exchangeApi = exchangeApi;
-        this.onUpdate = onUpdate;
+    public TriangularManager(@NotNull TriangularManagerConfig config, @NotNull Connector connector) {
+        super(config, connector);
         this.engine = config.getEngine().getConstructor(SearchTriangularEngine.EngineConfig.class).newInstance(config);
-    }
-
-    @Contract(value = "_ -> this")
-    public TriangularManager setTelemetry(@NotNull Telemetry telemetry) {
-        this.telemetry = telemetry;
-        return this;
     }
 
     @Blocking
     public void start() {
-        if (started) {
-            return;
-        }
-        started = true;
+        if (running) return;
+        running = true;
         if (config.getEngine() == null) throw new IllegalStateException("Engine is not setting");
         CompletableFuture<Map<String, Symbol>> allSymbolsMapFuture = CompletableFuture.supplyAsync(
-                exchangeApi::sGetAllSymbols
+                connector::sGetAllSymbols
         );
         CompletableFuture<Map<String, BookTickDouble>> tickersFuture = CompletableFuture.supplyAsync(
-                exchangeApi::sGetAllBooks
+                connector::sGetAllBooks
         );
         try {
             Log.info("Send Request...");
@@ -77,16 +65,16 @@ public class TriangularManager implements Switch, StatusProfiler, Configurable<T
                 return;
             }
 
-            Map<String, Volume24H> volume24H = exchangeApi.sGetVolume24H();
+            Map<String, Volume24H> volume24H = connector.sGetVolume24H();
             Set<String> symbolsToSubscribe = getSpotTradingSymbols(allSymbolsMap, tickersMap, volume24H);
             Log.info("<green>Request Received: %s Total Symbols.", allSymbolsMap.size());
             Log.info("Starting engine...");
             engine.configure(allSymbolsMap, tickersMap);
             Log.info("<green>Engine Ready: %s.", engine.getClass().getName());
             Log.info("Starting Api...");
-            exchangeApi.wsSubscribeBookTicker(streamListener = this::onBookTickerUpdate, symbolsToSubscribe);
-            exchangeApi.start();
-            Log.info("<green>Connector Running: %s", exchangeApi.getClass().getName());
+            connector.wsSubscribeBookTicker(streamListener = this::onBookTickerUpdate, symbolsToSubscribe);
+            connector.start();
+            Log.info("<green>Connector Running: %s", connector.getClass().getName());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             Log.exception("Error iniciando stream de arbitraje", e);
@@ -101,18 +89,19 @@ public class TriangularManager implements Switch, StatusProfiler, Configurable<T
     }
 
     public void stop() {
-        started = false;
+        if (!running) return;
+        running = false;
         Consumer<BookTickDouble> listener = streamListener;
         if (listener != null) {
-            exchangeApi.wsUnsubscribeBookTicker(listener);
+            connector.wsUnsubscribeBookTicker(listener);
         }
-        exchangeApi.stop();
+        connector.stop();
         streamListener = null;
         allSymbolsMap = null;
     }
 
     private void onBookTickerUpdate(@NotNull BookTickDouble updatedTicker) {
-        if (!started) {
+        if (!running) {
             return;
         }
         try {

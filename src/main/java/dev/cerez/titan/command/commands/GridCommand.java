@@ -2,8 +2,10 @@ package dev.cerez.titan.command.commands;
 
 import dev.cerez.titan.Main;
 import dev.cerez.titan.command.BaseCommand;
+import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.strategy.grid.GridManager;
+import dev.cerez.titan.strategy.grid.model.SideGrid;
 import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
@@ -26,10 +28,10 @@ public class GridCommand extends BaseCommand {
                 .sizePerOrderBaseAsset(new BigDecimal("0.01"))
                 .leverage(5)
                 .logsEndPoints(false)
-                .sideGrid(GridManager.SideGrid.LONG)
+                .sideGrid(SideGrid.LONG)
                 .amountPriceOffset(15)
                 .build();
-        GridManager manager = new GridManager(config);
+        GridManager manager = new GridManager(config, new BinanceConnector());
         discordConnector.setStatusProfiler(manager);
         discordConnector.start();
         manager.start();

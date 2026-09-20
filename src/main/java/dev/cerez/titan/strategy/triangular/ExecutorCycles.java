@@ -31,7 +31,7 @@ public class ExecutorCycles {
 
     private final @NotNull DecimalFormat decimalFormat = new DecimalFormat("0.00#######");
     private final @NotNull Set<TriangularArbitrageOpportunity> opportunityWindows = new HashSet<>();
-    private final @NotNull Executor executor = Executors.newFixedThreadPool(4);
+    private final @NotNull Executor executor = Executors.newFixedThreadPool(4, Utils.getThreadFactory());
     private final @NotNull HashMap<String, Symbol> symbolsByName;
     private final @NotNull Connector connector;
     private final @NotNull ExecutorCycles.ExecutorCyclesConfig config;

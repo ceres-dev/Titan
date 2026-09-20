@@ -46,7 +46,10 @@ public class TriangularCommand extends BaseCommand {
         ExecutorCycles executorCycles = new ExecutorCycles(configExecutor, connector);
 
         connector.setTelemetry(telemetry);
-        new TriangularManager(triangularManagerConfig, connector, executorCycles::onOpportunities).setTelemetry(telemetry).start();
+        TriangularManager manager = new TriangularManager(triangularManagerConfig, connector);
+        manager.setTelemetry(telemetry);
+        manager.setOnUpdate(executorCycles::onOpportunities);
+        manager.start();
         Log.info("<green>Ready! %.2fs", (System.currentTimeMillis() - startTime)/1000d);
         loader.printLoader(telemetry);
     }

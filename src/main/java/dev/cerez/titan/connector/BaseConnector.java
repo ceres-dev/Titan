@@ -10,6 +10,7 @@ import dev.cerez.titan.connector.exception.NotSetApiKeysException;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.io.IOdata;
+import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.telemtry.TelemetryConnector;
 import lombok.Builder;
 import lombok.Data;
@@ -48,7 +49,7 @@ public abstract class BaseConnector implements Connector {
     @NotNull  protected final ObjectMapper mapper = new ObjectMapper();
     @NotNull  protected final HttpClient clientHttp = HttpClient.newHttpClient();
     @NotNull  protected final HashMap<String, Symbol> cachedSymbols = new HashMap<>();
-    @NotNull  protected final ExecutorService executor = Executors.newFixedThreadPool(8);
+    @NotNull  protected final ExecutorService executor = Executors.newFixedThreadPool(8, Utils.getThreadFactory());
     @NotNull  protected final Map<String, WebSocketContainer> webSockets = new HashMap<>();
     @Getter
     @NotNull  protected final ConnectorConfig config;

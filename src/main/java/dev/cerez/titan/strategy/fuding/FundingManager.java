@@ -2,13 +2,12 @@ package dev.cerez.titan.strategy.fuding;
 
 import dev.cerez.titan.Log;
 import dev.cerez.titan.command.InputUser;
+import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.io.IOdata;
-import dev.cerez.titan.utils.Configurable;
-import dev.cerez.titan.utils.Switch;
-import dev.cerez.titan.utils.Utils;
+import dev.cerez.titan.utils.*;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Getter;
@@ -24,38 +23,27 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-@Getter
-public class FundingManager implements Switch, StatusProfiler, Configurable<FundingManager.FundingManagerConfig> {
+public class FundingManager extends BaseManager<FundingManager.FundingManagerConfig, BinanceConnector> implements StatusProfiler, Status<FundingManager.Status> {
 
-    @Getter
-    private final FundingManagerConfig config;
-    private final BinanceConnector connector = new BinanceConnector();
-    private final InputUser inputUser = new InputUser();
-    private final String baseAsset;
-    private final String quoteAsset;
-    private final String symbol;
-    @NotNull
-    private Status status = Status.READY;
-    private final UUID uuid;
+    @NotNull private final InputUser inputUser = new InputUser();
+    @NotNull private final String baseAsset;
+    @NotNull private final String quoteAsset;
+    @NotNull private final UUID uuid;
+    @NotNull @Getter private final String symbol;
+    @NotNull @Getter private Status status = Status.READY;
 
-    private boolean isStarted = false;
-
-    public FundingManager(@NotNull FundingManagerConfig config) {
+    public FundingManager(@NotNull FundingManagerConfig config, @NotNull BinanceConnector connector) {
+        super(config, connector);
         PersistenData data = IOdata.loadPersistenDataFundingManager(new PersistenData(this));
-        connector.getConfig().setLogsRequest(config.logsEndPoints);
-        connector.start();
         Log.info("Config use: %s", config);
         if (data.isActive) {
             Log.warning("El programa no termino el proceso de cierre adecuadamente. La estrategia esta corriendo");
-            this.config = data.config;
             this.baseAsset = data.config.getBaseAsset();
             this.quoteAsset = data.config.getQuoteAsset();
             this.symbol = baseAsset + quoteAsset;
             this.uuid = data.uuid;
             this.status = data.status;
-            this.isStarted = true;
         }else {
-            this.config = config;
             this.baseAsset = config.getBaseAsset();
             this.quoteAsset = config.getQuoteAsset();
             this.symbol = baseAsset + quoteAsset;
@@ -66,9 +54,11 @@ public class FundingManager implements Switch, StatusProfiler, Configurable<Fund
 
     @Override
     public void start() {
-        if (isStarted){
+        if (running){
             return;
-        } else isStarted = true;
+        } else running = true;
+        connector.getConfig().setLogsRequest(config.logsEndPoints);
+        connector.start();
         status = Status.CHECK;
         // Activar el margen Aislado
         Log.info("¿Esta Habilitado el margen aislado?...");
@@ -128,9 +118,10 @@ public class FundingManager implements Switch, StatusProfiler, Configurable<Fund
 
     @Override
     public void stop() {
-        if (!isStarted) {
+        if (!running) {
             return;
-        }else isStarted = false;
+        }else running = false;
+        connector.stop();
         BinanceConnector.FuturePosition position = connector.fGetPosition(symbol);
         BinanceConnector.AssetMargin balanceQuote = connector.miGetBalance(symbol).quote();
         if (position == null) {
@@ -276,7 +267,7 @@ public class FundingManager implements Switch, StatusProfiler, Configurable<Fund
         public PersistenData(@NotNull FundingManager manager) {
             this.config = manager.config;
             this.status = manager.status;
-            this.isActive = manager.isStarted;
+            this.isActive = manager.running;
             this.uuid = manager.uuid;
         }
     }

@@ -4,6 +4,7 @@ import dev.cerez.titan.command.CommandHander;
 import dev.cerez.titan.command.commands.*;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.discord.DiscordConnector;
+import dev.cerez.titan.utils.Utils;
 import lombok.Getter;
 
 import java.util.Comparator;
@@ -20,7 +21,7 @@ public class Main {
     private static final Main instance = new Main();
     private static final CommandHander commandHandler = new CommandHander();
 
-    public static final ScheduledExecutorService executor = Executors.newScheduledThreadPool(16);
+    public static final ScheduledExecutorService executor = Executors.newScheduledThreadPool(16, Utils.getThreadFactory());
     public static final boolean IS_TESTNET = false;
 
     @Getter

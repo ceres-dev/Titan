@@ -9,6 +9,7 @@ import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.connectors.exception.binance.SystemNotEnoughAssetException;
 import dev.cerez.titan.connector.model.Symbol;
+import dev.cerez.titan.utils.Utils;
 import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
 
@@ -29,7 +30,7 @@ public class DataRecoveryCommand extends BaseCommand {
         super("dataRecovery", "dr");
     }
 
-    private final Executor executor = Executors.newFixedThreadPool(2);
+    private final Executor executor = Executors.newFixedThreadPool(2, Utils.getThreadFactory());
 
     // TODO: crear una clase más organizada
 
