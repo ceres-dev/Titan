@@ -1,26 +1,22 @@
 package dev.cerez.titan.environment;
 
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.utils.BaseManager;
 import dev.cerez.titan.utils.Manager;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
-@RequiredArgsConstructor
-public class EnvironmentManager implements Manager<EnvironmentManager.EnvironmentManagerConfig> {
+public class EnvironmentManager extends BaseManager<EnvironmentManager.EnvironmentManagerConfig, BinanceConnector> {
 
-    @Getter
-    private final EnvironmentManagerConfig config;
-    @Getter
-    private boolean running = false;
-    @Getter
-    private final BinanceConnector connector;
+    private Map<UUID, Manager<?>> mamanger = new HashMap<>();
 
-    private Set<Manager<?>> mamanger = new HashSet<>();
+    public EnvironmentManager(@NotNull EnvironmentManager.EnvironmentManagerConfig config, @NotNull BinanceConnector connector) {
+        super(config, connector);
+    }
 
     @Override
     public void start() {
@@ -32,6 +28,22 @@ public class EnvironmentManager implements Manager<EnvironmentManager.Environmen
     public void stop() {
         if (!running) return;
         running = false;
+    }
+
+    public void addManager(@NotNull Manager<?> manager) {
+        mamanger.put(manager.getId(), manager);
+    }
+
+    public void removeManager(@NotNull Manager<?> manager) {
+        mamanger.remove(manager.getId());
+    }
+
+    public Manager<?> getManager(@NotNull UUID id) {
+        return mamanger.get(id);
+    }
+
+    public Set<Manager<?>> getManagers() {
+        return new HashSet<>(mamanger.values());
     }
 
     @Data

@@ -2,10 +2,8 @@ package dev.cerez.titan.connector.connectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.Main;
-import dev.cerez.titan.connector.connectors.exception.BinanceApiException;
-import dev.cerez.titan.connector.connectors.exception.BinanceDefaultApiException;
-import dev.cerez.titan.connector.connectors.exception.binance.*;
-import dev.cerez.titan.connector.exception.ApiException;
+import dev.cerez.titan.connector.exception.*;
+import dev.cerez.titan.connector.exception.exchange.*;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.model.*;

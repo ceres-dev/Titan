@@ -1,6 +1,5 @@
-package dev.cerez.titan.connector.connectors.exception;
+package dev.cerez.titan.connector.exception;
 
-import dev.cerez.titan.connector.exception.ApiException;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 

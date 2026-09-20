@@ -64,7 +64,8 @@ public abstract class BaseConnector implements Connector {
     protected volatile boolean waitingForPong = false;
     protected volatile long delayPingPongNanoTime = -1;
     protected volatile long deltaClienteToServer = 0;
-    protected volatile boolean runLoopers = false;
+    @Getter
+    protected volatile boolean running = false;
 
     @Setter
     protected Consumer<BookTickDouble> consumerBookTicker;
@@ -102,15 +103,15 @@ public abstract class BaseConnector implements Connector {
     }
 
     public void runLoopers(){
-        runLoopers = true;
+        running = true;
         executor.execute(() -> {
-            while (runLoopers) {
+            while (running) {
                 syncTimeServer();
                 LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(60));
             }
         });
         executor.execute(() -> {
-            while (runLoopers) {
+            while (running) {
                 LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(30));
                 invalidateCache();
             }
@@ -118,7 +119,7 @@ public abstract class BaseConnector implements Connector {
     }
 
     public void stopLoopers(){
-        this.runLoopers = false;
+        this.running = false;
     }
     private String lastRequestWebSocker = null;
 
