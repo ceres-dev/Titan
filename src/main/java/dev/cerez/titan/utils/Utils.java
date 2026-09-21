@@ -1,15 +1,21 @@
 package dev.cerez.titan.utils;
 
+import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
-import dev.cerez.titan.strategy.grid.GridManager;
-import dev.cerez.titan.strategy.grid.model.SideGrid;
-import dev.cerez.titan.strategy.grid.model.SidePosition;
+import dev.cerez.titan.connector.model.StatusOrder;
+import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
+import dev.cerez.titan.core.strategy.grid.model.SideGrid;
+import dev.cerez.titan.core.strategy.grid.model.SidePosition;
 import lombok.experimental.UtilityClass;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadFactory;
 
@@ -91,4 +97,27 @@ public class Utils {
                 .factory();
     }
 
+    public @NotNull @Unmodifiable List<BinanceConnector.OrderFuture> filterFilled(@NotNull List<BinanceConnector.OrderFuture> orders) {
+        return orders.stream().filter(o -> o.getStatusOrder() == StatusOrder.FILLED).toList();
+    }
+
+    public @NotNull @Unmodifiable List<BinanceConnector.OrderFuture> filterNew(@NotNull List<BinanceConnector.OrderFuture> orders) {
+        return orders.stream().filter(o -> o.getStatusOrder() == StatusOrder.NEW).toList();
+    }
+
+    public <T extends Order> @NotNull @Unmodifiable List<T> filterBuy(@NotNull List<T> orders) {
+        return orders.stream().filter(Order::isBuy).toList();
+    }
+
+    public <T extends Order> @NotNull @Unmodifiable List<T> filterSell(@NotNull List<T> orders) {
+        return orders.stream().filter(Order::isSell).toList();
+    }
+
+    public <T extends Order> @NotNull @Unmodifiable Optional<T> getMin(@NotNull List<T> orders) {
+        return orders.stream().min(Comparator.comparing(Order::getPrice));
+    }
+
+    public <T extends Order> @NotNull @Unmodifiable Optional<T> getMax(@NotNull List<T> orders) {
+        return orders.stream().max(Comparator.comparing(Order::getPrice));
+    }
 }

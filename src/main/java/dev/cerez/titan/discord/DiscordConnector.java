@@ -1,6 +1,6 @@
 package dev.cerez.titan.discord;
 
-import dev.cerez.titan.Main;
+import dev.cerez.titan.Titan;
 import dev.cerez.titan.io.IOdata;
 import dev.cerez.titan.utils.Configurable;
 import dev.cerez.titan.utils.Switch;
@@ -19,7 +19,7 @@ public class DiscordConnector implements Switch, Configurable<DiscordConnector.D
     private final @NotNull String token;
     @Getter
     private final @NotNull DiscordConfig config;
-    private final @NotNull JDA jda;
+    private @NotNull JDA jda;
     @Getter
     private boolean running = false;
     @Getter @Setter
@@ -29,16 +29,17 @@ public class DiscordConnector implements Switch, Configurable<DiscordConnector.D
         DiscordConfig config = IOdata.loadOrSaveConfig(DiscordConfig.builder().build());
         this.token = config.token;
         this.config = config;
-        this.jda = JDABuilder.createDefault(token).build();
     }
 
     @SneakyThrows
     @Override
     public void start() {
-        jda.awaitReady();
+        if (running) return;
         running = true;
-        Main.executor.execute(() -> {
-            while (running) {
+        jda = JDABuilder.createDefault(token).build();
+        jda.awaitReady();
+        Titan.getInstance().getExecutor().execute(() -> {
+            while (running) { // TODO: Bug: Cuando tarda en asignar el StatusProfiler se bloquea el bucle
                 LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(4));
                 if (statusProfiler == null) continue;
                 StatusProfiler.PresenceProfile presenceProfiler = statusProfiler.getPresenceProfile();
@@ -51,8 +52,9 @@ public class DiscordConnector implements Switch, Configurable<DiscordConnector.D
 
     @Override
     public void stop() {
-        jda.shutdown();
+        if (!running) return;
         running = false;
+        jda.shutdown();
     }
 
     public void sendMessage(String message) {

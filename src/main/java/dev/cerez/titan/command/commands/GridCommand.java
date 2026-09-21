@@ -1,11 +1,11 @@
 package dev.cerez.titan.command.commands;
 
-import dev.cerez.titan.Main;
+import dev.cerez.titan.Titan;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.discord.DiscordConnector;
-import dev.cerez.titan.strategy.grid.GridManager;
-import dev.cerez.titan.strategy.grid.model.SideGrid;
+import dev.cerez.titan.core.strategy.grid.GridManager;
+import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
@@ -20,7 +20,7 @@ public class GridCommand extends BaseCommand {
 
     @Override
     public void execute(@NotNull List<String> args) {
-        DiscordConnector discordConnector = Main.getInstance().getDiscordConnector();
+        DiscordConnector discordConnector = Titan.getInstance().getDiscordConnector();
         GridManager.GridManagerConfig config = GridManager.GridManagerConfig.builder()
                 .baseAsset("SPY")
                 .quoteAsset("USDT")

@@ -2,7 +2,7 @@ package dev.cerez.titan.command.commands;
 
 import dev.cerez.titan.Log;
 import dev.cerez.titan.command.BaseCommand;
-import dev.cerez.titan.strategy.fuding.FundingManager;
+import dev.cerez.titan.core.strategy.fuding.FundingManager;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;

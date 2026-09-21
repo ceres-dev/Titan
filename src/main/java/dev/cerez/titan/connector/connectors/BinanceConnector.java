@@ -1,15 +1,14 @@
 package dev.cerez.titan.connector.connectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import dev.cerez.titan.Main;
+import dev.cerez.titan.Titan;
 import dev.cerez.titan.connector.exception.*;
 import dev.cerez.titan.connector.exception.exchange.*;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.model.*;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
+import dev.cerez.titan.utils.Order;
+import lombok.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -45,7 +44,7 @@ public final class BinanceConnector extends BaseConnector {
 
     public BinanceConnector() {
         super(ConnectorConfig.builder()
-                .isTestNet(Main.IS_TESTNET)
+                .isTestNet(Titan.IS_TESTNET)
                 .maxStreamsPerSubscribe(100)
                 .build()
         );
@@ -556,19 +555,19 @@ public final class BinanceConnector extends BaseConnector {
         return Map.copyOf(symbols);
     }
 
-    public @NotNull List<FutureOrder> fGetAllOrder(@NotNull String symbol) {
+    public @NotNull List<OrderFuture> fGetAllOrder(@NotNull String symbol) {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
         JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v1/allOrders", params);
-        List<FutureOrder> orders = new ArrayList<>();
+        List<OrderFuture> orders = new ArrayList<>();
         for (JsonNode node : raw) {
-            orders.add(new FutureOrder(
+            orders.add(new OrderFuture(
                     node.get("clientOrderId").asText(),
                     new BigDecimal(node.get("price").asText()),
                     new BigDecimal(node.get("origQty").asText()),
                     SideOrder.valueOf(node.get("side").asText()),
-                    StatusOrder.parse(node.get("status").asText()),
                     node.get("reduceOnly").asBoolean(),
+                    StatusOrder.parse(node.get("status").asText()),
                     node.get("time").asLong(),
                     node.get("updateTime").asLong()
             ));
@@ -966,8 +965,19 @@ public final class BinanceConnector extends BaseConnector {
 
     public record SpotOrder(@NotNull BigDecimal baseAmount, @NotNull BigDecimal quoteAmount) {}
 
-    public record FutureOrder(String nameOrder, BigDecimal price, BigDecimal amountBaseAsset, SideOrder sideOrder, StatusOrder statusOrder, boolean reduceOnly, long dateCreate, long dateFilled) {
+    @EqualsAndHashCode(callSuper = true)
+    @Data
+    public static final class OrderFuture extends Order {
+        private final StatusOrder statusOrder;
+        private final long dateCreate;
+        private final long dateFilled;
 
+        public OrderFuture(String nameOrder, BigDecimal price, BigDecimal amountBaseAsset, SideOrder sideOrder, boolean reduceOnly, StatusOrder statusOrder, long dateCreate, long dateFilled) {
+            super(nameOrder, price, amountBaseAsset, sideOrder, reduceOnly);
+            this.statusOrder = statusOrder;
+            this.dateCreate = dateCreate;
+            this.dateFilled = dateFilled;
+        }
     }
 
 }

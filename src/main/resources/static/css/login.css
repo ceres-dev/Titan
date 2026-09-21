@@ -1,0 +1,65 @@
+:root {
+    --second-color: #5e1002;
+    --text-color: #f32500;
+}
+body{
+    background: black;
+    margin: 0;
+    color: var(--second-color);
+    background: radial-gradient(ellipse at center, #180808 0%, #000000 100%);
+    font-family: CascadiaCode, serif
+}
+#screen {
+    display: flex;
+    height: 100vh;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+form{
+    display: flex;
+    flex-direction: column;
+}
+
+input {
+    border: var(--second-color);
+    margin: 0;
+    background: transparent;
+    color: var(--second-color);
+    font-family: var(--font-family-monospace), serif;
+    transition: filter 0.3s ease;
+    font-size: 15px;
+}
+input:hover {
+    filter: brightness(150%);
+}
+input:focus {
+    outline: none;
+}
+button {
+    background: transparent;
+    color: var(--second-color);
+    font-family: var(--font-family-monospace), serif;
+    font-size: 15px;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+    transition: filter 0.3s ease;
+    margin-bottom: 40px;
+}
+button:hover {
+    filter: brightness(150%);
+}
+
+label{
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 2px solid var(--second-color);
+}
+.rgbEffect {
+    position: fixed;
+    pointer-events: none;
+    inset: 0;
+    opacity: 3%;
+    background-image: repeating-linear-gradient( to right, #f00 0px, #f00 1px, #0f0 1px, #0f0 2px, #00f 2px, #00f 3px );
+}

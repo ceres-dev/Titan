@@ -1,0 +1,282 @@
+package dev.cerez.titan.core.strategy.fuding;
+
+import dev.cerez.titan.Log;
+import dev.cerez.titan.command.InputUser;
+import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.connector.model.SideOrder;
+import dev.cerez.titan.discord.StatusProfiler;
+import dev.cerez.titan.io.IOdata;
+import dev.cerez.titan.utils.*;
+import lombok.Builder;
+import lombok.Data;
+import lombok.Getter;
+import net.dv8tion.jda.api.OnlineStatus;
+import net.dv8tion.jda.api.entities.Activity;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
+public class FundingManager extends BaseManager<FundingManager.FundingManagerConfig, BinanceConnector> implements StatusProfiler, Status<FundingManager.Status> {
+
+    @NotNull private final InputUser inputUser = new InputUser();
+    @NotNull private final String baseAsset;
+    @NotNull private final String quoteAsset;
+    @NotNull private final UUID uuid;
+    @NotNull @Getter private final String symbol;
+    @NotNull @Getter private Status status = Status.READY;
+
+    public FundingManager(@NotNull FundingManagerConfig config, @NotNull BinanceConnector connector) {
+        super(config, connector);
+        PersistenData data = IOdata.loadPersistenDataFundingManager(new PersistenData(this));
+        Log.info("Config use: %s", config);
+        if (data.isActive) {
+            Log.warning("El programa no termino el proceso de cierre adecuadamente. La estrategia esta corriendo");
+            this.baseAsset = data.config.getBaseAsset();
+            this.quoteAsset = data.config.getQuoteAsset();
+            this.symbol = baseAsset + quoteAsset;
+            this.uuid = data.uuid;
+            this.status = data.status;
+        }else {
+            this.baseAsset = config.getBaseAsset();
+            this.quoteAsset = config.getQuoteAsset();
+            this.symbol = baseAsset + quoteAsset;
+            this.uuid = UUID.randomUUID();
+            IOdata.savePersistenDataFundingManager(new PersistenData(this));
+        }
+    }
+
+    @Override
+    public void start() {
+        if (running){
+            return;
+        } else running = true;
+        connector.getConfig().setLogsRequest(config.logsEndPoints);
+        connector.start();
+        status = Status.CHECK;
+        // Activar el margen Aislado
+        Log.info("¿Esta Habilitado el margen aislado?...");
+        if (!connector.mIsEnableInsolated(symbol)){
+            Log.info("Habilitando margen aislado...");
+            connector.mSetEnableInsolated(symbol, true);
+        }
+        Log.info("<green>Habilitado margen aislado");
+        if (checkPreStart()) {
+            Log.info("Checks <red>Fail");
+            status = Status.READY;
+            return;
+        }
+        Log.info("Checks <green>Ok");
+        if (config.isLogsEndPoints()){
+            Log.info("Logs de EndPoints Activado");
+            connector.getConfig().setLogsRequest(true);
+        }
+        Log.info("Iniciando...");
+        status = Status.STARTING;
+        BalancePreview preview = new BalancePreview(config.getSizePosition(), config.getBooking());
+        // Transferir fondos
+        Log.info("Transfiriendo fondos...");
+        CompletableFuture<Void> futureTransfer = CompletableFuture.runAsync(() -> connector.wTransfer(null, BinanceConnector.Transfer.SPOT_TO_FUTURE, quoteAsset, preview.getLongQuote()));
+        CompletableFuture<Void> maginTransfer = CompletableFuture.runAsync(() -> {
+            connector.wTransfer(null, BinanceConnector.Transfer.SPOT_TO_MARGIN, quoteAsset, preview.getBorrowQuote());
+            connector.wTransfer(symbol, BinanceConnector.Transfer.MARGIN_TO_ISOLATED, quoteAsset, preview.getBorrowQuote());
+        });
+        CompletableFuture.allOf(futureTransfer, maginTransfer).join();
+        Log.info("<green>Fondos Transferidos");
+
+        connector.fSetLeverage(symbol, 1);
+        // Obtener precios
+        CompletableFuture<BigDecimal> pF = CompletableFuture.supplyAsync(() -> connector.fGetPrice(symbol));
+        CompletableFuture<BigDecimal> pS = CompletableFuture.supplyAsync(() -> connector.sGetPrice(symbol));
+
+        BigDecimal fPrice = pF.join();
+        BigDecimal sPrice = pS.join();
+        // Lado Futuro
+        CompletableFuture<Void> closeOrderFuture = CompletableFuture.runAsync(() -> {
+            Log.info("Abriendo posición Long...");
+            connector.fSendOrderToMkt(symbol, SideOrder.BUY, preview.getLongBase(fPrice), "lo-" + Utils.uuidToBase36(uuid), false);
+            Log.info("<green>Posición Long abierta");
+        });
+        // Lado Margen
+        CompletableFuture<Void> closeOrderMargin = CompletableFuture.runAsync(() -> {
+            Log.info("Abriendo posición Short...");
+            connector.mBorrow(symbol, baseAsset, preview.getBorrowBase(sPrice));
+            connector.mSendOrderToMkt(symbol, SideOrder.SELL, preview.getSellFromBorrowBase(sPrice), "so-" + Utils.uuidToBase36(uuid), true);
+            Log.info("<green>Posición Short abierta");
+        });
+        CompletableFuture.allOf(closeOrderMargin, closeOrderFuture).join();
+
+        IOdata.savePersistenDataFundingManager(new PersistenData(this));
+        status = Status.RUNNING;
+    }
+
+    @Override
+    public void stop() {
+        if (!running) {
+            return;
+        }else running = false;
+        connector.stop();
+        BinanceConnector.FuturePosition position = connector.fGetPosition(symbol);
+        BinanceConnector.AssetMargin balanceQuote = connector.miGetBalance(symbol).quote();
+        if (position == null) {
+            Log.error("La posición long no exite");
+            return;
+        }
+        if (balanceQuote == null) {
+            Log.error("La posición short no exite");
+            return;
+        }
+        status = Status.STOPING;
+        BigDecimal borrowed = connector.mGetBorrowed(symbol);
+        Log.info("Deuda: %s", borrowed);
+        CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
+            Log.info("Cerrando Long...", borrowed);
+            connector.fSendOrderToMkt(symbol, SideOrder.SELL, position.quantity(), "lc-" + Utils.uuidToBase36(uuid), true);
+            BigDecimal balance = connector.fGetBalance().get(quoteAsset);
+            Log.info("Transfiriendo %s de USDⓈ-M Futures a Spot", balance);
+            connector.wTransfer(null, BinanceConnector.Transfer.FUTURE_TO_SPOT, quoteAsset, balance);
+        });
+        CompletableFuture<Void> m = CompletableFuture.runAsync(() -> {
+            Log.info("Cerrando Short...", borrowed);
+            connector.mSendOrderToMkt(symbol, SideOrder.BUY, balanceQuote.free(), "sc-" + Utils.uuidToBase36(uuid), false);
+            Log.info("<green>Compra realizada de %s", baseAsset);
+        });
+        f.join();
+        m.join();
+        BinanceConnector.BalanceInsolated balanceInsolated = connector.miGetBalance(symbol);
+        if (balanceInsolated.base().free().compareTo(borrowed) >= 0) {
+            Log.info("Gano Short", baseAsset);
+            Log.info("Pagando el préstamo", baseAsset);
+            connector.mRepay(symbol, baseAsset, borrowed);
+            BigDecimal delta = balanceInsolated.base().free().subtract(borrowed);
+            Log.info("<green>Préstamo pagado", baseAsset);
+            Log.info("Transfiriendo %s %s de Margen Aislado a Spot", delta, baseAsset);
+            connector.wTransfer(symbol, BinanceConnector.Transfer.ISOLATED_TO_MARGIN, baseAsset, delta);
+            connector.wTransfer(null, BinanceConnector.Transfer.MARGIN_TO_SPOT, baseAsset, delta);
+            Log.info("Convirtiendo de %s a %s", baseAsset, quoteAsset);
+            connector.cConvert(baseAsset, quoteAsset, delta, true);
+        }else {
+            Log.info("Gano Long", baseAsset);
+            BigDecimal delta = borrowed.subtract(balanceInsolated.base().free());
+            // Se convierte
+            Log.info("Convirtiendo de %s a %s", quoteAsset, baseAsset);
+            connector.cConvert(quoteAsset, baseAsset, delta, false);
+            Log.info("Transfiriendo %s %s de Margen Aislado a Spot", delta, baseAsset);
+            // Se transfiere lo convertido
+            connector.wTransfer(null, BinanceConnector.Transfer.SPOT_TO_MARGIN, baseAsset, delta);
+            connector.wTransfer(symbol, BinanceConnector.Transfer.MARGIN_TO_ISOLATED, baseAsset, delta);
+            Log.info("Pagando el préstamo", baseAsset);
+            connector.mRepay(symbol, baseAsset, borrowed);
+            Log.info("<green>Préstamo pagado", baseAsset);
+        }
+        Log.info("<green>Long cerrado", borrowed);
+        Log.info("<green>Short Cerrado", baseAsset, quoteAsset);
+        Log.info("Fin del programa", baseAsset, quoteAsset);
+        status = Status.STOPPED;
+    }
+
+    public boolean checkPreStart(){
+        BigDecimal sizePosition = config.getSizePosition();
+        TestFunding.Result testsResults = new TestFunding().run(config);
+        if (testsResults.fail() > 0 || testsResults.waring() > 0 || testsResults.weakWaring() > 0){
+            if (!inputUser.inBoolean("Estas seguro de continuarl?")){
+                Log.info("Abort");
+                return true;
+            }
+        }
+        Log.info("Símbolo configurado <green>%s<reset>. Comenzado...", baseAsset+ quoteAsset);
+
+        Map<String, BigDecimal> balance = connector.sGetBalance();
+        double usdt = balance.getOrDefault("USDT", BigDecimal.ZERO).doubleValue();
+        if (usdt < sizePosition.add(new BigDecimal("0.1")).doubleValue()) {
+            Log.error("Abort: Fondos insuficientes");
+            return true;
+        }else {
+            Log.info("Total: %.2fUSDT | Usara: %.2fUSDT | Reserva: %.2fUSDT", usdt, sizePosition.doubleValue(), BigDecimal.valueOf(usdt).subtract(sizePosition).doubleValue());
+        }
+        BalancePreview preview = new BalancePreview(config.getSizePosition(), config.getBooking());
+        BigDecimal fPrice = connector.fGetPrice(symbol);
+        BigDecimal sPrice = connector.sGetPrice(symbol);
+        DecimalFormat df = new DecimalFormat("000,000.00000");
+        Log.info("""
+                Balance previsto (NO SON LAS CANTIDADES EXACTAS)
+                |         | BASE          | QUOTE         |
+                | Long    | %s | %s |
+                | Borrow  | %s | %s |
+                | SELL    | %s | %s |
+                | Booking | %s | %s |
+                """.formatted(
+                df.format(preview.getLongBase(fPrice)),           df.format(preview.getLongQuote()),
+                df.format(preview.getBookingBase(sPrice)),        df.format(preview.getBookingQuote()),
+                df.format(preview.getSellFromBorrowBase(sPrice)), df.format(preview.getSellFromBorrowQuote()),
+                df.format(preview.getBookingBase(sPrice)),        df.format(preview.getBorrowQuote())
+        ));
+        Log.info("EntrySpred: %.3f%%", (fPrice.divide(sPrice, 12, RoundingMode.DOWN).subtract(BigDecimal.ONE)).multiply(new BigDecimal("100")));
+        return false;
+    }
+
+    @Override
+    public @NotNull StatusProfiler.PresenceProfile getPresenceProfile() {
+        switch (status) {
+            case STOPPED -> {
+                return new PresenceProfile(OnlineStatus.DO_NOT_DISTURB, Activity.of(Activity.ActivityType.WATCHING, "Detenido"));
+            }
+            case READY -> {
+                return new PresenceProfile(OnlineStatus.IDLE, Activity.of(Activity.ActivityType.PLAYING, "En espera de iniciar"));
+            }
+            case CHECK, STARTING -> {
+                return new PresenceProfile(OnlineStatus.ONLINE, Activity.of(Activity.ActivityType.PLAYING, "Iniciando..."));
+            }
+            case RUNNING -> {
+                return new PresenceProfile(OnlineStatus.ONLINE, Activity.of(Activity.ActivityType.WATCHING, "%s @ %.4f%%".formatted(baseAsset + quoteAsset, connector.fGetFundingRate().get(baseAsset + quoteAsset).nextFundingRate().multiply(new BigDecimal("100")))));
+            }
+            case STOPING -> {
+                return new PresenceProfile(OnlineStatus.DO_NOT_DISTURB, Activity.of(Activity.ActivityType.PLAYING, "Deteniendo..."));
+            }
+            default -> {
+                return new PresenceProfile(OnlineStatus.IDLE, Activity.of(Activity.ActivityType.PLAYING, "Estado desconocido"));
+            }
+        }
+    }
+
+
+    @Builder
+    @Getter
+    @Data
+    public static class FundingManagerConfig {
+        private BigDecimal sizePosition;
+        private BigDecimal booking;
+        private String baseAsset;
+        private String quoteAsset;
+        private boolean logsEndPoints;
+    }
+
+    public static class PersistenData {
+        private final FundingManagerConfig config;
+        private final Status status;
+        private final boolean isActive;
+        private final UUID uuid;
+
+        @Contract(pure = true)
+        public PersistenData(@NotNull FundingManager manager) {
+            this.config = manager.config;
+            this.status = manager.status;
+            this.isActive = manager.running;
+            this.uuid = manager.uuid;
+        }
+    }
+
+    public enum Status{
+        READY,
+        CHECK,
+        STARTING,
+        RUNNING,
+        STOPING,
+        STOPPED,
+    }
+}

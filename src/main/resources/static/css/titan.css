@@ -1,0 +1,21 @@
+:root {
+    --font-family-monospace: CascadiaCode;
+}
+
+@font-face {
+    font-family: 'CascadiaCode';
+    src: url('../assets/CascadiaCode.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+body{
+    background: black;
+    margin: 0;
+    color: var(--second-color);
+    background: radial-gradient(ellipse at center, #180808 0%, #000000 100%);
+    font-family: CascadiaCode, serif
+}
+h1{
+    font-size: 80px;
+    margin: 0;
+}

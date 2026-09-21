@@ -1,7 +1,7 @@
 package dev.cerez.titan.utils.telemtry;
 
 import dev.cerez.titan.connector.BaseConnector;
-import dev.cerez.titan.strategy.triangular.utils.TriangularArbitrageOpportunity;
+import dev.cerez.titan.core.strategy.triangular.utils.TriangularArbitrageOpportunity;
 import dev.cerez.titan.utils.Configurable;
 import dev.cerez.titan.utils.Utils;
 import lombok.*;
