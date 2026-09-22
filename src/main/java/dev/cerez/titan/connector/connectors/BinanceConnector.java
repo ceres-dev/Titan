@@ -956,8 +956,12 @@ public final class BinanceConnector extends BaseConnector {
             return nextFundingRate.multiply(BigDecimal.valueOf(24d / interval)) ;
         }
 
-        public @NotNull BigDecimal reate24hAbs(){
+        public @NotNull BigDecimal rate24hAbs(){
             return rate24h().abs();
+        }
+
+        public @NotNull BigDecimal nextFundingRateAbs() {
+            return nextFundingRate.abs();
         }
     }
 

@@ -110,7 +110,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfig, Bina
                 lastOrderFilled.getSideOrder() == order.getSideOrder()
         ));
         applyAttributes.add(new CallOnUpdate((order, c) -> {
-            priceAlarm.clear();
+//            priceAlarm.clear();
             OrderPreview sell = order.stream().filter(OrderPreview::isSell).min(Comparator.comparing(OrderPreview::getPrice)).orElse(null);
             OrderPreview buy = order.stream().filter(OrderPreview::isBuy).max(Comparator.comparing(OrderPreview::getPrice)).orElse(null);
             if (sell != null){

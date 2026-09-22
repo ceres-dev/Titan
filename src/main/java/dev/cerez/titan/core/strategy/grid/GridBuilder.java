@@ -263,7 +263,7 @@ public class GridBuilder {
              */
             BigDecimal allowedAmount = positionBaseAsset.abs();
             while (sumAmount(orders).compareTo(allowedAmount) > 0 && !orders.isEmpty()) {
-                orders.remove(0);
+                orders.removeFirst();
             }
         }else {
             /*
@@ -271,7 +271,7 @@ public class GridBuilder {
              * limitamos el margen total.
              */
             while (sumMargin(orders).compareTo(budgetUsdt) > 0 && !orders.isEmpty()) {
-                orders.remove(0);
+                orders.removeFirst();
             }
         }
     }

@@ -3,7 +3,7 @@ package dev.cerez.titan.io;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.core.strategy.fuding.FundingManager;
+import dev.cerez.titan.core.strategy.funding.FundingManager;
 import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import org.jetbrains.annotations.NotNull;

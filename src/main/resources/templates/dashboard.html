@@ -4,8 +4,42 @@
     <meta charset="UTF-8">
     <title>Dashboard</title>
     <meta name="robots" content="noindex">
+    <link rel="stylesheet" href="../static/css/titan.css">
+    <link rel="stylesheet" href="../static/css/dashboard.css">
 </head>
 <body>
-<h1>Dashboard</h1>
+<header class="boxNav box">
+    <h1>Titan</h1>
+    <p>Local --:--:--</p>
+    <p>Remote --:--:--</p>
+    <p>Exchange --:--:--</p>
+</header>
+<section class="mainDashBoard">
+    <section class="box">
+        <h2>Ordenes</h2>
+    </section>
+    <section class="box">
+        <h2>Balance</h2>
+    </section>
+    <section id="strategy" class="box">
+        <h2>Estrategias</h2>
+        <ul>
+            <li>
+                Grid
+                <button>
+                    Stop
+                </button>
+            </li>
+        </ul>
+        <footer>
+            <button>
+                StopAll
+            </button>
+            <button>
+                New
+            </button>
+        </footer>
+    </section>
+</section>
 </body>
 </html>

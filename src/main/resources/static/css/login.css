@@ -1,13 +1,12 @@
 :root {
-    --second-color: #5e1002;
-    --text-color: #f32500;
+    --main-login-color: #275e02;
 }
 body{
     background: black;
     margin: 0;
-    color: var(--second-color);
-    background: radial-gradient(ellipse at center, #180808 0%, #000000 100%);
-    font-family: CascadiaCode, serif
+    color: var(--main-login-color);
+    background: radial-gradient(ellipse at center, #101808 0%, #000000 40%);
+    font-family: CascadiaCode, monospace, serif
 }
 #screen {
     display: flex;
@@ -22,10 +21,10 @@ form{
 }
 
 input {
-    border: var(--second-color);
+    border: var(--main-login-color);
     margin: 0;
     background: transparent;
-    color: var(--second-color);
+    color: var(--main-login-color);
     font-family: var(--font-family-monospace), serif;
     transition: filter 0.3s ease;
     font-size: 15px;
@@ -38,28 +37,44 @@ input:focus {
 }
 button {
     background: transparent;
-    color: var(--second-color);
+    color: var(--main-login-color);
     font-family: var(--font-family-monospace), serif;
     font-size: 15px;
     padding: 0;
     border: none;
     cursor: pointer;
-    transition: filter 0.3s ease;
+    transition: filter 0.2s ease;
     margin-bottom: 40px;
 }
 button:hover {
     filter: brightness(150%);
 }
+button:active {
+    filter: brightness(0.7);
+}
 
 label{
     padding: 10px;
     margin-bottom: 15px;
-    border: 2px solid var(--second-color);
+    border: 2px solid var(--main-login-color);
 }
 .rgbEffect {
     position: fixed;
     pointer-events: none;
     inset: 0;
-    opacity: 3%;
+    z-index: -1;
+    opacity: 5%;
     background-image: repeating-linear-gradient( to right, #f00 0px, #f00 1px, #0f0 1px, #0f0 2px, #00f 2px, #00f 3px );
+}
+.lines {
+    position: fixed;
+    pointer-events: none;
+    inset: 0;
+    z-index: 0;
+    opacity: 40%;
+    background: repeating-linear-gradient( to top, transparent 0px, transparent 3px, rgba(0, 0, 0, 0.25) 3px, rgba(0, 0, 0, 0.25) 4px );
+}
+.title{
+    font-size: 80px;
+    margin: 0;
 }

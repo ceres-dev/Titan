@@ -65,7 +65,7 @@ public final class GeminiConnector extends BaseConnector implements AutoCloseabl
     @Override
     protected String getPingPayload(@NotNull String wwsURL) {
         return """
-                {"id":"%d","method":"ping","params":{}}
+                {"id":"%d","method":"rangeTime","params":{}}
                 """.formatted(id.incrementAndGet());
     }
 
