@@ -300,6 +300,10 @@ public class GridBuilder {
          * Comenzamos desde el extremo existente.
          * Si no hay ninguna orden, usamos currentPrice.
          */
+        if (orders.isEmpty()) {
+            return;
+        }
+
         BigDecimal nextPrice = getNextPrice(side, orders, currentPrice);
 
         if (reduceOnly) {

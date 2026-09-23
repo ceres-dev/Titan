@@ -4,6 +4,9 @@ import dev.cerez.titan.Log;
 import dev.cerez.titan.command.InputUser;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
+import dev.cerez.titan.core.BaseManager;
+import dev.cerez.titan.core.event.events.FundingManagerEvent;
+import dev.cerez.titan.core.event.events.GridManagerEvent;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.io.IOdata;
 import dev.cerez.titan.utils.*;
@@ -22,7 +25,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public class FundingManager extends BaseManager<FundingManager.FundingManagerConfig, BinanceConnector> implements StatusProfiler, Status<FundingManager.Status> {
+public class FundingManager extends BaseManager<FundingManager.FundingManagerConfig, BinanceConnector, FundingManagerEvent> implements StatusProfiler, Status<FundingManager.Status> {
 
     @NotNull private final InputUser inputUser = new InputUser();
     @NotNull private final String baseAsset;
@@ -56,6 +59,7 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
         if (running){
             return;
         } else running = true;
+        GridManagerEvent gridManagerEvent = new GridManagerEvent() {};
         connector.getConfig().setLogsRequest(config.logsEndPoints);
         connector.start();
         status = Status.CHECK;

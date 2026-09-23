@@ -10,6 +10,7 @@ import dev.cerez.titan.connector.exception.exchange.ReduceOnlyRejectException;
 import dev.cerez.titan.connector.exception.exchange.UnknownOrderException;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
+import dev.cerez.titan.core.event.events.GridManagerEvent;
 import dev.cerez.titan.core.strategy.grid.attribute.attributes.*;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.core.strategy.grid.attribute.ApplyAttributes;
@@ -17,7 +18,7 @@ import dev.cerez.titan.core.strategy.grid.attribute.SideAffected;
 import dev.cerez.titan.core.strategy.grid.model.Context;
 import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
-import dev.cerez.titan.utils.BaseManager;
+import dev.cerez.titan.core.BaseManager;
 import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.WaitableSet;
 import lombok.Builder;
@@ -34,7 +35,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
-public class GridManager extends BaseManager<GridManager.GridManagerConfig, BinanceConnector> implements StatusProfiler {
+public class GridManager extends BaseManager<GridManager.GridManagerConfig, BinanceConnector, GridManagerEvent> implements StatusProfiler {
 
     @Nullable
     private BinanceConnector.OrderFuture lastOrderFilled = null;
@@ -104,10 +105,30 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfig, Bina
             }
             return 1;
         }));
-        applyAttributes.add(new RemoveIf((order, c) ->
-                lastOrderFilled != null &&
-                lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0 &&
-                lastOrderFilled.getSideOrder() == order.getSideOrder()
+        applyAttributes.add(new RemoveIf((order, c) -> {
+               if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
+                   switch(c.config().getSideGrid()) {
+                       case LONG -> {
+                           if (order.getSideOrder() == SideOrder.BUY){
+                               return lastOrderFilled.getPrice().compareTo(order.getPrice()) <= 0;
+                           }else {
+                               return false;
+                           }
+                       }
+                       case SHORT -> {
+                            if (order.getSideOrder() == SideOrder.SELL){
+                                return lastOrderFilled.getPrice().compareTo(order.getPrice()) >= 0;
+                            }else {
+                                return false;
+                            }
+                       }
+                       case BOTH -> {
+                            return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
+                       }
+                   }
+               }
+               return false;
+        }
         ));
         applyAttributes.add(new CallOnUpdate((order, c) -> {
 //            priceAlarm.clear();
@@ -166,6 +187,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfig, Bina
     public synchronized void updateGrid() {
         waitForCancel.clear();
         forOpen.clear();
+        if (event != null) event.onUpdate();
         CompletableFuture<BinanceConnector.FuturePosition> positionFuture = CompletableFuture.supplyAsync(() -> connector.fGetPosition(symbol));
         CompletableFuture<BigDecimal> currentPriceFuture = CompletableFuture.supplyAsync(() -> connector.fGetPrice(symbol));
         CompletableFuture<List<BinanceConnector.OrderFuture>> ordersFuture = CompletableFuture.supplyAsync(() -> connector.fGetAllOrder(symbol));

@@ -7,6 +7,7 @@ import dev.cerez.titan.connector.exception.exchange.*;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.model.*;
+import dev.cerez.titan.core.strategy.grid.model.SidePosition;
 import dev.cerez.titan.utils.Order;
 import lombok.*;
 import org.jetbrains.annotations.Contract;
@@ -370,7 +371,7 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     @Contract("_ -> new")
-    public @NotNull BinanceConnector.BookTick sGetFullPrice(@NotNull String symbol) {
+    public @NotNull BinanceConnector.BookTick sGetBookTick(@NotNull String symbol) {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
         JsonNode node = sendPublicRequest(Method.GET, "/api/v3/depth", params);
@@ -596,7 +597,7 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     @Contract("_ -> new")
-    public @NotNull BinanceConnector.BookTick fGetFullPrice(@NotNull String symbol) {
+    public @NotNull BinanceConnector.BookTick fGetBookTick(@NotNull String symbol) {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
         JsonNode node = sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/depth", params);
@@ -927,7 +928,13 @@ public final class BinanceConnector extends BaseConnector {
 
     public record Convert(double fromMin, double fromMax, double toMin, double toMax) {}
 
-    public record FuturePosition(@NotNull BigDecimal quantity, @NotNull BigDecimal entryPriceAvg, @NotNull BigDecimal pnlUnrealize) {}
+    public record FuturePosition(@NotNull BigDecimal quantity, @NotNull BigDecimal entryPriceAvg, @NotNull BigDecimal pnlUnrealize) {
+        @Contract(pure = true)
+        public @NotNull SidePosition sidePosition() {
+            if (quantity.signum() == 1) return SidePosition.LONG;
+            else return SidePosition.SHORT;
+        }
+    }
 
     public record BookTick(BigDecimal bidPrice, BigDecimal bidQty, BigDecimal askPrice, BigDecimal askQty){}
 

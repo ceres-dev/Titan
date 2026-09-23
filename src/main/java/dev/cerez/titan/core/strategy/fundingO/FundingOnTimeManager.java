@@ -1,21 +1,24 @@
-package dev.cerez.titan.core.strategy.funding2;
+package dev.cerez.titan.core.strategy.fundingO;
 
 import dev.cerez.titan.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.utils.BaseManager;
+import dev.cerez.titan.connector.model.SideOrder;
+import dev.cerez.titan.connector.model.Symbol;
+import dev.cerez.titan.core.BaseManager;
+import dev.cerez.titan.core.event.events.FundingOnTimeManagerEvent;
 import dev.cerez.titan.utils.Utils;
+import lombok.Builder;
+import lombok.Data;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -23,12 +26,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
-public class FundingManger extends BaseManager<FundingManger.FundingMangerConfig, BinanceConnector> {
+public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.FundingMangerConfig, BinanceConnector, FundingOnTimeManagerEvent> {
 
     private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(4, Utils.getThreadFactory());
     private final BigDecimal fundingRateMin = BigDecimal.valueOf(0.003);
+    private volatile BinanceConnector.BookTick currentBookTick = null;
 
-    public FundingManger(@NonNull FundingMangerConfig config, @NonNull BinanceConnector connector) {
+    public FundingOnTimeManager(@NonNull FundingMangerConfig config, @NonNull BinanceConnector connector) {
         super(config, connector);
     }
 
@@ -58,29 +62,44 @@ public class FundingManger extends BaseManager<FundingManger.FundingMangerConfig
                 .plus(1, ChronoUnit.HOURS);
         Duration remaining = Duration.between(now, nextHour);
 
+        Log.info("Balance: %.4f USDT", connector.fGetBalance().get("USDT"));
         Log.info("waiting for funding seconds:%s", remaining.toSeconds());
 
         LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(30)));
 
+        if (event != null) event.onPrepare();
         CompletableFuture<Map<String, BinanceConnector.FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
         CompletableFuture<RangeTime> remoteFuture = CompletableFuture.supplyAsync(() -> getDeltaClockRemote(TimeUnit.SECONDS, 20));
+        CompletableFuture<Map<String, Symbol>> symbolsFuture = CompletableFuture.supplyAsync(connector::fGetAllSymbols);
 
         Map<String, BinanceConnector.FundingRate> funding = fundingFuture.join();
         RangeTime remote = remoteFuture.join();
+        Map<String, Symbol> symbols = symbolsFuture.join();
 
         BinanceConnector.FundingRate target = funding.values().stream()
                 .filter((f) -> (f.nextFundingTime() - System.currentTimeMillis()) < TimeUnit.HOURS.toMillis(1))
                 .max(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRateAbs))
                 .orElse(null);
+
         if (target == null) {
             Log.info("No funding rate found");
             return;
         }
-        if (target.nextFundingRate().abs().compareTo(fundingRateMin) < 0){
-            Log.info("Funding rate is out of range");
-            return;
+
+        try {
+            connector.wfCreateBookTicker(bookTick -> this.currentBookTick = bookTick, target.symbol());
+            this.currentBookTick = connector.fGetBookTick(target.symbol());
+
+            if (target.nextFundingRate().abs().compareTo(fundingRateMin) < 0){
+                Log.info("Funding rate is out of range %.4f%%", target.nextFundingRate().multiply(new BigDecimal(100)));
+//            return;
+            }
+            Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
+            waitForFunding(remote, target);
+        }finally {
+            closePosition(target.symbol());
+            connector.wfRemoveBookTicker(target.symbol());
         }
-        waitForFunding(remote, target);
     }
 
     private void waitForFunding(@NotNull RangeTime remote,
@@ -89,21 +108,58 @@ public class FundingManger extends BaseManager<FundingManger.FundingMangerConfig
 
         long openTime = (fundingTimeLocal - windowSize / 2);
 
+        if (openTime > 500){
+            Log.info("Abort: out window", openTime);
+            return;
+        }
+
+        SideOrder sideOpen = fundingRate.nextFundingRate().signum() > 0 ? SideOrder.SELL : SideOrder.BUY;
+        SideOrder sideClose = sideOpen.inverse();
+
+        BigDecimal quantityQuote = config.getQuantityQuote();
+        BigDecimal quantity = sideClose.isBuy()
+                ? currentBookTick.bidQty().min(quantityQuote.divide(currentBookTick.bidPrice(), 12, RoundingMode.DOWN))
+                : currentBookTick.askQty().min(quantityQuote.divide(currentBookTick.askPrice(), 12, RoundingMode.DOWN));
+
+        Log.info("Orden: %s Cantidad: %.4f".formatted(sideOpen, quantity));
+
         // Esperar hasta el momento de apertura
         parkUntil(openTime);
 
         Log.info("Send order open: %s %d".formatted(fundingRate.symbol(), openTime));
+        CompletableFuture.runAsync(() ->
+                connector.fSendOrderToMkt(fundingRate.symbol(), sideOpen, quantity, null, false)
+        );
 
         // Esperar hasta el funding
         parkUntil(fundingTimeLocal);
 
         Log.info("Send order close: %s %d".formatted(fundingRate.symbol(), fundingTimeLocal));
+        CompletableFuture.runAsync(() ->
+                connector.fSendOrderToMkt(fundingRate.symbol(), sideClose, quantity, null, true)
+        );
     }
 
+    private void closePosition(String symbol){
+        BinanceConnector.FuturePosition position = connector.fGetPosition(symbol);
+        if (position == null) {
+            Log.info("Cierre de la posición exitosa");
+            return;
+        }
+        SideOrder sideOrder = Utils.toSide(position.sidePosition()).inverse();
+
+        connector.fSendOrderToMkt(symbol,
+                sideOrder,
+                position.quantity(),
+                "close-" + Utils.uuidToBase36(UUID.randomUUID()),
+                true
+        );
+        closePosition(symbol);
+    }
 
     @SuppressWarnings("SameParameterValue")
     @Contract("_, _ -> new")
-    private @NotNull FundingManger.RangeTime getDeltaPing(TimeUnit unit, long timeMax){
+    private @NotNull FundingOnTimeManager.RangeTime getDeltaPing(TimeUnit unit, long timeMax){
         AtomicBoolean running = new AtomicBoolean(true);
         executor.schedule(() -> running.set(false), timeMax, unit);
         LinkedList<Long> pingDelta = new LinkedList<>();
@@ -158,6 +214,10 @@ public class FundingManger extends BaseManager<FundingManger.FundingMangerConfig
         }
     }
 
-    public static class FundingMangerConfig {}
+    @Builder
+    @Data
+    public static class FundingMangerConfig {
+        @Builder.Default private BigDecimal quantityQuote = new BigDecimal("20");
+    }
 
 }

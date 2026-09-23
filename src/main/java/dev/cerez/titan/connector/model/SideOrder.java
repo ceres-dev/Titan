@@ -16,4 +16,11 @@ public enum SideOrder implements Side<SideOrder> {
     public SideOrder inverse() {
         return BUY == this ? SELL : BUY;
     }
+
+    public boolean isBuy() {
+        return this == BUY;
+    }
+    public boolean isSell() {
+        return this == SELL;
+    }
 }

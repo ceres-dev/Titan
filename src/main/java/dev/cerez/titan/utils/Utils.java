@@ -74,7 +74,7 @@ public class Utils {
         throw new IllegalArgumentException();
     }
 
-    public SideOrder toSide(SidePosition  sidePosition) {
+    public SideOrder toSide(SidePosition sidePosition) {
         if (sidePosition == SidePosition.LONG) {
             return SideOrder.BUY;
         }
