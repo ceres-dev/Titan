@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/html">
 <head>
     <meta charset="UTF-8">
     <title>Dashboard</title>
@@ -8,18 +8,42 @@
     <link rel="stylesheet" href="../static/css/dashboard.css">
 </head>
 <body>
-<header class="boxNav box">
-    <h1>Titan</h1>
-    <p>Local --:--:--</p>
-    <p>Remote --:--:--</p>
-    <p>Exchange --:--:--</p>
+<header class="mainSections">
+    <nav class="navBar box">
+        <h1>Titan</h1>
+        <p>Local --:--:--</p>
+        <p>Remote --:--:--</p>
+        <p>Exchange --:--:--</p>
+    </nav>
 </header>
-<section class="mainDashBoard">
+<section class="mainSections" style="display: grid; grid-template-columns: 1fr 1fr;">
     <section class="box">
         <h2>Ordenes</h2>
     </section>
     <section class="box">
         <h2>Balance</h2>
+        <ul>
+            <li>
+                <h3>Futuros</h3>
+                <ul  class="listSmall">
+                    <li>
+                        <strong>USDT</strong> 10.123
+                    </li>
+                    <li>
+                        <strong>USDC</strong> 10.123
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <h3>Spot</h3>
+            </li>
+            <li>
+                <h3>Fondos</h3>
+            </li>
+            <li>
+                <h3>Total</h3>
+            </li>
+        </ul>
     </section>
     <section id="strategy" class="box">
         <h2>Estrategias</h2>
@@ -41,5 +65,6 @@
         </footer>
     </section>
 </section>
+<div class="rgbEffect"></div>
 </body>
 </html>

@@ -58,14 +58,7 @@ label{
     margin-bottom: 15px;
     border: 2px solid var(--main-login-color);
 }
-.rgbEffect {
-    position: fixed;
-    pointer-events: none;
-    inset: 0;
-    z-index: -1;
-    opacity: 5%;
-    background-image: repeating-linear-gradient( to right, #f00 0px, #f00 1px, #0f0 1px, #0f0 2px, #00f 2px, #00f 3px );
-}
+
 .lines {
     position: fixed;
     pointer-events: none;

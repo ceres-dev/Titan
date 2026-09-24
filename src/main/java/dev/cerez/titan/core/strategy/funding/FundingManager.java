@@ -252,7 +252,7 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
     @Builder
     @Getter
     @Data
-    public static class FundingManagerConfig {
+    public static class FundingManagerConfig implements Config {
         private BigDecimal sizePosition;
         private BigDecimal booking;
         private String baseAsset;

@@ -19,6 +19,7 @@ import dev.cerez.titan.core.strategy.grid.model.Context;
 import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.core.BaseManager;
+import dev.cerez.titan.utils.Config;
 import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.WaitableSet;
 import lombok.Builder;
@@ -295,7 +296,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfig, Bina
 
     @Builder
     @Data
-    public static class GridManagerConfig {
+    public static class GridManagerConfig implements Config {
         @NotNull private final String baseAsset;
         @NotNull private final String quoteAsset;
         @NotNull private BigDecimal stepSize;

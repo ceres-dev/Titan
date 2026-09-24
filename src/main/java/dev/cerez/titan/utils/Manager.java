@@ -5,7 +5,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.UUID;
 
-public interface Manager<C> extends Configurable<C>, Switch {
+public interface Manager<C extends Config> extends Configurable<C>, Switch, Nameable, Identifiable {
 
     @NotNull Connector getConnector();
 

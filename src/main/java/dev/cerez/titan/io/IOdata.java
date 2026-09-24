@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Properties;
 
+@Deprecated(forRemoval = true)
 @UtilityClass
 public class IOdata {
 

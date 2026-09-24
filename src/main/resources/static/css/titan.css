@@ -9,23 +9,60 @@
     font-weight: normal;
     font-style: normal;
 }
+/* Estructura */
 body{
     background: black;
-    margin: 10px;
     color: white;
-    font-family: CascadiaCode, serif
+    font-family: CascadiaCode, serif;
+    align-content: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
+.box{
+    border : 3px solid var(--main-color);
+    flex-grow: 1;
+    border-radius: 10px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+}
+.navBar{
+    display: flex;
+    flex-direction: row;
+    max-width: 80rem;
+    margin-bottom: 1rem;
+}
+.mainSections{
+
+    max-width: 80rem;
+    width: 100%;
+    grid-gap: 1rem;
+}
+@media (max-width: 75rem){
+    .mainSections{
+        display: flex;
+        flex-direction: column;
+    }
+}
+footer{
+    margin-top: auto;
+}
+/* Texto */
 h1{
     text-align: center;
     margin: auto 0 auto 0;
 }
-h2{
-    margin: auto 0 auto 0;
+h2, h3{
+    margin: 0;
 }
 p{
     text-align: center;
     margin: auto 10px auto;
 }
+
+/* Interactivo */
+
 button {
     background: transparent;
     color: black;
@@ -36,7 +73,6 @@ button {
     border-radius: 6px;
     padding: 2px;
     cursor: pointer;
-    transition: filter 0.2s ease;
 }
 button:hover {
     filter: brightness(1.5);
@@ -44,18 +80,34 @@ button:hover {
 button:active {
     filter: brightness(0.7);
 }
-.box{
-    border : 3px solid var(--main-color);
-    flex-grow: 1;
-    border-radius: 10px;
-    margin-bottom: 15px;
-    padding: 10px;
+
+/* Listas */
+ul, ol{
+    margin: 0;
 }
-.boxNav{
-    display: flex;
+li{
+    margin-top: 1rem
 }
-.mainDashBoard{
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr;
-    grid-gap: 10px;
+li:last-child{
+    margin-bottom: 1rem;
 }
+.listSmall{
+    padding-left: 1rem;
+}
+.listSmall > li{
+    margin-top: 0.2rem;
+}
+.listSmall > li:last-child{
+    margin-bottom: 0.5rem;
+}
+
+/* Effects */
+.rgbEffect {
+    position: fixed;
+    pointer-events: none;
+    inset: 0;
+    z-index: -1;
+    opacity: 5%;
+    background-image: repeating-linear-gradient( to right, #f00 0px, #f00 1px, #0f0 1px, #0f0 2px, #00f 2px, #00f 3px );
+}
+

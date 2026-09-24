@@ -511,6 +511,19 @@ public final class BinanceConnector extends BaseConnector {
         return null;
     }
 
+    public @NotNull List<BinanceConnector.FuturePosition> fGetPositions() {
+        List<BinanceConnector.FuturePosition> result = new ArrayList<>();
+        JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v3/positionRisk");
+        for (JsonNode node : raw) {
+            result.add(new FuturePosition(
+                    new BigDecimal(node.get("positionAmt").asText()),
+                    new BigDecimal(node.get("entryPrice").asText()),
+                    new BigDecimal(node.get("unRealizedProfit").asText())
+            ));
+        }
+        return result;
+    }
+
     private final ConcurrentHashMap<String, Symbol> fCachedSymbols = new ConcurrentHashMap<>();
 
     @SuppressWarnings("DuplicatedCode")
