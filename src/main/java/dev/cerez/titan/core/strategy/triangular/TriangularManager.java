@@ -8,6 +8,7 @@ import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.connector.model.Volume24H;
 import dev.cerez.titan.core.PersistenceNope;
 import dev.cerez.titan.core.event.events.TriangularManagerListener;
+import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
 import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularEngineJava;
@@ -225,6 +226,11 @@ public class TriangularManager extends BaseManager<TriangularManager.TriangularM
     @Override
     public @NotNull StatusProfiler.PresenceProfile getPresenceProfile() {
         return null;
+    }
+
+    @Override
+    public @NotNull TypeManager getTypeManager() {
+        return TypeManager.TRIANGULAR;
     }
 
     protected record SymbolVolume(

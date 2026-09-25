@@ -36,6 +36,7 @@ public final class Titan implements Switch {
 
     @Getter private final DiscordConnector discordConnector = new DiscordConnector();
     @Getter private final TitanApplication titanApplication = new TitanApplication();
+    @Getter private final BinanceConnector publicConnector = new BinanceConnector();
     private final Map<UUID, EnvironmentManager> environmentManagers = new HashMap<>();
 
     public static void main(String[] args) {

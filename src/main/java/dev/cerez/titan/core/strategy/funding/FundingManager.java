@@ -7,6 +7,7 @@ import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.core.BaseManager;
 import dev.cerez.titan.core.event.events.FundingManagerListener;
 import dev.cerez.titan.core.event.events.GridManagerListener;
+import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.io.StorageManager;
 import dev.cerez.titan.utils.Status;
@@ -245,6 +246,10 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
         }
     }
 
+    @Override
+    public @NotNull TypeManager getTypeManager() {
+        return TypeManager.FUNDING;
+    }
 
     @Builder
     @Getter

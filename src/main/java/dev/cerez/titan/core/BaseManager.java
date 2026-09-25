@@ -2,12 +2,12 @@ package dev.cerez.titan.core;
 
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.core.event.Listener;
+import dev.cerez.titan.core.exception.MangerIsNotRunningException;
 import dev.cerez.titan.io.PersistenceProvider;
 import dev.cerez.titan.io.StorageManager;
 import dev.cerez.titan.io.ConfigurationProvider;
-import dev.cerez.titan.utils.Manager;
+import dev.cerez.titan.core.strategy.Manager;
 import dev.cerez.titan.core.event.SupplierEvent;
-import dev.cerez.titan.utils.exception.MangerIsNotRunningException;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -32,7 +32,11 @@ public abstract class BaseManager<C, P, O extends Connector, L extends Listener>
 
     @Getter @Setter(value = AccessLevel.NONE) protected boolean running = false;
 
-    public BaseManager(@NotNull C configDefault, @NotNull Class<P> persistenceClazz, @NotNull O connector, @NotNull StorageManager storageManager) {
+    public BaseManager(@NotNull C configDefault,
+                       @NotNull Class<P> persistenceClazz,
+                       @NotNull O connector,
+                       @NotNull StorageManager storageManager
+    ) {
         this.configProvider = storageManager.getProviderOrSaveConfig(configDefault);
         this.persistenceProvider = storageManager.getPersistenceProvider(persistenceClazz);
         this.connector = connector;
@@ -43,7 +47,7 @@ public abstract class BaseManager<C, P, O extends Connector, L extends Listener>
 
     protected void runningOrException(){
         if (!this.running){
-            throw new MangerIsNotRunningException("Manager is not running");
+            throw new MangerIsNotRunningException();
         }
     }
 
@@ -83,4 +87,5 @@ public abstract class BaseManager<C, P, O extends Connector, L extends Listener>
     protected void savePersistence(P persistence){
         storageManager.savePersistence(persistence);
     }
+
 }

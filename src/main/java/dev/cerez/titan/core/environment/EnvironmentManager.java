@@ -4,13 +4,13 @@ import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.BaseManager;
 import dev.cerez.titan.core.ConfigNope;
 import dev.cerez.titan.core.PersistenceNope;
-import dev.cerez.titan.core.environment.exception.AssetNotExitsException;
-import dev.cerez.titan.core.environment.exception.ConfigMalformatException;
-import dev.cerez.titan.core.environment.exception.ManagerIsNotFoundException;
+import dev.cerez.titan.core.exception.ConfigMalformatException;
+import dev.cerez.titan.core.exception.ManagerIsNotFoundException;
 import dev.cerez.titan.core.event.events.EnvironmentManagerListener;
+import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.io.StorageManager;
 import dev.cerez.titan.io.StorageManagerJsonLocal;
-import dev.cerez.titan.utils.Manager;
+import dev.cerez.titan.core.strategy.Manager;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.Contract;
@@ -60,6 +60,11 @@ public class EnvironmentManager extends BaseManager<ConfigNope, PersistenceNope,
         running = false;
     }
 
+    @Override
+    public @NotNull TypeManager getTypeManager() {
+        return TypeManager.FUNDING;
+    }
+
     public class EnvironmentPort {
 
         public void stopManager(@NotNull UUID id) throws ManagerIsNotFoundException {
@@ -91,8 +96,8 @@ public class EnvironmentManager extends BaseManager<ConfigNope, PersistenceNope,
             return uuid;
         }
 
-        public @NotNull Set<UUID> getManagerIds() {
-            return new HashSet<>(manager.keySet());
+        public @NotNull Set<Manager<?>> getManagers() {
+            return new HashSet<>(manager.values());
         }
 
         public long getLocalTimestamp() {

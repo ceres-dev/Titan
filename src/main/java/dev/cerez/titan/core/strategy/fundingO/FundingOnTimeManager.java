@@ -7,6 +7,7 @@ import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.BaseManager;
 import dev.cerez.titan.core.PersistenceNope;
 import dev.cerez.titan.core.event.events.FundingOnTimeManagerListener;
+import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.io.StorageManager;
 import dev.cerez.titan.utils.Utils;
 import lombok.Builder;
@@ -189,6 +190,11 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
             deltaTime.add(serverTime - midpoint);
         }
         return newRange(deltaTime);
+    }
+
+    @Override
+    public @NotNull TypeManager getTypeManager() {
+        return TypeManager.FUNDING_ON_TIME;
     }
 
     private record RangeTime(long max, long min, long avg){}

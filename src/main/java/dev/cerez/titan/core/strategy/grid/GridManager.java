@@ -12,6 +12,7 @@ import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
 import dev.cerez.titan.core.PersistenceNope;
 import dev.cerez.titan.core.event.events.GridManagerListener;
+import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.core.strategy.grid.attribute.attributes.*;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.core.strategy.grid.attribute.ApplyAttributes;
@@ -292,6 +293,11 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
                 preview.getAmountBaseAsset().compareTo(order.getAmountBaseAsset()) == 0 &&
                 preview.getPrice().compareTo(order.getPrice()) == 0 &&
                 preview.isReduceOnly() == order.isReduceOnly();
+    }
+
+    @Override
+    public @NotNull TypeManager getTypeManager() {
+        return TypeManager.GRID;
     }
 
     @Builder
