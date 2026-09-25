@@ -36,14 +36,13 @@ public class Log {
         LOGGER.error(formatColor("<red_light>" + message + "<reset>"));
     }
 
-    public static synchronized void clearLine(){
-        System.out.print("\r " + " ".repeat(150) + "\r");
-    }
     public static synchronized void exception(String message, Exception exception) {
-//        LOGGER.error(setFormatException(message, exception));
-        exception.printStackTrace();
+        LOGGER.error(message, exception);
     }
 
+    public static synchronized void exception(Exception exception) {
+        LOGGER.error("No especificado", exception);
+    }
 
     private static String formatColor(String s){
         for (Colors color : Colors.values()) {

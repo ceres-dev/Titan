@@ -14,7 +14,7 @@ import java.util.function.BiFunction;
 public class TestFunding {
 
     @SuppressWarnings("resource")
-    public Result run(FundingManager.FundingManagerConfig config) {
+    public Result run(FundingManager.FundingManagerConfiguration config) {
         BinanceConnector connector = new BinanceConnector();
         connector.getConfig().setLogsRequest(config.isLogsEndPoints());
         connector.start();

@@ -8,6 +8,9 @@ import dev.cerez.titan.core.strategy.triangular.TriangularManager;
 import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularEngineJava;
 import dev.cerez.titan.core.strategy.triangular.ExecutorCycles;
 import dev.cerez.titan.core.strategy.triangular.utils.Loader;
+import dev.cerez.titan.io.StorageManager;
+import dev.cerez.titan.io.StorageManagerJsonLocal;
+import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.telemtry.Telemetry;
 import org.jetbrains.annotations.NotNull;
 
@@ -32,7 +35,7 @@ public class TriangularCommand extends BaseCommand {
                 .maxDelaysDeltaComputeNanoTime(500)
                 .stepsAddDelayComputeNanoTime(10)
                 .build();
-        TriangularManager.TriangularManagerConfig triangularManagerConfig = TriangularManager.TriangularManagerConfig.builder()
+        TriangularManager.TriangularManagerConfiguration triangularManagerConfig = TriangularManager.TriangularManagerConfiguration.builder()
                 .maxSymbols(900)
                 .banAssets(Set.of("TRY"))
                 .maxCycleLength(4)
@@ -44,9 +47,10 @@ public class TriangularCommand extends BaseCommand {
         Telemetry telemetry =           new Telemetry(telemetryConfig);
         Loader loader =                 new Loader();
         ExecutorCycles executorCycles = new ExecutorCycles(configExecutor, connector);
+        StorageManager storageManager = new StorageManagerJsonLocal(Utils.getRootId());
 
         connector.setTelemetry(telemetry);
-        TriangularManager manager = new TriangularManager(triangularManagerConfig, connector);
+        TriangularManager manager = new TriangularManager(triangularManagerConfig, connector, storageManager);
         manager.setTelemetry(telemetry);
         manager.setOnUpdate(executorCycles::onOpportunities);
         manager.start();

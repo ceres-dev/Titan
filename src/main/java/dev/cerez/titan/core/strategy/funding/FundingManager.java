@@ -5,11 +5,12 @@ import dev.cerez.titan.command.InputUser;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.core.BaseManager;
-import dev.cerez.titan.core.event.events.FundingManagerEvent;
-import dev.cerez.titan.core.event.events.GridManagerEvent;
+import dev.cerez.titan.core.event.events.FundingManagerListener;
+import dev.cerez.titan.core.event.events.GridManagerListener;
 import dev.cerez.titan.discord.StatusProfiler;
-import dev.cerez.titan.io.IOdata;
-import dev.cerez.titan.utils.*;
+import dev.cerez.titan.io.StorageManager;
+import dev.cerez.titan.utils.Status;
+import dev.cerez.titan.utils.Utils;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Getter;
@@ -25,7 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public class FundingManager extends BaseManager<FundingManager.FundingManagerConfig, BinanceConnector, FundingManagerEvent> implements StatusProfiler, Status<FundingManager.Status> {
+public class FundingManager extends BaseManager<FundingManager.FundingManagerConfiguration, FundingManager.FundingManagerPersistan, BinanceConnector, FundingManagerListener> implements StatusProfiler, Status<FundingManager.Status> {
 
     @NotNull private final InputUser inputUser = new InputUser();
     @NotNull private final String baseAsset;
@@ -34,23 +35,19 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
     @NotNull @Getter private final String symbol;
     @NotNull @Getter private Status status = Status.READY;
 
-    public FundingManager(@NotNull FundingManagerConfig config, @NotNull BinanceConnector connector) {
-        super(config, connector);
-        PersistenData data = IOdata.loadPersistenDataFundingManager(new PersistenData(this));
-        Log.info("Config use: %s", config);
-        if (data.isActive) {
+    public FundingManager(@NotNull FundingManagerConfiguration config, @NotNull BinanceConnector connector, @NotNull StorageManager storageManager) {
+        super(config, FundingManagerPersistan.class, connector, storageManager);
+
+        FundingManagerPersistan persistan = getPersistence();
+        this.baseAsset = getConfig().getBaseAsset();
+        this.quoteAsset = getConfig().getQuoteAsset();
+        this.symbol = baseAsset + quoteAsset;
+        if (persistan.isActive) {
             Log.warning("El programa no termino el proceso de cierre adecuadamente. La estrategia esta corriendo");
-            this.baseAsset = data.config.getBaseAsset();
-            this.quoteAsset = data.config.getQuoteAsset();
-            this.symbol = baseAsset + quoteAsset;
-            this.uuid = data.uuid;
-            this.status = data.status;
+            this.uuid = persistan.uuid;
+            this.status = persistan.status;
         }else {
-            this.baseAsset = config.getBaseAsset();
-            this.quoteAsset = config.getQuoteAsset();
-            this.symbol = baseAsset + quoteAsset;
             this.uuid = UUID.randomUUID();
-            IOdata.savePersistenDataFundingManager(new PersistenData(this));
         }
     }
 
@@ -59,8 +56,8 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
         if (running){
             return;
         } else running = true;
-        GridManagerEvent gridManagerEvent = new GridManagerEvent() {};
-        connector.getConfig().setLogsRequest(config.logsEndPoints);
+        GridManagerListener gridManagerEvent = new GridManagerListener() {};
+        connector.getConfig().setLogsRequest(getConfig().logsEndPoints);
         connector.start();
         status = Status.CHECK;
         // Activar el margen Aislado
@@ -76,13 +73,13 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
             return;
         }
         Log.info("Checks <green>Ok");
-        if (config.isLogsEndPoints()){
+        if (getConfig().isLogsEndPoints()){
             Log.info("Logs de EndPoints Activado");
             connector.getConfig().setLogsRequest(true);
         }
         Log.info("Iniciando...");
         status = Status.STARTING;
-        BalancePreview preview = new BalancePreview(config.getSizePosition(), config.getBooking());
+        BalancePreview preview = new BalancePreview(getConfig().getSizePosition(), getConfig().getBooking());
         // Transferir fondos
         Log.info("Transfiriendo fondos...");
         CompletableFuture<Void> futureTransfer = CompletableFuture.runAsync(() -> connector.wTransfer(null, BinanceConnector.Transfer.SPOT_TO_FUTURE, quoteAsset, preview.getLongQuote()));
@@ -115,7 +112,7 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
         });
         CompletableFuture.allOf(closeOrderMargin, closeOrderFuture).join();
 
-        IOdata.savePersistenDataFundingManager(new PersistenData(this));
+        savePersistence(new FundingManagerPersistan(this));
         status = Status.RUNNING;
     }
 
@@ -185,8 +182,8 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
     }
 
     public boolean checkPreStart(){
-        BigDecimal sizePosition = config.getSizePosition();
-        TestFunding.Result testsResults = new TestFunding().run(config);
+        BigDecimal sizePosition = getConfig().getSizePosition();
+        TestFunding.Result testsResults = new TestFunding().run(getConfig());
         if (testsResults.fail() > 0 || testsResults.waring() > 0 || testsResults.weakWaring() > 0){
             if (!inputUser.inBoolean("Estas seguro de continuarl?")){
                 Log.info("Abort");
@@ -203,7 +200,7 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
         }else {
             Log.info("Total: %.2fUSDT | Usara: %.2fUSDT | Reserva: %.2fUSDT", usdt, sizePosition.doubleValue(), BigDecimal.valueOf(usdt).subtract(sizePosition).doubleValue());
         }
-        BalancePreview preview = new BalancePreview(config.getSizePosition(), config.getBooking());
+        BalancePreview preview = new BalancePreview(getConfig().getSizePosition(), getConfig().getBooking());
         BigDecimal fPrice = connector.fGetPrice(symbol);
         BigDecimal sPrice = connector.sGetPrice(symbol);
         DecimalFormat df = new DecimalFormat("000,000.00000");
@@ -252,7 +249,7 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
     @Builder
     @Getter
     @Data
-    public static class FundingManagerConfig implements Config {
+    public static class FundingManagerConfiguration {
         private BigDecimal sizePosition;
         private BigDecimal booking;
         private String baseAsset;
@@ -260,15 +257,13 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
         private boolean logsEndPoints;
     }
 
-    public static class PersistenData {
-        private final FundingManagerConfig config;
+    public static class FundingManagerPersistan {
         private final Status status;
         private final boolean isActive;
         private final UUID uuid;
 
         @Contract(pure = true)
-        public PersistenData(@NotNull FundingManager manager) {
-            this.config = manager.config;
+        public FundingManagerPersistan(@NotNull FundingManager manager) {
             this.status = manager.status;
             this.isActive = manager.running;
             this.uuid = manager.uuid;

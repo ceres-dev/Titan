@@ -5,8 +5,9 @@ import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.BaseManager;
-import dev.cerez.titan.core.event.events.FundingOnTimeManagerEvent;
-import dev.cerez.titan.utils.Config;
+import dev.cerez.titan.core.PersistenceNope;
+import dev.cerez.titan.core.event.events.FundingOnTimeManagerListener;
+import dev.cerez.titan.io.StorageManager;
 import dev.cerez.titan.utils.Utils;
 import lombok.Builder;
 import lombok.Data;
@@ -27,14 +28,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
-public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.FundingMangerConfig, BinanceConnector, FundingOnTimeManagerEvent> {
+public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.FundingMangerConfiguration, PersistenceNope, BinanceConnector, FundingOnTimeManagerListener> {
 
     private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(4, Utils.getThreadFactory());
     private final BigDecimal fundingRateMin = BigDecimal.valueOf(0.003);
     private volatile BinanceConnector.BookTick currentBookTick = null;
 
-    public FundingOnTimeManager(@NonNull FundingMangerConfig config, @NonNull BinanceConnector connector) {
-        super(config, connector);
+    public FundingOnTimeManager(@NotNull FundingMangerConfiguration config, @NonNull BinanceConnector connector, @NotNull StorageManager storageManager) {
+        super(config, PersistenceNope.class, connector, storageManager);
     }
 
     @Override
@@ -68,7 +69,7 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
 
         LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
 
-        if (event != null) event.onPrepare();
+        callEvent(FundingOnTimeManagerListener::onPrepare);
         CompletableFuture<Map<String, BinanceConnector.FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
         CompletableFuture<RangeTime> remoteFuture = CompletableFuture.supplyAsync(() -> getDeltaClockRemote(TimeUnit.SECONDS, 20));
         CompletableFuture<Map<String, Symbol>> symbolsFuture = CompletableFuture.supplyAsync(connector::fGetAllSymbols);
@@ -99,6 +100,7 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
             }
             Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
             waitForFunding(remote, target);
+            callEvent(FundingOnTimeManagerListener::onPostExecute);
         }finally {
             LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
             closePosition(target.symbol());
@@ -120,7 +122,7 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
         SideOrder sideOpen = target.nextFundingRate().signum() > 0 ? SideOrder.SELL : SideOrder.BUY;
         SideOrder sideClose = sideOpen.inverse();
 
-        BigDecimal quantityQuote = config.getQuantityQuote();
+        BigDecimal quantityQuote = getConfig().getQuantityQuote();
         BigDecimal quantity = sideOpen.isBuy()
                 ? /*currentBookTick.askQty().min*/(quantityQuote.divide(currentBookTick.askPrice(), 12, RoundingMode.DOWN))
                 : /*currentBookTick.bidQty().min*/(quantityQuote.divide(currentBookTick.bidPrice(), 12, RoundingMode.DOWN));
@@ -220,7 +222,7 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
 
     @Builder
     @Data
-    public static class FundingMangerConfig implements Config {
+    public static class FundingMangerConfiguration {
         @Builder.Default private BigDecimal quantityQuote = new BigDecimal("20");
     }
 

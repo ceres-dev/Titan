@@ -5,7 +5,6 @@ import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.strategy.triangular.engine.model.NameAsset;
 import dev.cerez.titan.core.strategy.triangular.utils.TriangularArbitrageOpportunity;
-import dev.cerez.titan.utils.Config;
 import dev.cerez.titan.utils.Configurable;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -17,12 +16,12 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @RequiredArgsConstructor
-public abstract class SearchTriangularEngine implements Configurable<SearchTriangularEngine.EngineConfig> {
+public abstract class SearchTriangularEngine implements Configurable<SearchTriangularEngine.EngineConfigurationProvider> {
 
     public static final double PROFIT_EPSILON = 1e-12;
 
     @Getter
-    protected final EngineConfig config;
+    protected final EngineConfigurationProvider config;
     protected final ConcurrentMap<String, TriangularArbitrageOpportunity> lastTriangular = new ConcurrentHashMap<>();
     protected final ConcurrentMap<String, BookTickDouble> liveTickers = new ConcurrentHashMap<>();
     protected final ConcurrentMap<String, NameAssetIndexed> nameAssetCache = new ConcurrentHashMap<>();
@@ -157,7 +156,7 @@ public abstract class SearchTriangularEngine implements Configurable<SearchTrian
 
     @Data
     @SuperBuilder
-    public static class EngineConfig implements Config {
+    public static class EngineConfigurationProvider {
         @Builder.Default public int maxSymbols = 1500;
         @Builder.Default public double defaultFeeRate = 0.001;
         @Builder.Default public double defaultStartAmount = 10d;

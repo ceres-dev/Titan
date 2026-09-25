@@ -4,8 +4,12 @@
     <meta charset="UTF-8">
     <title>Dashboard</title>
     <meta name="robots" content="noindex">
+    <!--Local-->
     <link rel="stylesheet" href="../static/css/titan.css">
     <link rel="stylesheet" href="../static/css/dashboard.css">
+    <!--Remote-->
+    <link rel="stylesheet" href="/css/titan.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
 </head>
 <body>
 <header class="mainSections">
@@ -25,23 +29,35 @@
         <ul>
             <li>
                 <h3>Futuros</h3>
-                <ul  class="listSmall">
+                <ul class="listSmall" id="futureBalance">
                     <li>
-                        <strong>USDT</strong> 10.123
-                    </li>
-                    <li>
-                        <strong>USDC</strong> 10.123
+                        <div class="loader loaderSmall"></div>
                     </li>
                 </ul>
             </li>
             <li>
                 <h3>Spot</h3>
+                <ul class="listSmall" id="spotBalance">
+                    <li>
+                        <div class="loader loaderSmall"></div>
+                    </li>
+                </ul>
             </li>
             <li>
                 <h3>Fondos</h3>
+                <ul class="listSmall" id="fondoBalance">
+                    <li>
+                        <div class="loader loaderSmall"></div>
+                    </li>
+                </ul>
             </li>
             <li>
                 <h3>Total</h3>
+                <ul class="listSmall" id="totalBalance">
+                    <li>
+                        <div class="loader loaderSmall"></div>
+                    </li>
+                </ul>
             </li>
         </ul>
     </section>
@@ -49,7 +65,7 @@
         <h2>Estrategias</h2>
         <ul>
             <li>
-                Grid
+                <strong>Grid</strong>
                 <button>
                     Stop
                 </button>
@@ -66,5 +82,54 @@
     </section>
 </section>
 <div class="rgbEffect"></div>
+<script>
+    async function loadBalance() {
+        try {
+            const response = await fetch("/api/balance");
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const balance = await response.json();
+
+            renderBalance("futureBalance", balance.future);
+            renderBalance("spotBalance", balance.spot);
+            //renderBalance("fondoBalance", balance.spot);
+            //renderBalance("totalBalance", balance.spot);
+
+
+        } catch (error) {
+            console.error("Error obteniendo el balance:", error);
+        }
+    }
+
+    function renderBalance(elementId, balances) {
+        const list = document.getElementById(elementId);
+
+        // Limpiar contenido anterior
+        list.innerHTML = "";
+        if (Object.entries(balances).length > 0) {
+            for (const [asset, amount] of Object.entries(balances)) {
+                const li = document.createElement("li");
+                const strong = document.createElement("strong");
+                strong.textContent = asset;
+
+                li.appendChild(strong);
+                li.append(` ${amount}`);
+
+                list.appendChild(li);
+            }
+        }else {
+            const li = document.createElement("li");
+            const strong = document.createElement("strong");
+            strong.textContent = "Sin Fondos";
+            li.appendChild(strong);
+            list.appendChild(li);
+        }
+
+    }
+    loadBalance();
+
+</script>
 </body>
 </html>

@@ -6,12 +6,14 @@ import dev.cerez.titan.connector.model.AssetRate;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.connector.model.Volume24H;
-import dev.cerez.titan.core.event.events.TriangularManagerEvent;
+import dev.cerez.titan.core.PersistenceNope;
+import dev.cerez.titan.core.event.events.TriangularManagerListener;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
 import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularEngineJava;
 import dev.cerez.titan.core.strategy.triangular.utils.TriangularArbitrageOpportunity;
 import dev.cerez.titan.core.BaseManager;
+import dev.cerez.titan.io.StorageManager;
 import dev.cerez.titan.utils.telemtry.Telemetry;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -25,7 +27,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 
-public class TriangularManager extends BaseManager<TriangularManager.TriangularManagerConfig, Connector, TriangularManagerEvent> implements StatusProfiler {
+public class TriangularManager extends BaseManager<TriangularManager.TriangularManagerConfiguration, PersistenceNope, Connector, TriangularManagerListener> implements StatusProfiler {
 
     @Setter @Nullable private SearchTriangularEngine engine;
     @Setter @Nullable private Consumer<SearchTriangularEngine.OnOpportunities> onUpdate;
@@ -35,16 +37,16 @@ public class TriangularManager extends BaseManager<TriangularManager.TriangularM
     @Nullable private Consumer<BookTickDouble> streamListener = null;
 
     @SneakyThrows
-    public TriangularManager(@NotNull TriangularManagerConfig config, @NotNull Connector connector) {
-        super(config, connector);
-        this.engine = config.getEngine().getConstructor(SearchTriangularEngine.EngineConfig.class).newInstance(config);
+    public TriangularManager(@NotNull TriangularManagerConfiguration config, @NotNull Connector connector, StorageManager storageManager) {
+        super(config, PersistenceNope.class, connector, storageManager);
+        this.engine = getConfig().getEngine().getConstructor(SearchTriangularEngine.EngineConfigurationProvider.class).newInstance(getConfig());
     }
 
     @Blocking
     public void start() {
         if (running) return;
         running = true;
-        if (config.getEngine() == null) throw new IllegalStateException("Engine is not setting");
+        if (getConfig().getEngine() == null) throw new IllegalStateException("Engine is not setting");
         CompletableFuture<Map<String, Symbol>> allSymbolsMapFuture = CompletableFuture.supplyAsync(
                 connector::sGetAllSymbols
         );
@@ -130,7 +132,7 @@ public class TriangularManager extends BaseManager<TriangularManager.TriangularM
             if (!symbol.getIsAllowTrading()) {
                 continue;
             }
-            if (config.getBanAssets().contains(symbol.getBaseAsset()) || config.getBanAssets().contains(symbol.getQuoteAsset())) {
+            if (getConfig().getBanAssets().contains(symbol.getBaseAsset()) || getConfig().getBanAssets().contains(symbol.getQuoteAsset())) {
                 continue;
             }
 
@@ -154,7 +156,7 @@ public class TriangularManager extends BaseManager<TriangularManager.TriangularM
         }
 
         candidates.sort((a, b) -> Double.compare(b.volumeUsdt(), a.volumeUsdt()));
-        int limit = Math.min(config.getMaxSymbols(), candidates.size());
+        int limit = Math.min(getConfig().getMaxSymbols(), candidates.size());
         Set<String> result = new HashSet<>(limit);
         for (int i = 0; i < limit; i++) {
             result.add(candidates.get(i).symbol());
@@ -235,7 +237,7 @@ public class TriangularManager extends BaseManager<TriangularManager.TriangularM
     @Getter
     @Setter
     @ToString
-    public static class TriangularManagerConfig extends SearchTriangularEngine.EngineConfig {
+    public static class TriangularManagerConfiguration extends SearchTriangularEngine.EngineConfigurationProvider {
         @Builder.Default public int maxSymbols = 1500;
         @Builder.Default public Set<String> banAssets = Set.of();
         @Builder.Default public final Class<? extends SearchTriangularEngine> engine = SearchTriangularEngineJava.class;

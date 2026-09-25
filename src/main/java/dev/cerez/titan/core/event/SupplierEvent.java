@@ -1,9 +1,8 @@
 package dev.cerez.titan.core.event;
 
-public interface SupplierEvent<E extends Event> {
+public interface SupplierEvent<E extends Listener> {
 
-    E getEvent();
 
-    void setEvent(E e);
+    void registerListener(E e);
 
 }

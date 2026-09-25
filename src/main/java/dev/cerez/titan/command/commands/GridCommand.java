@@ -6,11 +6,15 @@ import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.core.strategy.grid.GridManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
+import dev.cerez.titan.io.StorageManager;
+import dev.cerez.titan.io.StorageManagerJsonLocal;
+import dev.cerez.titan.utils.Utils;
 import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 @ToString
 public class GridCommand extends BaseCommand {
@@ -21,7 +25,7 @@ public class GridCommand extends BaseCommand {
     @Override
     public void execute(@NotNull List<String> args) {
         DiscordConnector discordConnector = Titan.getInstance().getDiscordConnector();
-        GridManager.GridManagerConfig config = GridManager.GridManagerConfig.builder()
+        GridManager.GridManagerConfiguration config = GridManager.GridManagerConfiguration.builder()
                 .baseAsset("SPY")
                 .quoteAsset("USDT")
                 .stepSize(new BigDecimal("0.5"))
@@ -31,7 +35,8 @@ public class GridCommand extends BaseCommand {
                 .sideGrid(SideGrid.LONG)
                 .amountPriceOffset(15)
                 .build();
-        GridManager manager = new GridManager(config, new BinanceConnector());
+        StorageManager storageManager = new StorageManagerJsonLocal(Utils.getRootId());
+        GridManager manager = new GridManager(config, new BinanceConnector(), storageManager);
         discordConnector.setStatusProfiler(manager);
         discordConnector.start();
         manager.start();

@@ -24,7 +24,7 @@ public class CheckFundingCommand extends BaseCommand {
         if (args.size() < 2) {
             return;
         }
-        FundingManager.FundingManagerConfig config = FundingManager.FundingManagerConfig.builder()
+        FundingManager.FundingManagerConfiguration config = FundingManager.FundingManagerConfiguration.builder()
                 .sizePosition(new BigDecimal(12))
                 .booking(new BigDecimal("0.1"))
                 .baseAsset("ONG")

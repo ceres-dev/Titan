@@ -27,7 +27,7 @@ public class OffsetOrderSellPrice extends BaseAttribute {
         for (OrderPreview order : context.sells()) {
             order.setPrice(order.getPrice().add(offset));
         }
-        GridManager.GridManagerConfig config = context.context().config();
+        GridManager.GridManagerConfiguration config = context.context().config();
         Utils.getMin(context.sells()).ifPresent(order -> {
             if (order.getPrice().subtract(config.getStepSize()).compareTo(context.context().currentPrice()) >= 0) {
                 context.orderUse().add(new OrderPreview(Utils.uuidToBase36(UUID.randomUUID()),

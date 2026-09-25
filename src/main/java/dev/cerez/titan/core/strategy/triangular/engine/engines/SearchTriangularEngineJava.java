@@ -19,7 +19,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
     @NotNull(value = "Call configure first")
     private ArbitrageEdge[][] outgoingByFromArray = null;
 
-    public SearchTriangularEngineJava(EngineConfig engineConfig) {
+    public SearchTriangularEngineJava(EngineConfigurationProvider engineConfig) {
         super(engineConfig);
     }
 

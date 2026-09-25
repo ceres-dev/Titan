@@ -1,37 +1,86 @@
 package dev.cerez.titan.core;
 
 import dev.cerez.titan.connector.Connector;
-import dev.cerez.titan.core.environment.EnvironmentManager;
-import dev.cerez.titan.core.event.Event;
-import dev.cerez.titan.utils.Config;
+import dev.cerez.titan.core.event.Listener;
+import dev.cerez.titan.io.PersistenceProvider;
+import dev.cerez.titan.io.StorageManager;
+import dev.cerez.titan.io.ConfigurationProvider;
 import dev.cerez.titan.utils.Manager;
 import dev.cerez.titan.core.event.SupplierEvent;
-import dev.cerez.titan.utils.Nameable;
 import dev.cerez.titan.utils.exception.MangerIsNotRunningException;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
-public abstract class BaseManager<C extends Config, O extends Connector, E extends Event> implements Manager<C>, SupplierEvent<E> {
+public abstract class BaseManager<C, P, O extends Connector, L extends Listener> implements Manager<C>, SupplierEvent<L> {
 
-    @Getter @NotNull protected final C config;
+    @NotNull private final ConfigurationProvider<C> configProvider;
+    @NotNull private final PersistenceProvider<P> persistenceProvider;
     @Getter @NotNull protected final O connector;
     @Getter @NotNull protected final UUID id = UUID.randomUUID();
-    @Getter @Setter @NotNull protected String name = id.toString();
-    @Getter @Setter @Nullable protected E event;
-    @Getter protected boolean running = false;
+    @Getter @NotNull protected final StorageManager storageManager;
+    @Getter @NotNull protected final Set<L> listeners = new HashSet<>();
 
-    public BaseManager(@NotNull C config, @NotNull O connector) {
-        this.config = config;
+    @Getter @Setter @NotNull protected String name = id.toString();
+
+    @Getter @Setter(value = AccessLevel.NONE) protected boolean running = false;
+
+    public BaseManager(@NotNull C configDefault, @NotNull Class<P> persistenceClazz, @NotNull O connector, @NotNull StorageManager storageManager) {
+        this.configProvider = storageManager.getProviderOrSaveConfig(configDefault);
+        this.persistenceProvider = storageManager.getPersistenceProvider(persistenceClazz);
         this.connector = connector;
+        this.storageManager = storageManager;
+
+        this.cacheConfig = configDefault;
     }
 
     protected void runningOrException(){
         if (!this.running){
-            throw new MangerIsNotRunningException("Manger is not running");
+            throw new MangerIsNotRunningException("Manager is not running");
         }
+    }
+
+    public void registerListener(L listener){
+        listeners.add(listener);
+    }
+
+    protected void callEvent(Consumer<L> consumer){
+        listeners.forEach(consumer);
+    }
+
+    private C cacheConfig;
+    private P cachePersistence = null;
+
+    public synchronized C getConfig() {
+        return Objects.requireNonNullElse(cacheConfig, cacheConfig = this.configProvider.getConfiguration());
+    }
+
+    public synchronized P getPersistence() {
+        return Objects.requireNonNullElse(cachePersistence, cachePersistence = this.persistenceProvider.getPersistence());
+    }
+
+    @Override
+    public void saveConfig() {
+        storageManager.saveConfig(getConfig());
+    }
+
+    @Override
+    public void savePersistence(){
+        storageManager.savePersistence(getConfig());
+    }
+
+    protected void saveConfig(C config) {
+        storageManager.saveConfig(config);
+    }
+
+    protected void savePersistence(P persistence){
+        storageManager.savePersistence(persistence);
     }
 }

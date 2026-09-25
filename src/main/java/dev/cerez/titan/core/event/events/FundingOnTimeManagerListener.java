@@ -1,0 +1,12 @@
+package dev.cerez.titan.core.event.events;
+
+import dev.cerez.titan.core.event.Listener;
+
+public interface FundingOnTimeManagerListener extends Listener {
+
+    default void onPrepare() {}
+
+    default void onPostExecute() {}
+
+
+}

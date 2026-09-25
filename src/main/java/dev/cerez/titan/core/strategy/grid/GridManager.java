@@ -10,7 +10,8 @@ import dev.cerez.titan.connector.exception.exchange.ReduceOnlyRejectException;
 import dev.cerez.titan.connector.exception.exchange.UnknownOrderException;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
-import dev.cerez.titan.core.event.events.GridManagerEvent;
+import dev.cerez.titan.core.PersistenceNope;
+import dev.cerez.titan.core.event.events.GridManagerListener;
 import dev.cerez.titan.core.strategy.grid.attribute.attributes.*;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.core.strategy.grid.attribute.ApplyAttributes;
@@ -19,7 +20,7 @@ import dev.cerez.titan.core.strategy.grid.model.Context;
 import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.core.BaseManager;
-import dev.cerez.titan.utils.Config;
+import dev.cerez.titan.io.StorageManager;
 import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.WaitableSet;
 import lombok.Builder;
@@ -36,7 +37,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
-public class GridManager extends BaseManager<GridManager.GridManagerConfig, BinanceConnector, GridManagerEvent> implements StatusProfiler {
+public class GridManager extends BaseManager<GridManager.GridManagerConfiguration, PersistenceNope, BinanceConnector, GridManagerListener> implements StatusProfiler {
 
     @Nullable
     private BinanceConnector.OrderFuture lastOrderFilled = null;
@@ -47,18 +48,18 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfig, Bina
     @NotNull private final GridBuilder gridBuilder;
     @NotNull private final ApplyAttributes applyAttributes;
 
-    public GridManager(@NotNull GridManagerConfig config, @NotNull BinanceConnector connector) {
-        super(config, connector);
-        this.symbol = config.baseAsset + config.quoteAsset;
+    public GridManager(@NotNull GridManagerConfiguration config, @NotNull BinanceConnector connector, StorageManager storageManager) {
+        super(config, PersistenceNope.class, connector, storageManager);
+        this.symbol = getConfig().baseAsset + getConfig().quoteAsset;
         this.priceAlarm = new PriceAlarm(connector, symbol);
-        this.gridBuilder = new GridBuilder(config);
+        this.gridBuilder = new GridBuilder(getConfig());
         this.applyAttributes = new ApplyAttributes(gridBuilder);
     }
 
     @Override
     public @NotNull StatusProfiler.PresenceProfile getPresenceProfile() {
-        BigDecimal balance = connector.fGetBalanceTotal().get(config.quoteAsset);
-        BigDecimal unPnl = connector.fGetUnPNL().get(config.quoteAsset);
+        BigDecimal balance = connector.fGetBalanceTotal().get(getConfig().quoteAsset);
+        BigDecimal unPnl = connector.fGetUnPNL().get(getConfig().quoteAsset);
         String label = "Bal: %.2f PNL: %.4f Sy: %s".formatted(balance, unPnl, symbol);
         return new PresenceProfile(
                 OnlineStatus.ONLINE,
@@ -72,10 +73,10 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfig, Bina
         running = true;
         Log.info("Iniciando...");
         connector.start();
-        connector.getConfig().setLogsRequest(config.logsEndPoints);
+        connector.getConfig().setLogsRequest(getConfig().logsEndPoints);
 
         connector.fGetAllSymbols();
-        connector.fSetLeverage(symbol, config.leverage);
+        connector.fSetLeverage(symbol, getConfig().leverage);
 
         applyAttributes.add(new OffsetOrderSellPrice(new BigDecimal("0.15")));
         applyAttributes.add(new DontSendOrder(SideAffected.AGAINST, c -> {
@@ -86,7 +87,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfig, Bina
             // Cantidad APROXIMADA no puede ser que no sea la cantidad real
             BigDecimal amountOrderApproximate = c.balanceUsdt()
                     .divide(c.currentPrice(), 12, RoundingMode.HALF_EVEN)
-                    .divide(config.getSizePerOrderBaseAsset(), 12, RoundingMode.HALF_EVEN)
+                    .divide(getConfig().getSizePerOrderBaseAsset(), 12, RoundingMode.HALF_EVEN)
                     // Entre dos ya que lo ideal es que tenga la misma cantidad de órdenes de compra y de venta
                     .divide(BigDecimal.TWO, 12, RoundingMode.HALF_EVEN)
                     .add(BigDecimal.ONE);
@@ -149,7 +150,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfig, Bina
             }
         }));
 
-        Log.info("Balance disponible %.4f %s", connector.fGetBalance().get(config.quoteAsset), config.quoteAsset);
+        Log.info("Balance disponible %.4f %s", connector.fGetBalance().get(getConfig().quoteAsset), getConfig().quoteAsset);
         updateGrid();
         connector.wuEventOrderTradeUpdate(payload -> {
             JsonNode node = payload.get("o");
@@ -181,18 +182,17 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfig, Bina
         connector.stop();
 
         applyAttributes.clear();
-        connector.fCloseUserData();
         connector.fCancelOrderAll(symbol);
     }
 
     public synchronized void updateGrid() {
         waitForCancel.clear();
         forOpen.clear();
-        if (event != null) event.onUpdate();
+        callEvent(GridManagerListener::onUpdate);
         CompletableFuture<BinanceConnector.FuturePosition> positionFuture = CompletableFuture.supplyAsync(() -> connector.fGetPosition(symbol));
         CompletableFuture<BigDecimal> currentPriceFuture = CompletableFuture.supplyAsync(() -> connector.fGetPrice(symbol));
         CompletableFuture<List<BinanceConnector.OrderFuture>> ordersFuture = CompletableFuture.supplyAsync(() -> connector.fGetAllOrder(symbol));
-        CompletableFuture<BigDecimal> balanceFuture = CompletableFuture.supplyAsync(() -> connector.fGetBalanceTotal().getOrDefault(config.quoteAsset, BigDecimal.ZERO));
+        CompletableFuture<BigDecimal> balanceFuture = CompletableFuture.supplyAsync(() -> connector.fGetBalanceTotal().getOrDefault(getConfig().quoteAsset, BigDecimal.ZERO));
 
         BinanceConnector.FuturePosition position = positionFuture.join();
         BigDecimal currentPrice = currentPriceFuture.join();
@@ -205,9 +205,9 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfig, Bina
         BigDecimal balanceUse = position == null
                 ? balance
                 // En caso de que tenga una posición con PNL negativo se descuenta del margen usable
-                : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO)).multiply(new BigDecimal(config.getLeverage()));
+                : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO)).multiply(new BigDecimal(getConfig().getLeverage()));
 
-        Context context = new Context(balanceUse, currentPrice, config, position, orders);
+        Context context = new Context(balanceUse, currentPrice, getConfig(), position, orders);
 
         List<OrderPreview> orderPreviews = gridBuilder.buildGrid(context);
         List<OrderPreview> desiredOrders = applyAttributes.apply(context, orderPreviews);
@@ -296,7 +296,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfig, Bina
 
     @Builder
     @Data
-    public static class GridManagerConfig implements Config {
+    public static class GridManagerConfiguration {
         @NotNull private final String baseAsset;
         @NotNull private final String quoteAsset;
         @NotNull private BigDecimal stepSize;

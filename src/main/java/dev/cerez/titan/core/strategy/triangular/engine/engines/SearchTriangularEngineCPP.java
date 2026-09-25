@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 public class SearchTriangularEngineCPP extends SearchTriangularEngine {
-    public SearchTriangularEngineCPP(EngineConfig engineConfig) {
+    public SearchTriangularEngineCPP(EngineConfigurationProvider engineConfig) {
         super(engineConfig);
     }
 

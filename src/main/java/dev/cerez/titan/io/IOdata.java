@@ -46,25 +46,25 @@ public class IOdata {
         }
     }
 
-    public void savePersistenDataFundingManager(FundingManager.PersistenData persistenData) {
+    public void savePersistenDataFundingManager(FundingManager.FundingManagerPersistan fundingManagerPersistan) {
         try (FileWriter writer = new FileWriter(PATH_PERSISTEN_DATA_FUNDING_MANAGER.toFile())) {
-            gson.toJson(persistenData, writer);
+            gson.toJson(fundingManagerPersistan, writer);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public FundingManager.PersistenData loadPersistenDataFundingManager(FundingManager.PersistenData persistenData) {
+    public FundingManager.FundingManagerPersistan loadPersistenDataFundingManager(FundingManager.FundingManagerPersistan fundingManagerPersistan) {
         File file = PATH_PERSISTEN_DATA_FUNDING_MANAGER.toFile();
         if (file.exists()) {
             try (FileReader reader = new FileReader(file)) {
-                return gson.fromJson(reader, FundingManager.PersistenData.class);
+                return gson.fromJson(reader, FundingManager.FundingManagerPersistan.class);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         } else {
-            savePersistenDataFundingManager(persistenData);
-            return persistenData;
+            savePersistenDataFundingManager(fundingManagerPersistan);
+            return fundingManagerPersistan;
         }
     }
 

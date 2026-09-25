@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>[[${error}]]</title>
+    <!--Local-->
+
+    <link rel="stylesheet" href="../static/css/titan.css">
+    <link rel="stylesheet" href="../static/css/error.css">
+    <!--Remote-->
+    <link rel="stylesheet" href="/css/titan.css">
+    <link rel="stylesheet" href="/css/error.css">
+</head>
+<body>
+<h1 class="error" th:text="'Error ' + ${status}" th:glichText="'Error ' + ${status}"></h1>
+<small th:text="${error}"></small>
+
+<div class="rgbEffect"></div>
+<div class="linesEffect"></div>
+</body>
+</html>

@@ -213,7 +213,9 @@ public final class BinanceConnector extends BaseConnector {
         JsonNode raw = sendSignedRequest(Method.GET, "/api/v3/account", new TreeMap<>());
         Map<String, BigDecimal> result = new HashMap<>();
         for (JsonNode node : raw.get("balances")) {
-            result.put(node.get("asset").asText(), new BigDecimal(node.get("free").asText()));
+            BigDecimal balance =  new BigDecimal(node.get("free").asText());
+            if (balance.compareTo(BigDecimal.ZERO) <= 0) continue;
+            result.put(node.get("asset").asText(), balance);
         }
         return result;
     }
@@ -426,7 +428,9 @@ public final class BinanceConnector extends BaseConnector {
         JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v3/balance");
         Map<String, BigDecimal> result = new HashMap<>();
         for (JsonNode node : raw){
-            result.put(node.get("asset").asText(), new BigDecimal(node.get("maxWithdrawAmount").asText()));
+            BigDecimal balance =  new BigDecimal(node.get("maxWithdrawAmount").asText());
+            if (balance.compareTo(BigDecimal.ZERO) <= 0) continue;
+            result.put(node.get("asset").asText(), balance);
         }
         return result;
     }

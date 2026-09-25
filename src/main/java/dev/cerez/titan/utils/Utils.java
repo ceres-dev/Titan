@@ -3,9 +3,9 @@ package dev.cerez.titan.utils;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
-import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
+import lombok.Getter;
 import lombok.experimental.UtilityClass;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -120,4 +120,7 @@ public class Utils {
     public <T extends Order> @NotNull @Unmodifiable Optional<T> getMax(@NotNull List<T> orders) {
         return orders.stream().max(Comparator.comparing(Order::getPrice));
     }
+
+    @Getter
+    private static final UUID rootId = UUID.fromString("00000000-0000-0000-0000-000000000000");
 }
