@@ -14,7 +14,8 @@ import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
 import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularEngineJava;
 import dev.cerez.titan.core.strategy.triangular.utils.TriangularArbitrageOpportunity;
 import dev.cerez.titan.core.BaseManager;
-import dev.cerez.titan.io.StorageManager;
+import dev.cerez.titan.storage.StorageManager;
+import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.telemtry.Telemetry;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -38,7 +39,7 @@ public class TriangularManager extends BaseManager<TriangularManager.TriangularM
     @Nullable private Consumer<BookTickDouble> streamListener = null;
 
     @SneakyThrows
-    public TriangularManager(@NotNull TriangularManagerConfiguration config, @NotNull Connector connector, StorageManager storageManager) {
+    public TriangularManager(@NotNull Provider<TriangularManagerConfiguration> config, @NotNull Connector connector, StorageManager storageManager) {
         super(config, PersistenceNope.class, connector, storageManager);
         this.engine = getConfig().getEngine().getConstructor(SearchTriangularEngine.EngineConfigurationProvider.class).newInstance(getConfig());
     }
@@ -238,11 +239,9 @@ public class TriangularManager extends BaseManager<TriangularManager.TriangularM
             double volumeUsdt
     ) {}
 
-    @EqualsAndHashCode(callSuper = true)
+    @Data
     @SuperBuilder
-    @Getter
-    @Setter
-    @ToString
+    @EqualsAndHashCode(callSuper = true)
     public static class TriangularManagerConfiguration extends SearchTriangularEngine.EngineConfigurationProvider {
         @Builder.Default public int maxSymbols = 1500;
         @Builder.Default public Set<String> banAssets = Set.of();

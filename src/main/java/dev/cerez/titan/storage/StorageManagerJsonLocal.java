@@ -1,8 +1,10 @@
-package dev.cerez.titan.io;
+package dev.cerez.titan.storage;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.cerez.titan.Log;
+import dev.cerez.titan.core.BaseConfig;
+import dev.cerez.titan.utils.Provider;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
@@ -43,7 +45,7 @@ public class StorageManagerJsonLocal implements StorageManager {
     }
 
     @Override
-    public <P> PersistenceProvider<P> getPersistenceProvider(Class<P> p) {
+    public <P> Provider<P> getPersistenceProvider(Class<P> p) {
         return () -> {
             try (FileReader reader = new FileReader(path.resolve(p.getSimpleName() + EXTENSION).toFile())) {
                 return gson.fromJson(reader, p);
@@ -55,8 +57,8 @@ public class StorageManagerJsonLocal implements StorageManager {
     }
 
     @Override
-    public <C> void saveConfig(@NotNull C config) {
-        try (FileWriter writer = new FileWriter(path.resolve(config.getClass().getSimpleName() + EXTENSION).toFile())) {
+    public <C extends BaseConfig> void saveConfig(@NotNull C config) {
+        try (FileWriter writer = new FileWriter(path.resolve(config.getClass().getSimpleName() + "-" + config.getName() + EXTENSION).toFile())) {
             gson.toJson(config, writer);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -64,9 +66,9 @@ public class StorageManagerJsonLocal implements StorageManager {
     }
 
     @Override
-    public <C> ConfigurationProvider<C> getConfigProvider(Class<C> c) {
+    public <C extends BaseConfig> Provider<C> getConfigProvider(Class<C> c, String nameProfiler) {
         return () -> {
-            try (FileReader reader = new FileReader(path.resolve(c.getSimpleName() + EXTENSION).toFile())) {
+            try (FileReader reader = new FileReader(path.resolve(c.getSimpleName() + "-" + nameProfiler + EXTENSION).toFile())) {
                 return gson.fromJson(reader, c);
             } catch (IOException e) {
                 Log.exception(e);

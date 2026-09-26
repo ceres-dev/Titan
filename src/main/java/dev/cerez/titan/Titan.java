@@ -6,10 +6,12 @@ import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.environment.EnvironmentManager;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.infrastructure.TitanApplication;
+import dev.cerez.titan.utils.MarketSession;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.Utils;
 import lombok.Getter;
 
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -29,15 +31,12 @@ public final class Titan implements Switch {
     private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(16, Utils.getThreadFactory());
     public static final boolean IS_TESTNET = false;
 
-    @Getter private final DiscordConnector discordConnector = new DiscordConnector();
     @Getter private final TitanApplication titanApplication = new TitanApplication();
-    @Getter private final BinanceConnector publicConnector = new BinanceConnector();
     private final Map<UUID, EnvironmentManager> environmentManagers = new HashMap<>();
 
     public static void main(String[] args) {
-        instance.discordConnector.start();
-        BinanceConnector connector = new BinanceConnector();
-        connector.start();
+//        BinanceConnector connector = new BinanceConnector();
+//        connector.start();
 
 //        if (args.length != 0 && args[0].equals("SpringBoot")) {
 //            instance.start();
@@ -58,8 +57,7 @@ public final class Titan implements Switch {
         try {
             commandHandler.init();
         } catch (Exception e) {
-            Titan.getInstance().getDiscordConnector().sendMessage("Error Critico: " + e.getMessage());
-            e.printStackTrace();
+            Log.exception(e);
         }
 
     }

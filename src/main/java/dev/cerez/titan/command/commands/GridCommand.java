@@ -1,13 +1,14 @@
 package dev.cerez.titan.command.commands;
 
-import dev.cerez.titan.Titan;
 import dev.cerez.titan.command.BaseCommand;
+import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.core.strategy.grid.GridManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
-import dev.cerez.titan.io.StorageManager;
-import dev.cerez.titan.io.StorageManagerJsonLocal;
+import dev.cerez.titan.storage.StorageManager;
+import dev.cerez.titan.storage.StorageManagerJsonLocal;
+import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Utils;
 import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
@@ -23,7 +24,6 @@ public class GridCommand extends BaseCommand {
 
     @Override
     public void execute(@NotNull List<String> args) {
-        DiscordConnector discordConnector = Titan.getInstance().getDiscordConnector();
         GridManager.GridManagerConfiguration config = GridManager.GridManagerConfiguration.builder()
                 .baseAsset("SPY")
                 .quoteAsset("USDT")
@@ -37,9 +37,10 @@ public class GridCommand extends BaseCommand {
                 .amountPriceOffset(15)
                 .build();
         StorageManager storageManager = new StorageManagerJsonLocal(Utils.getRootId());
-        BinanceConnector binanceConnector = new BinanceConnector();
+        BinanceConnector binanceConnector = new BinanceConnector(storageManager.getProviderOrSaveConfig(BaseConnector.ConnectorConfig.builder().build()));
         binanceConnector.start();
-        GridManager manager = new GridManager(config, binanceConnector, storageManager);
+        GridManager manager = new GridManager(Provider.from(config), binanceConnector, storageManager);
+        DiscordConnector discordConnector = new DiscordConnector(storageManager.getProviderOrSaveConfig(DiscordConnector.DiscordConfig.builder().build()));
         discordConnector.setStatusProfiler(manager);
         discordConnector.start();
         manager.start();

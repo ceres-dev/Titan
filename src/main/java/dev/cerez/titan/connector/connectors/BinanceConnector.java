@@ -9,6 +9,7 @@ import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.model.*;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
 import dev.cerez.titan.utils.Order;
+import dev.cerez.titan.utils.Provider;
 import lombok.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -43,16 +44,21 @@ public final class BinanceConnector extends BaseConnector {
 
     private String listenKey = null;
 
-    public BinanceConnector() {
-        super(ConnectorConfig.builder()
-                .isTestNet(Titan.IS_TESTNET)
-                .maxStreamsPerSubscribe(100)
-                .build()
-        );
+    public BinanceConnector(Provider<ConnectorConfig> config) {
+        super(config);
     }
 
     public BinanceConnector(ConnectorConfig config) {
-        super(config);
+        super(Provider.from(config));
+    }
+
+    public BinanceConnector() {
+        super(Provider.from(
+                BaseConnector.ConnectorConfig.builder()
+                        .isTestNet(Titan.IS_TESTNET)
+                        .maxStreamsPerSubscribe(100)
+                        .build()
+        ));
     }
 
     @Override
@@ -279,12 +285,6 @@ public final class BinanceConnector extends BaseConnector {
     @Override
     public @NotNull String sGetWWS() {
         return config.isTestNet() ? BASE_TESTNET_WWS_STREAM : BASE_WWS_STREAM;
-    }
-
-    public static class BinanceKeys extends Keys {
-        public BinanceKeys(String key, String secret) {
-            super(key, secret);
-        }
     }
 
     @Override
@@ -719,11 +719,16 @@ public final class BinanceConnector extends BaseConnector {
                 """.formatted(stream, uuid.toString().replace("-", "")));
     }
 
-    public void wuEventOrderTradeUpdate(Consumer<JsonNode> consumer, boolean muliThreading){
+    public void wuEventOrderTradeUpdate(Consumer<OrderUpdate> consumer, boolean muliThreading){
         addConsumerStreams(uGetWWS(), (payload) -> {
             if (payload.get("e").asText().equals("ORDER_TRADE_UPDATE")) {
-                // TODO: transformar a objeto
-                consumer.accept(payload);
+                JsonNode node = payload.get("o");
+                StatusOrder statusOrder = StatusOrder.parse(node.get("x").asText());
+                String nameOrder = node.get("c").asText();
+                String symbol = node.get("s").asText();
+                SideOrder sideOrder = SideOrder.valueOf(node.get("S").asText());
+
+                consumer.accept(new OrderUpdate(nameOrder, symbol, sideOrder, statusOrder));
             }
         }, muliThreading);
     }
@@ -942,6 +947,8 @@ public final class BinanceConnector extends BaseConnector {
                 params
         );
     }
+
+    public record OrderUpdate(String name, String symbol, SideOrder sideOrder, StatusOrder statusOrder) {}
 
     public record Convert(double fromMin, double fromMax, double toMin, double toMax) {}
 

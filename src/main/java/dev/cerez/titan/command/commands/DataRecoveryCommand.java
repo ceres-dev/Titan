@@ -36,62 +36,61 @@ public class DataRecoveryCommand extends BaseCommand {
     @SneakyThrows
     @Override
     public void execute(@NotNull List<String> args) {
-        FundingDataStorage fundingDataStorage = new FundingDataStorage();
-        BinanceConnector connector = new BinanceConnector();
-        connector.loadApikey();
-        connector.runLoopers();
-        connector.syncTimeServer();
-        Map<String, FundingData> data = fundingDataStorage.loadLatest();
-        Map<String, Symbol> spotSymbol = connector.sGetAllSymbols();
-        Map<String, Symbol> futureSymbol = connector.sGetAllSymbols();
-        executor.execute(() -> {
-            try {
-                while (true) {
-                    Map<String, BinanceConnector.FundingRate> funding = connector.fGetFundingRate();
-
-                    List<BinanceConnector.FundingRate> top35 = funding.values().stream()
-                            .filter(f -> f.symbol().endsWith("USDT"))
-                            .filter(f -> spotSymbol.containsKey(f.symbol()))
-                            .filter(f -> futureSymbol.containsKey(f.symbol()))
-                            .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRate))
-                            .limit(35)
-                            .toList();
-                    Set<String> symbolRecopile = data.keySet();
-                    List<BinanceConnector.FundingRate> prevRecopile = funding.values().stream()
-                            .filter(f ->  symbolRecopile.contains(f.symbol()))
-                            .toList();
-
-                    Set<BinanceConnector.FundingRate> total = new HashSet<>();
-                    total.addAll(top35);
-                    total.addAll(prevRecopile);
-
-                    long date = System.currentTimeMillis();
-                    Map<String, FundingData> newData = new ConcurrentHashMap<>();
-                    CountDownLatch countDownLatch = new CountDownLatch(total.size());
-                    for (BinanceConnector.FundingRate fundingRate : total) {
-                        executor.execute(() -> {
-                            BigDecimal maxBorrowable;
-                            try {
-                                maxBorrowable = connector.mGetMaxAmountBorrowable(null, fundingRate.symbol().replace("USDT", ""));
-                            } catch (SystemNotEnoughAssetException e) {
-                                maxBorrowable = new BigDecimal("-1");
-                            }
-                            newData.put(fundingRate.symbol(), new FundingData(date, fundingRate.nextFundingRate(), maxBorrowable));
-                            countDownLatch.countDown();
-                        });
-                    }
-                    if (!countDownLatch.await(5,  TimeUnit.MINUTES)){
-                        Log.warning("Excedió el tiempo máximo de las request");
-                    }
-
-                    fundingDataStorage.save(newData);
-                    Log.info("Datos guardas symbols=%s", total.stream().map(BinanceConnector.FundingRate::symbol).toList());
-                    LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(10));
-                }
-            }catch (Exception ignored) {
-
-            }
-        });
+//        FundingDataStorage fundingDataStorage = new FundingDataStorage();
+//        BinanceConnector connector = new BinanceConnector();
+//        connector.runLoopers();
+//        connector.syncTimeServer();
+//        Map<String, FundingData> data = fundingDataStorage.loadLatest();
+//        Map<String, Symbol> spotSymbol = connector.sGetAllSymbols();
+//        Map<String, Symbol> futureSymbol = connector.sGetAllSymbols();
+//        executor.execute(() -> {
+//            try {
+//                while (true) {
+//                    Map<String, BinanceConnector.FundingRate> funding = connector.fGetFundingRate();
+//
+//                    List<BinanceConnector.FundingRate> top35 = funding.values().stream()
+//                            .filter(f -> f.symbol().endsWith("USDT"))
+//                            .filter(f -> spotSymbol.containsKey(f.symbol()))
+//                            .filter(f -> futureSymbol.containsKey(f.symbol()))
+//                            .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRate))
+//                            .limit(35)
+//                            .toList();
+//                    Set<String> symbolRecopile = data.keySet();
+//                    List<BinanceConnector.FundingRate> prevRecopile = funding.values().stream()
+//                            .filter(f ->  symbolRecopile.contains(f.symbol()))
+//                            .toList();
+//
+//                    Set<BinanceConnector.FundingRate> total = new HashSet<>();
+//                    total.addAll(top35);
+//                    total.addAll(prevRecopile);
+//
+//                    long date = System.currentTimeMillis();
+//                    Map<String, FundingData> newData = new ConcurrentHashMap<>();
+//                    CountDownLatch countDownLatch = new CountDownLatch(total.size());
+//                    for (BinanceConnector.FundingRate fundingRate : total) {
+//                        executor.execute(() -> {
+//                            BigDecimal maxBorrowable;
+//                            try {
+//                                maxBorrowable = connector.mGetMaxAmountBorrowable(null, fundingRate.symbol().replace("USDT", ""));
+//                            } catch (SystemNotEnoughAssetException e) {
+//                                maxBorrowable = new BigDecimal("-1");
+//                            }
+//                            newData.put(fundingRate.symbol(), new FundingData(date, fundingRate.nextFundingRate(), maxBorrowable));
+//                            countDownLatch.countDown();
+//                        });
+//                    }
+//                    if (!countDownLatch.await(5,  TimeUnit.MINUTES)){
+//                        Log.warning("Excedió el tiempo máximo de las request");
+//                    }
+//
+//                    fundingDataStorage.save(newData);
+//                    Log.info("Datos guardas symbols=%s", total.stream().map(BinanceConnector.FundingRate::symbol).toList());
+//                    LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(10));
+//                }
+//            }catch (Exception ignored) {
+//
+//            }
+//        });
     }
 
     private static class FundingDataStorage {

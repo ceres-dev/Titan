@@ -3,6 +3,7 @@ package dev.cerez.titan.core.strategy.triangular.engine;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
+import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.strategy.triangular.engine.model.NameAsset;
 import dev.cerez.titan.core.strategy.triangular.utils.TriangularArbitrageOpportunity;
 import dev.cerez.titan.utils.Configurable;
@@ -156,12 +157,18 @@ public abstract class SearchTriangularEngine implements Configurable<SearchTrian
 
     @Data
     @SuperBuilder
-    public static class EngineConfigurationProvider {
+    @EqualsAndHashCode(callSuper = true)
+    public static class EngineConfigurationProvider extends BaseConfig {
         @Builder.Default public int maxSymbols = 1500;
         @Builder.Default public double defaultFeeRate = 0.001;
         @Builder.Default public double defaultStartAmount = 10d;
         @Builder.Default public int minCycleLength = 3;
         @Builder.Default public int maxCycleLength = 3;
         @Builder.Default public String preferredStartAsset = "USDT";
+
+        @SuppressWarnings("unused") // Se debe declarar el constructor por el @Data
+        private EngineConfigurationProvider() {
+            super();
+        }
     }
 }

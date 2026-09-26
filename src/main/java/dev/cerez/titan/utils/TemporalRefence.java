@@ -5,26 +5,35 @@ import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 @RequiredArgsConstructor
 public class TemporalRefence<R>  {
 
+    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(Utils.getThreadFactory());
     private final TimeUnit unit;
     private final long time;
 
-    private R reference;
-    private long dateSetting;
+    private volatile R reference;
+    private volatile boolean isAviated = true;
+    private Future<Boolean> isAviatedFuture = CompletableFuture.completedFuture(true);
+
     @Setter
     private Provider<R> provider;
 
-    public void set(@NotNull R r){
+    public R set(@NotNull R r){
         this.reference = r;
-        this.dateSetting = System.currentTimeMillis();
+        if (!isAviatedFuture.isDone()) isAviatedFuture.cancel(true);
+        isAviatedFuture = executor.schedule(() -> isAviated = false, time, unit);
+        return reference;
     }
 
     public @Nullable R get(){
-        return reference != null && System.currentTimeMillis() > unit.toMillis(time) + dateSetting ? null : reference;
+        if (isAviated && reference != null) {
+            return reference;
+        }else {
+            return null;
+        }
     }
 
     public @NotNull R getOrDefault(@NotNull R r){
@@ -33,16 +42,14 @@ public class TemporalRefence<R>  {
 
     public @NotNull R getOrCompute(){
         if (get() == null) {
-            this.dateSetting = System.currentTimeMillis();
-            return this.reference = provider.apply();
+            return set(provider.get());
         }
         return this.reference;
     }
 
     public @NotNull R getOrCompute(Provider<R> provider){
         if (get() == null) {
-            this.dateSetting = System.currentTimeMillis();
-            return this.reference = provider.apply();
+            return set(provider.get());
         }
         return this.reference;
     }

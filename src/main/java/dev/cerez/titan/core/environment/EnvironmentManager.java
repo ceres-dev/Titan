@@ -1,5 +1,7 @@
 package dev.cerez.titan.core.environment;
 
+import dev.cerez.titan.Titan;
+import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.BaseManager;
 import dev.cerez.titan.core.ConfigNope;
@@ -8,9 +10,10 @@ import dev.cerez.titan.core.exception.ConfigMalformatException;
 import dev.cerez.titan.core.exception.ManagerIsNotFoundException;
 import dev.cerez.titan.core.event.events.EnvironmentManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
-import dev.cerez.titan.io.StorageManager;
-import dev.cerez.titan.io.StorageManagerJsonLocal;
+import dev.cerez.titan.storage.StorageManager;
+import dev.cerez.titan.storage.StorageManagerJsonLocal;
 import dev.cerez.titan.core.strategy.Manager;
+import dev.cerez.titan.utils.Provider;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.Contract;
@@ -28,17 +31,24 @@ public class EnvironmentManager extends BaseManager<ConfigNope, PersistenceNope,
     private final Map<UUID, Manager<?>> manager = new HashMap<>();
     private final EnvironmentPort port = new EnvironmentPort();
 
-    private EnvironmentManager(@NotNull ConfigNope config, @NotNull BinanceConnector binanceConnector, @NotNull StorageManager storageManager, @NotNull UUID idOwner) {
+    private EnvironmentManager(@NotNull Provider<ConfigNope> config, @NotNull BinanceConnector binanceConnector, @NotNull StorageManager storageManager, @NotNull UUID idOwner) {
         super(config, PersistenceNope.class, binanceConnector, storageManager);
         this.idOwner = idOwner;
     }
 
     @Contract(pure = true)
     public static @NotNull EnvironmentManager create(@NotNull UUID idUser) {
-        BinanceConnector binanceConnector = new BinanceConnector();
         StorageManager storageManager = new StorageManagerJsonLocal(idUser);
+        BinanceConnector binanceConnector = new BinanceConnector(
+                storageManager.getProviderOrSaveConfig(
+                        BaseConnector.ConnectorConfig.builder()
+                                .isTestNet(Titan.IS_TESTNET)
+                                .maxStreamsPerSubscribe(100)
+                                .build()
+                )
+        );
         var environment = new EnvironmentManager(
-                new ConfigNope(),
+                Provider.from(new ConfigNope()),
                 binanceConnector,
                 storageManager,
                 idUser

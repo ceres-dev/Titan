@@ -4,17 +4,19 @@ import dev.cerez.titan.Log;
 import dev.cerez.titan.command.InputUser;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
+import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.BaseManager;
 import dev.cerez.titan.core.event.events.FundingManagerListener;
-import dev.cerez.titan.core.event.events.GridManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.StatusProfiler;
-import dev.cerez.titan.io.StorageManager;
+import dev.cerez.titan.storage.StorageManager;
+import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Status;
 import dev.cerez.titan.utils.Utils;
-import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.experimental.SuperBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
 import org.jetbrains.annotations.Contract;
@@ -36,11 +38,11 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
     @NotNull @Getter private final String symbol;
     @NotNull @Getter private Status status = Status.READY;
 
-    public FundingManager(@NotNull FundingManagerConfiguration config, @NotNull BinanceConnector connector, @NotNull StorageManager storageManager) {
+    public FundingManager(@NotNull Provider<FundingManagerConfiguration> config, @NotNull BinanceConnector connector, @NotNull StorageManager storageManager) {
         super(config, FundingManagerPersistan.class, connector, storageManager);
         FundingManagerPersistan persistan = getPersistence();
-        this.baseAsset = config.getBaseAsset();
-        this.quoteAsset = config.getQuoteAsset();
+        this.baseAsset = getConfig().getBaseAsset();
+        this.quoteAsset = getConfig().getQuoteAsset();
         this.symbol = baseAsset + quoteAsset;
         if (persistan.isActive) {
             Log.warning("El programa no termino el proceso de cierre adecuadamente. La estrategia esta corriendo");
@@ -248,10 +250,10 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
         return TypeManager.FUNDING;
     }
 
-    @Builder
-    @Getter
     @Data
-    public static class FundingManagerConfiguration {
+    @SuperBuilder
+    @EqualsAndHashCode(callSuper = true)
+    public static class FundingManagerConfiguration extends BaseConfig {
         private BigDecimal sizePosition;
         private BigDecimal booking;
         private String baseAsset;

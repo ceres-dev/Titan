@@ -1,4 +1,4 @@
 package dev.cerez.titan.core;
 
-public class ConfigNope {
+public class ConfigNope extends BaseConfig {
 }

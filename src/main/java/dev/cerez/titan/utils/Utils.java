@@ -28,6 +28,11 @@ public class Utils {
         return value.toString(36);
     }
 
+    public @NotNull String uuidToBase64(UUID uuid) {
+        BigInteger value = uuidToBigInteger(uuid);
+        return value.toString(64);
+    }
+
     private @NotNull BigInteger uuidToBigInteger(@NotNull UUID uuid) {
         return BigInteger.valueOf(uuid.getMostSignificantBits())
                 .shiftLeft(64)
@@ -91,9 +96,9 @@ public class Utils {
                         .findFirst()
                         .map(StackWalker.StackFrame::getClassName)
                         .orElse("Unknown"));
-
+        String id = Utils.uuidToBase36(UUID.randomUUID());
         return Thread.ofVirtual()
-                .name(className + "-", 0)
+                .name(id + "-" + className + "-", 0)
                 .factory();
     }
 

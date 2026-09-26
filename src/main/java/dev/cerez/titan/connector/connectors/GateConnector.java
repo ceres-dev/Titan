@@ -3,6 +3,7 @@ package dev.cerez.titan.connector.connectors;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.model.*;
+import dev.cerez.titan.utils.Provider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -18,7 +19,7 @@ public final class GateConnector extends BaseConnector implements AutoCloseable 
     private static final String BASE_TESTNET_WWS = "wss://ws-testnet.gate.com/v4/ws/spot";
 
     public GateConnector(boolean isTestNet) {
-        super(ConnectorConfig.builder().isTestNet(isTestNet).build());
+        super(Provider.from(ConnectorConfig.builder().isTestNet(isTestNet).build()));
     }
 
     @Override

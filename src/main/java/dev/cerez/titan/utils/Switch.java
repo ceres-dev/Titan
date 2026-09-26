@@ -1,5 +1,7 @@
 package dev.cerez.titan.utils;
 
+import dev.cerez.titan.core.exception.ManagerIsNotRunningException;
+
 public interface Switch {
 
     void start();
@@ -7,4 +9,10 @@ public interface Switch {
     void stop();
 
     boolean isRunning();
+
+    default void runningOrException(){
+        if (!this.isRunning()){
+            throw new ManagerIsNotRunningException();
+        }
+    }
 }

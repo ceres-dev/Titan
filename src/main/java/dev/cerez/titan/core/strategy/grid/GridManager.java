@@ -10,6 +10,7 @@ import dev.cerez.titan.connector.exception.exchange.ReduceOnlyRejectException;
 import dev.cerez.titan.connector.exception.exchange.UnknownOrderException;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
+import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.PersistenceNope;
 import dev.cerez.titan.core.event.events.GridManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
@@ -21,11 +22,10 @@ import dev.cerez.titan.core.strategy.grid.model.Context;
 import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.core.BaseManager;
-import dev.cerez.titan.io.StorageManager;
-import dev.cerez.titan.utils.MarketSession;
-import dev.cerez.titan.utils.Utils;
-import dev.cerez.titan.utils.WaitableSet;
+import dev.cerez.titan.storage.StorageManager;
+import dev.cerez.titan.utils.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
 import org.jetbrains.annotations.Contract;
@@ -51,11 +51,11 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
     @NotNull private final GridBuilder gridBuilder;
     @NotNull private final ApplyAttributes applyAttributes;
 
-    public GridManager(@NotNull GridManagerConfiguration config, @NotNull BinanceConnector connector, StorageManager storageManager) {
+    public GridManager(@NotNull Provider<GridManagerConfiguration> config, @NotNull BinanceConnector connector, StorageManager storageManager) {
         super(config, PersistenceNope.class, connector, storageManager);
         this.symbol = getConfig().baseAsset + getConfig().quoteAsset;
         this.priceAlarm = new PriceAlarm(connector, symbol);
-        this.gridBuilder = new GridBuilder(config);
+        this.gridBuilder = new GridBuilder(getConfig());
         this.applyAttributes = new ApplyAttributes(gridBuilder);
     }
 
@@ -63,7 +63,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
     public @NotNull StatusProfiler.PresenceProfile getPresenceProfile() {
         BigDecimal balance = connector.fGetBalanceTotal().get(getConfig().quoteAsset);
         BigDecimal unPnl = connector.fGetUnPNL().get(getConfig().quoteAsset);
-        String label = "Bal: %.2f PNL: %.4f Sy: %s".formatted(balance, unPnl, symbol);
+        String label = "Bal: %.2f PNL: %.4f Sy: %s St: %s".formatted(balance, unPnl, symbol, MarketSession.getSession(GridManagerConfiguration.ZONE_NEW_YORK));
         return new PresenceProfile(
                 OnlineStatus.ONLINE,
                 Activity.of(Activity.ActivityType.PLAYING, label)
@@ -136,16 +136,17 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
         ));
         applyAttributes.add(new CallOnUpdate((order, c) -> {
 //            priceAlarm.clear();
+            BigDecimal stepSize = c.config().getStepSize();
             OrderPreview sell = order.stream().filter(OrderPreview::isSell).min(Comparator.comparing(OrderPreview::getPrice)).orElse(null);
             OrderPreview buy = order.stream().filter(OrderPreview::isBuy).max(Comparator.comparing(OrderPreview::getPrice)).orElse(null);
             if (sell != null){
-                priceAlarm.addAlarm(false, sell.getPrice().subtract(c.config().getStepSize()), () -> {
+                priceAlarm.addAlarm(false, sell.getPrice().subtract(stepSize), () -> {
                     Log.info("Sell price: %.2f Alarm!!!", c.currentPrice());
                     updateGrid();
                 });
             }
             if (buy != null){
-                priceAlarm.addAlarm(true, buy.getPrice().add(c.config().getStepSize()), () -> {
+                priceAlarm.addAlarm(true, buy.getPrice().add(stepSize), () -> {
                     Log.info("Buy price: %.2f Alarm!!!", c.currentPrice());
                     updateGrid();
                 });
@@ -153,18 +154,20 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
         }));
 
         Log.info("Balance disponible %.4f %s", connector.fGetBalance().get(getConfig().quoteAsset), getConfig().quoteAsset);
-        connector.wuEventOrderTradeUpdate(payload -> {
-            JsonNode node = payload.get("o");
-            StatusOrder statusOrder = StatusOrder.parse(node.get("x").asText());
-            String nameOrder = node.get("c").asText();
-            switch (statusOrder){
+        connector.wuEventOrderTradeUpdate(orderUpdate -> {
+            if (!orderUpdate.symbol().equals(symbol)) {
+                return;
+            }
+            switch (orderUpdate.statusOrder()){
                 case CANCELED -> {
-                    if (waitForCancel.remove(nameOrder)) return;
+                    if (waitForCancel.remove(orderUpdate.name())) return;
                 }
                 case NEW -> {
-                    if (forOpen.remove(nameOrder)) return;
+                    if (forOpen.remove(orderUpdate.name())) return;
                 }
             }
+            // Es para que actualize la caché de binance al momentó de obtener los datos
+            LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
             updateGrid();
         }, true);
         Titan.getInstance().getExecutor().execute(() -> {
@@ -191,6 +194,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
         waitForCancel.clear();
         forOpen.clear();
         callEvent(GridManagerListener::onUpdate);
+
         CompletableFuture<BinanceConnector.FuturePosition> positionFuture = CompletableFuture.supplyAsync(() -> connector.fGetPosition(symbol));
         CompletableFuture<BigDecimal> currentPriceFuture = CompletableFuture.supplyAsync(() -> connector.fGetPrice(symbol));
         CompletableFuture<List<BinanceConnector.OrderFuture>> ordersFuture = CompletableFuture.supplyAsync(() -> connector.fGetAllOrder(symbol));
@@ -306,8 +310,9 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
     }
 
     @Data
-    @Builder
-    public static class GridManagerConfiguration {
+    @SuperBuilder
+    @EqualsAndHashCode(callSuper = true)
+    public static class GridManagerConfiguration extends BaseConfig {
         @NotNull private final String baseAsset;
         @NotNull private final String quoteAsset;
         @Getter(AccessLevel.NONE) @NotNull private final BigDecimal stepSizeHighActivity;
@@ -319,23 +324,16 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
         private boolean logsEndPoints;
         private int amountPriceOffset;
 
-        @Builder.Default @NotNull @Getter(AccessLevel.NONE) @Setter(AccessLevel.NONE)
-        private transient BigDecimal lastStepSize = BigDecimal.ZERO;
-
         private static final ZoneId ZONE_NEW_YORK = ZoneId.of("America/New_York");
+        private final TemporalRefence<BigDecimal> lastStepSizeTemporal = new TemporalRefence<>(TimeUnit.MINUTES, 1);
 
         @Contract
         public BigDecimal getStepSize() {
-            BigDecimal currentStepSize = switch (MarketSession.getSession(ZONE_NEW_YORK)){
+            return lastStepSizeTemporal.getOrCompute(() -> switch (MarketSession.getSession(ZONE_NEW_YORK)){
                 case CLOSED, PRE_MARKET, POST_MARKET -> stepSizeMediumActivity;
                 case OVERNIGHT -> stepSizeLowActivity;
                 case REGULAR -> stepSizeHighActivity;
-            };
-            if (lastStepSize.compareTo(currentStepSize) == 0) {
-                return currentStepSize;
-            }else {
-                return this.lastStepSize = currentStepSize;
-            }
+            });
         }
     }
 }

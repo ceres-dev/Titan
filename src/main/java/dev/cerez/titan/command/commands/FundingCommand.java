@@ -1,18 +1,9 @@
 package dev.cerez.titan.command.commands;
 
-import dev.cerez.titan.Log;
 import dev.cerez.titan.command.BaseCommand;
-import dev.cerez.titan.command.InputUser;
-import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.discord.DiscordConnector;
-import dev.cerez.titan.core.strategy.funding.BlockerForSpread;
-import dev.cerez.titan.core.strategy.funding.FundingManager;
-import dev.cerez.titan.core.strategy.funding.TestFunding;
-import dev.cerez.titan.io.IOdata;
 import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @ToString

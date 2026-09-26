@@ -4,14 +4,18 @@ import dev.cerez.titan.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.Symbol;
+import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.BaseManager;
 import dev.cerez.titan.core.PersistenceNope;
 import dev.cerez.titan.core.event.events.FundingOnTimeManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
-import dev.cerez.titan.io.StorageManager;
+import dev.cerez.titan.storage.StorageManager;
+import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Utils;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.experimental.SuperBuilder;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
@@ -35,7 +39,7 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
     private final BigDecimal fundingRateMin = BigDecimal.valueOf(0.003);
     private volatile BinanceConnector.BookTick currentBookTick = null;
 
-    public FundingOnTimeManager(@NotNull FundingMangerConfiguration config, @NonNull BinanceConnector connector, @NotNull StorageManager storageManager) {
+    public FundingOnTimeManager(@NotNull Provider<FundingMangerConfiguration> config, @NonNull BinanceConnector connector, @NotNull StorageManager storageManager) {
         super(config, PersistenceNope.class, connector, storageManager);
     }
 
@@ -226,9 +230,10 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
         }
     }
 
-    @Builder
     @Data
-    public static class FundingMangerConfiguration {
+    @EqualsAndHashCode(callSuper = true)
+    @SuperBuilder
+    public static class FundingMangerConfiguration extends BaseConfig {
         @Builder.Default private BigDecimal quantityQuote = new BigDecimal("20");
     }
 

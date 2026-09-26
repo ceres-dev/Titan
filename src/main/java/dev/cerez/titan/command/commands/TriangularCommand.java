@@ -8,8 +8,9 @@ import dev.cerez.titan.core.strategy.triangular.TriangularManager;
 import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularEngineJava;
 import dev.cerez.titan.core.strategy.triangular.ExecutorCycles;
 import dev.cerez.titan.core.strategy.triangular.utils.Loader;
-import dev.cerez.titan.io.StorageManager;
-import dev.cerez.titan.io.StorageManagerJsonLocal;
+import dev.cerez.titan.storage.StorageManager;
+import dev.cerez.titan.storage.StorageManagerJsonLocal;
+import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.telemtry.Telemetry;
 import org.jetbrains.annotations.NotNull;
@@ -50,7 +51,7 @@ public class TriangularCommand extends BaseCommand {
         StorageManager storageManager = new StorageManagerJsonLocal(Utils.getRootId());
 
         connector.setTelemetry(telemetry);
-        TriangularManager manager = new TriangularManager(triangularManagerConfig, connector, storageManager);
+        TriangularManager manager = new TriangularManager(Provider.from(triangularManagerConfig), connector, storageManager);
         manager.setTelemetry(telemetry);
         manager.setOnUpdate(executorCycles::onOpportunities);
         manager.start();

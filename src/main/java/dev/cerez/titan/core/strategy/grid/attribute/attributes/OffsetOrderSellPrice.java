@@ -29,9 +29,10 @@ public class OffsetOrderSellPrice extends BaseAttribute {
         }
         GridManager.GridManagerConfiguration config = context.context().config();
         Utils.getMin(context.sells()).ifPresent(order -> {
-            if (order.getPrice().subtract(config.getStepSize()).compareTo(context.context().currentPrice()) >= 0) {
+            BigDecimal stepSize = config.getStepSize();
+            if (order.getPrice().subtract(stepSize).compareTo(context.context().currentPrice()) >= 0) {
                 context.orderUse().add(new OrderPreview(Utils.uuidToBase36(UUID.randomUUID()),
-                        order.getPrice().subtract(config.getStepSize()),
+                        order.getPrice().subtract(stepSize),
                         config.getSizePerOrderBaseAsset(),
                         SideOrder.SELL,
                         order.isReduceOnly()

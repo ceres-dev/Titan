@@ -25,13 +25,11 @@ public class GridBuilder {
 
     private final GridManager.GridManagerConfiguration config;
     private final SideGrid grid;
-    private final BigDecimal stepSize;
     private final BigDecimal amountPerOrderBaseAsset;
 
     public GridBuilder(GridManager.@NotNull GridManagerConfiguration config) {
         this.config = config;
         this.grid = config.getSideGrid();
-        this.stepSize = config.getStepSize();
         this.amountPerOrderBaseAsset = config.getSizePerOrderBaseAsset();
     }
 
@@ -118,19 +116,21 @@ public class GridBuilder {
     }
 
     private @NotNull BigDecimal buyGridPrice(@NotNull BigDecimal currentPrice, int level) {
+        BigDecimal stepSize = config.getStepSize();
         BigDecimal base = currentPrice
-                .divide(config.getStepSize(), 0, RoundingMode.FLOOR)
-                .multiply(config.getStepSize());
+                .divide(stepSize, 0, RoundingMode.FLOOR)
+                .multiply(stepSize);
 
-        return base.subtract(config.getStepSize().multiply(BigDecimal.valueOf(level)));
+        return base.subtract(stepSize.multiply(BigDecimal.valueOf(level)));
     }
 
     private @NotNull BigDecimal sellGridPrice(@NotNull BigDecimal currentPrice, int level) {
+        BigDecimal stepSize = config.getStepSize();
         BigDecimal base = currentPrice
-                .divide(config.getStepSize(), 0, RoundingMode.CEILING)
-                .multiply(config.getStepSize());
+                .divide(stepSize, 0, RoundingMode.CEILING)
+                .multiply(stepSize);
 
-        return base.add(config.getStepSize().multiply(BigDecimal.valueOf(level)));
+        return base.add(stepSize.multiply(BigDecimal.valueOf(level)));
     }
 
     @Contract(pure = true, value = "_, _, _, _ -> new")
@@ -325,6 +325,7 @@ public class GridBuilder {
     }
 
     private @NotNull BigDecimal getNextPrice(@NotNull SideOrder side, @NotNull List<OrderPreview> orders, @NotNull BigDecimal currentPrice) {
+        BigDecimal stepSize = config.getStepSize();
         if (orders.isEmpty())
             return side == SideOrder.BUY ? buyGridPrice(currentPrice, 0) : sellGridPrice(currentPrice, 0);
         if (side == SideOrder.BUY) {
@@ -343,6 +344,7 @@ public class GridBuilder {
     }
 
     private @NotNull BigDecimal moveToNextLevel(@NotNull SideOrder side,  @NotNull BigDecimal price) {
+        BigDecimal stepSize = config.getStepSize();
         return side == SideOrder.BUY ? price.subtract(stepSize) : price.add(stepSize);
     }
 

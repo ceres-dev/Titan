@@ -9,13 +9,12 @@ import dev.cerez.titan.connector.exception.DefaultApiException;
 import dev.cerez.titan.connector.exception.NotSetApiKeysException;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
-import dev.cerez.titan.io.IOdata;
+import dev.cerez.titan.core.BaseConfig;
+import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.telemtry.TelemetryConnector;
-import lombok.Builder;
-import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -53,8 +52,6 @@ public abstract class BaseConnector implements Connector {
     @NotNull  protected final Map<String, WebSocketContainer> webSockets = new HashMap<>();
     @Getter
     @NotNull  protected final ConnectorConfig config;
-
-    @Nullable protected       Keys apiKey;
     @Setter   protected       TelemetryConnector telemetry;
 
     @NotNull  private final Object streamIncomingLock = new Object();
@@ -70,8 +67,8 @@ public abstract class BaseConnector implements Connector {
     @Setter
     protected Consumer<BookTickDouble> consumerBookTicker;
 
-    public BaseConnector(@NotNull ConnectorConfig config) {
-        this.config = config;
+    public BaseConnector(@NotNull Provider<ConnectorConfig> config) {
+        this.config = config.get();
     }
 
     public void invalidateCache() {
@@ -80,7 +77,6 @@ public abstract class BaseConnector implements Connector {
 
     @Override
     public void start(){
-        loadApikey();
         initWebSocket(sGetWWS());
         runLoopers();
     }
@@ -92,10 +88,6 @@ public abstract class BaseConnector implements Connector {
         }
         webSockets.clear();
         stopLoopers();
-    }
-
-    public void loadApikey(){
-        apiKey = IOdata.loadApiKeysBinance();
     }
 
     public void syncTimeServer(){
@@ -223,18 +215,17 @@ public abstract class BaseConnector implements Connector {
                                                   @NotNull String endpoint,
                                                   @NotNull Map<String, Object> params
     ) {
-        if (apiKey == null) {
+        if (config.secret == null || config.key == null || config.secret.isBlank() || config.key.isBlank()) {
             throw new NotSetApiKeysException("API Key not set");
         }
         params.put("timestamp", System.currentTimeMillis() + deltaClienteToServer);
         String queryString = buildQueryString(params);
         try {
-            String signature = hmacSha256(queryString, apiKey.secret);
+            String signature = hmacSha256(queryString, config.secret);
             String finalUrl = baseUrl + endpoint + "?" + queryString + "&signature=" + signature;
-
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(finalUrl))
-                    .header("X-MBX-APIKEY", apiKey.key)
+                    .header("X-MBX-APIKEY", config.key)
                     .method(method.name(), HttpRequest.BodyPublishers.noBody())
                     .build();
             if (config.isLogsRequest() && !getBlackListEndpointLog().contains(endpoint)) Log.info("Pr https=%s %s", method, finalUrl);
@@ -244,7 +235,7 @@ public abstract class BaseConnector implements Connector {
                 checkResponse(jsonRaw = mapper.readTree(response.body()), request);
                 return jsonRaw;
             } catch (IOException | InterruptedException e) {
-                Log.error("Error de IO o Interrupción: %s", e.getMessage());
+                Log.exception("Error de IO o Interrupción: %s".formatted(e.getMessage()), e);
                 throw new RuntimeException(e);
             }catch (DefaultApiException e) {
                 Log.error("%s %s -> %s", method.name(), finalUrl, jsonRaw);
@@ -436,12 +427,6 @@ public abstract class BaseConnector implements Connector {
     }
 
     @Data
-    public abstract static class Keys{
-        @NotNull private final String key;
-        @NotNull private final String secret;
-    }
-
-    @Data
     public static class WebSocketContainer{
         private final String wwsURL;
         @Nullable
@@ -459,12 +444,15 @@ public abstract class BaseConnector implements Connector {
         }
     }
 
-    @Builder
     @Data
-    public static class ConnectorConfig{
+    @SuperBuilder
+    @EqualsAndHashCode(callSuper = true)
+    public static class ConnectorConfig extends BaseConfig {
         @Builder.Default private int maxStreamsPerSubscribe = 200;
         @Builder.Default private long cooldownMsPerRequest = 1_000;
         @Builder.Default private boolean isTestNet = true;
         @Builder.Default private boolean logsRequest = false;
+        @Builder.Default private String key = "";
+        @Builder.Default private String secret = "";
     }
 }

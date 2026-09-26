@@ -3,6 +3,7 @@ package dev.cerez.titan.connector.connectors;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.model.*;
+import dev.cerez.titan.utils.Provider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -16,7 +17,7 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
     private static final String BASE_WWS = "wss://ws-api-spot.kucoin.com";
 
     public KuCoinConnector() {
-        super(ConnectorConfig.builder().build());
+        super(Provider.from(ConnectorConfig.builder().build()));
     }
 
     @Override
