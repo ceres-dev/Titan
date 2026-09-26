@@ -38,10 +38,9 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
 
     public FundingManager(@NotNull FundingManagerConfiguration config, @NotNull BinanceConnector connector, @NotNull StorageManager storageManager) {
         super(config, FundingManagerPersistan.class, connector, storageManager);
-
         FundingManagerPersistan persistan = getPersistence();
-        this.baseAsset = getConfig().getBaseAsset();
-        this.quoteAsset = getConfig().getQuoteAsset();
+        this.baseAsset = config.getBaseAsset();
+        this.quoteAsset = config.getQuoteAsset();
         this.symbol = baseAsset + quoteAsset;
         if (persistan.isActive) {
             Log.warning("El programa no termino el proceso de cierre adecuadamente. La estrategia esta corriendo");
@@ -57,9 +56,7 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
         if (running){
             return;
         } else running = true;
-        GridManagerListener gridManagerEvent = new GridManagerListener() {};
         connector.getConfig().setLogsRequest(getConfig().logsEndPoints);
-        connector.start();
         status = Status.CHECK;
         // Activar el margen Aislado
         Log.info("¿Esta Habilitado el margen aislado?...");

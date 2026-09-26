@@ -22,17 +22,19 @@ import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.core.BaseManager;
 import dev.cerez.titan.io.StorageManager;
+import dev.cerez.titan.utils.MarketSession;
 import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.WaitableSet;
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -53,7 +55,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
         super(config, PersistenceNope.class, connector, storageManager);
         this.symbol = getConfig().baseAsset + getConfig().quoteAsset;
         this.priceAlarm = new PriceAlarm(connector, symbol);
-        this.gridBuilder = new GridBuilder(getConfig());
+        this.gridBuilder = new GridBuilder(config);
         this.applyAttributes = new ApplyAttributes(gridBuilder);
     }
 
@@ -73,7 +75,6 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
         if (running) return;
         running = true;
         Log.info("Iniciando...");
-        connector.start();
         connector.getConfig().setLogsRequest(getConfig().logsEndPoints);
 
         connector.fGetAllSymbols();
@@ -152,7 +153,6 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
         }));
 
         Log.info("Balance disponible %.4f %s", connector.fGetBalance().get(getConfig().quoteAsset), getConfig().quoteAsset);
-        updateGrid();
         connector.wuEventOrderTradeUpdate(payload -> {
             JsonNode node = payload.get("o");
             StatusOrder statusOrder = StatusOrder.parse(node.get("x").asText());
@@ -174,6 +174,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
                 updateGrid();
             }
         });
+        updateGrid();
     }
 
     @Override
@@ -261,7 +262,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
 
         // Enviar orden
         boolean retry = false;
-        forOpen.addAll(ordersToCancel.stream().map(BinanceConnector.OrderFuture::getNameOrder).toList());
+        forOpen.addAll(ordersToCreate.stream().map(OrderPreview::getNameOrder).toList());
         for (OrderPreview order : ordersToCreate) {
             try {
                 connector.fSendOrderToLimit(symbol,
@@ -285,7 +286,11 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
             );
         }
         // Se vuelve a intentar
-        if (retry) updateGrid();
+        if (retry) {
+            Log.info("Operación fallida reintentado calculo en 5 segundos...");
+            LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(5));
+            updateGrid();
+        }
     }
 
     private boolean sameOrder(@NotNull OrderPreview preview, @NotNull BinanceConnector.OrderFuture order) {
@@ -300,16 +305,37 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
         return TypeManager.GRID;
     }
 
-    @Builder
     @Data
+    @Builder
     public static class GridManagerConfiguration {
         @NotNull private final String baseAsset;
         @NotNull private final String quoteAsset;
-        @NotNull private BigDecimal stepSize;
+        @Getter(AccessLevel.NONE) @NotNull private final BigDecimal stepSizeHighActivity;
+        @Getter(AccessLevel.NONE) @NotNull private final BigDecimal stepSizeMediumActivity;
+        @Getter(AccessLevel.NONE) @NotNull private final BigDecimal stepSizeLowActivity;
         @NotNull private BigDecimal sizePerOrderBaseAsset;
         @NotNull private SideGrid sideGrid;
         private int leverage;
         private boolean logsEndPoints;
         private int amountPriceOffset;
+
+        @Builder.Default @NotNull @Getter(AccessLevel.NONE) @Setter(AccessLevel.NONE)
+        private transient BigDecimal lastStepSize = BigDecimal.ZERO;
+
+        private static final ZoneId ZONE_NEW_YORK = ZoneId.of("America/New_York");
+
+        @Contract
+        public BigDecimal getStepSize() {
+            BigDecimal currentStepSize = switch (MarketSession.getSession(ZONE_NEW_YORK)){
+                case CLOSED, PRE_MARKET, POST_MARKET -> stepSizeMediumActivity;
+                case OVERNIGHT -> stepSizeLowActivity;
+                case REGULAR -> stepSizeHighActivity;
+            };
+            if (lastStepSize.compareTo(currentStepSize) == 0) {
+                return currentStepSize;
+            }else {
+                return this.lastStepSize = currentStepSize;
+            }
+        }
     }
 }

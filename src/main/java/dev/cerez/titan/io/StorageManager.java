@@ -23,7 +23,12 @@ public interface StorageManager {
             savePersistence(p);
             return PersistenceProvider.from(p);
         }else {
-            return loaded;
+            if (loaded.getPersistence() == null) {
+                saveConfig(p);
+                return PersistenceProvider.from(p);
+            }else {
+                return loaded;
+            }
         }
     }
 
@@ -42,7 +47,12 @@ public interface StorageManager {
             saveConfig(c);
             return ConfigurationProvider.from(c);
         }else {
-            return loaded;
+            if (loaded.getConfiguration() == null) {
+                saveConfig(c);
+                return ConfigurationProvider.from(c);
+            }else {
+                return loaded;
+            }
         }
     }
 }

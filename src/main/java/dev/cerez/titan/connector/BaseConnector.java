@@ -191,7 +191,7 @@ public abstract class BaseConnector implements Connector {
     @SuppressWarnings("DataFlowIssue")
     public void sendWebSocket(String wwsURL, String content) {
         if (savePendingRequest(wwsURL, content)) return;
-        if (config.isLogsRequest()) Log.info("wws=%s@%s", wwsURL, content);
+        if (config.isLogsRequest()) Log.info("wws=%s %s", wwsURL, content);
         lastRequestWebSocker = content;
         WebSocketContainer container = webSockets.get(wwsURL);
         container.setLastRequest(content);
@@ -237,7 +237,7 @@ public abstract class BaseConnector implements Connector {
                     .header("X-MBX-APIKEY", apiKey.key)
                     .method(method.name(), HttpRequest.BodyPublishers.noBody())
                     .build();
-            if (config.isLogsRequest() && !getBlackListEndpointLog().contains(endpoint)) Log.info("https=%s %s", method, finalUrl);
+            if (config.isLogsRequest() && !getBlackListEndpointLog().contains(endpoint)) Log.info("Pr https=%s %s", method, finalUrl);
             JsonNode jsonRaw = null;
             try {
                 HttpResponse<String> response = clientHttp.send(request, HttpResponse.BodyHandlers.ofString());
@@ -295,7 +295,7 @@ public abstract class BaseConnector implements Connector {
                 .uri(URI.create(finalUrl))
                 .method(method.toString(), HttpRequest.BodyPublishers.noBody())
                 .build();
-        if (config.isLogsRequest() && !getBlackListEndpointLog().contains(endpoint)) Log.info("https=%s@%s", method, finalUrl);
+        if (config.isLogsRequest() && !getBlackListEndpointLog().contains(endpoint)) Log.info( "Pu https=%s %s", method, finalUrl);
         String jsonRaw = null;
         if (telemetry != null) telemetry.addRequestConnector(method, finalUrl);
         try {
@@ -409,7 +409,6 @@ public abstract class BaseConnector implements Connector {
     }
 
     protected void addConsumerStreams(@NotNull String key, @NotNull Consumer<JsonNode> consumer, boolean muliThreading) {
-        Thread.currentThread().getStackTrace();
         if (muliThreading) {
             consumerStreamsMap.computeIfAbsent(key, k -> new HashSet<>()).add((json) -> executor.execute(() -> consumer.accept(json)));
         }else {

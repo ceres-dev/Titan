@@ -12,6 +12,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.Objects;
@@ -32,16 +33,15 @@ public abstract class BaseManager<C, P, O extends Connector, L extends Listener>
 
     @Getter @Setter(value = AccessLevel.NONE) protected boolean running = false;
 
-    public BaseManager(@NotNull C configDefault,
+    public BaseManager(@Nullable C configDefault,
                        @NotNull Class<P> persistenceClazz,
                        @NotNull O connector,
                        @NotNull StorageManager storageManager
     ) {
-        this.configProvider = storageManager.getProviderOrSaveConfig(configDefault);
+        this.configProvider = ConfigurationProvider.from(configDefault); // storageManager.getProviderOrSaveConfig(configDefault);
         this.persistenceProvider = storageManager.getPersistenceProvider(persistenceClazz);
         this.connector = connector;
         this.storageManager = storageManager;
-
         this.cacheConfig = configDefault;
     }
 
@@ -59,14 +59,14 @@ public abstract class BaseManager<C, P, O extends Connector, L extends Listener>
         listeners.forEach(consumer);
     }
 
-    private C cacheConfig;
+    private final C cacheConfig;
     private P cachePersistence = null;
 
-    public synchronized C getConfig() {
-        return Objects.requireNonNullElse(cacheConfig, cacheConfig = this.configProvider.getConfiguration());
+    public @NotNull C getConfig() {
+        return Objects.requireNonNullElse(cacheConfig, this.configProvider.getConfiguration());
     }
 
-    public synchronized P getPersistence() {
+    public P getPersistence() {
         return Objects.requireNonNullElse(cachePersistence, cachePersistence = this.persistenceProvider.getPersistence());
     }
 

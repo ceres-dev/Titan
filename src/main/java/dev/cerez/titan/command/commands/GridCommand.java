@@ -14,7 +14,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 @ToString
 public class GridCommand extends BaseCommand {
@@ -28,7 +27,9 @@ public class GridCommand extends BaseCommand {
         GridManager.GridManagerConfiguration config = GridManager.GridManagerConfiguration.builder()
                 .baseAsset("SPY")
                 .quoteAsset("USDT")
-                .stepSize(new BigDecimal("0.5"))
+                .stepSizeHighActivity(new BigDecimal("0.7"))
+                .stepSizeMediumActivity(new BigDecimal("0.5"))
+                .stepSizeLowActivity(new BigDecimal("0.4"))
                 .sizePerOrderBaseAsset(new BigDecimal("0.01"))
                 .leverage(5)
                 .logsEndPoints(false)
@@ -36,7 +37,9 @@ public class GridCommand extends BaseCommand {
                 .amountPriceOffset(15)
                 .build();
         StorageManager storageManager = new StorageManagerJsonLocal(Utils.getRootId());
-        GridManager manager = new GridManager(config, new BinanceConnector(), storageManager);
+        BinanceConnector binanceConnector = new BinanceConnector();
+        binanceConnector.start();
+        GridManager manager = new GridManager(config, binanceConnector, storageManager);
         discordConnector.setStatusProfiler(manager);
         discordConnector.start();
         manager.start();
