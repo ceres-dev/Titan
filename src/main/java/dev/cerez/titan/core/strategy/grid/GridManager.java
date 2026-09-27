@@ -1,6 +1,5 @@
 package dev.cerez.titan.core.strategy.grid;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.Log;
 import dev.cerez.titan.Titan;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
@@ -85,7 +84,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
             //noinspection DataFlowIssue
             return c.position().entryPriceAvg();
         }, false).addCondicion(c -> c.context().position() != null));
-        applyAttributes.add(new MultiplyFristOrderSize(SideAffected.AGAINST, (orders, c) -> {
+        applyAttributes.add(new MultiplyFirstOrderSize(SideAffected.AGAINST, (orders, c) -> {
             // Cantidad APROXIMADA no puede ser que no sea la cantidad real
             BigDecimal amountOrderApproximate = c.balanceUsdt()
                     .divide(c.currentPrice(), 12, RoundingMode.HALF_EVEN)
@@ -132,10 +131,15 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
                    }
                }
                return false;
-        }
-        ));
+        }));
+//        applyAttributes.add(new RemoveIf((order, c) -> {
+//            if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
+//                return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
+//            }
+//            return false;
+//        }));
         applyAttributes.add(new CallOnUpdate((order, c) -> {
-//            priceAlarm.clear();
+            priceAlarm.clear();
             BigDecimal stepSize = c.config().getStepSize();
             OrderPreview sell = order.stream().filter(OrderPreview::isSell).min(Comparator.comparing(OrderPreview::getPrice)).orElse(null);
             OrderPreview buy = order.stream().filter(OrderPreview::isBuy).max(Comparator.comparing(OrderPreview::getPrice)).orElse(null);
@@ -153,7 +157,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
             }
         }));
 
-        Log.info("Balance disponible %.4f %s", connector.fGetBalance().get(getConfig().quoteAsset), getConfig().quoteAsset);
+        Log.info("Balance disponible %.4f %s", fGetBalance().get(getConfig().quoteAsset), getConfig().quoteAsset);
         connector.wuEventOrderTradeUpdate(orderUpdate -> {
             if (!orderUpdate.symbol().equals(symbol)) {
                 return;
@@ -198,7 +202,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
         CompletableFuture<BinanceConnector.FuturePosition> positionFuture = CompletableFuture.supplyAsync(() -> connector.fGetPosition(symbol));
         CompletableFuture<BigDecimal> currentPriceFuture = CompletableFuture.supplyAsync(() -> connector.fGetPrice(symbol));
         CompletableFuture<List<BinanceConnector.OrderFuture>> ordersFuture = CompletableFuture.supplyAsync(() -> connector.fGetAllOrder(symbol));
-        CompletableFuture<BigDecimal> balanceFuture = CompletableFuture.supplyAsync(() -> connector.fGetBalanceTotal().getOrDefault(getConfig().quoteAsset, BigDecimal.ZERO));
+        CompletableFuture<BigDecimal> balanceFuture = CompletableFuture.supplyAsync(() -> fGetBalanceTotal().getOrDefault(getConfig().quoteAsset, BigDecimal.ZERO));
 
         BinanceConnector.FuturePosition position = positionFuture.join();
         BigDecimal currentPrice = currentPriceFuture.join();

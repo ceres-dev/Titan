@@ -3,6 +3,7 @@ package dev.cerez.titan.command.commands;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.core.strategy.BalanceRiskManager;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.core.strategy.grid.GridManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
@@ -15,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @ToString
 public class GridCommand extends BaseCommand {
@@ -43,6 +45,8 @@ public class GridCommand extends BaseCommand {
         DiscordConnector discordConnector = new DiscordConnector(storageManager.getProviderOrSaveConfig(DiscordConnector.DiscordConfig.builder().build()));
         discordConnector.setStatusProfiler(manager);
         discordConnector.start();
+        manager.setBalanceRiskManager(new BalanceRiskManager(binanceConnector, Map.of("SPY", BigDecimal.ONE)));
+        manager.setName("SPY");
         manager.start();
     }
 }

@@ -10,12 +10,11 @@ import org.jetbrains.annotations.NotNull;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
-public class MultiplyFristOrderSize extends AttributeMultiplySize {
+public class MultiplyFirstOrderSize extends AttributeMultiplySize {
 
     private final BiFunction<List<OrderPreview>, Context, Integer> multiply;
-    public MultiplyFristOrderSize(SideAffected sideAffected, BiFunction<List<OrderPreview>, Context, Integer> multiplier) {
+    public MultiplyFirstOrderSize(SideAffected sideAffected, BiFunction<List<OrderPreview>, Context, Integer> multiplier) {
         super(sideAffected);
         this.multiply = multiplier;
     }

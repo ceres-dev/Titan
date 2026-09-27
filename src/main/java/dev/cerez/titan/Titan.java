@@ -4,19 +4,21 @@ import dev.cerez.titan.command.CommandHander;
 import dev.cerez.titan.command.commands.*;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.environment.EnvironmentManager;
-import dev.cerez.titan.discord.DiscordConnector;
+import dev.cerez.titan.core.strategy.fundingO.FundingOnTimeManager;
 import dev.cerez.titan.infrastructure.TitanApplication;
-import dev.cerez.titan.utils.MarketSession;
+import dev.cerez.titan.storage.StorageManagerJsonLocal;
+import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.Utils;
 import lombok.Getter;
 
-import java.time.ZoneId;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 
 public final class Titan implements Switch {
 
@@ -32,19 +34,14 @@ public final class Titan implements Switch {
     public static final boolean IS_TESTNET = false;
 
     @Getter private final TitanApplication titanApplication = new TitanApplication();
-    private final Map<UUID, EnvironmentManager> environmentManagers = new HashMap<>();
+    private final Map<UUID, EnvironmentManager> environmentManagers = new ConcurrentHashMap<>();
 
     public static void main(String[] args) {
-//        BinanceConnector connector = new BinanceConnector();
-//        connector.start();
 
-//        if (args.length != 0 && args[0].equals("SpringBoot")) {
-//            instance.start();
-//        }else {
-//            LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
-//            FundingOnTimeManager fundingManger = new FundingOnTimeManager(FundingOnTimeManager.FundingMangerConfiguration.builder().build(),connector, new StorageManagerJsonLocal(Utils.getRootId()));
-//            fundingManger.start();
-//        }
+
+        if (args.length != 0 && args[0].equals("SpringBoot")) {
+            instance.start();
+        }
 
         commandHandler.registerCommand(
                 new ExitCommand(),
@@ -52,7 +49,8 @@ public final class Titan implements Switch {
                 new FundingCommand(),
                 new CheckFundingCommand(),
                 new GridCommand(),
-                new DataRecoveryCommand()
+                new DataRecoveryCommand(),
+                new FundingOnTimeCommand()
         );
         try {
             commandHandler.init();

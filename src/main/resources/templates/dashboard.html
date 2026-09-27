@@ -5,11 +5,11 @@
     <title>Titan Dashboard</title>
     <meta name="robots" content="noindex">
     <!--Local (ignorame)-->
-    <link rel="stylesheet" href="../static/css/titan.css">
-    <link rel="stylesheet" href="../static/css/dashboard.css">
+    <link rel="stylesheet" href="../static/style/titan.css">
+    <link rel="stylesheet" href="../static/style/dashboard.css">
     <!--Remote-->
-    <link rel="stylesheet" href="/css/titan.css">
-    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/style/titan.css">
+    <link rel="stylesheet" href="/style/dashboard.css">
 </head>
 <body>
 <header class="mainSections">
@@ -61,14 +61,11 @@
             </li>
         </ul>
     </section>
-    <section id="strategy" class="box">
+    <section class="box">
         <h2>Estrategias</h2>
-        <ul>
+        <ul id="strategy">
             <li>
-                <strong>Grid</strong>
-                <button>
-                    Stop
-                </button>
+                <div class="loader loaderSmall"></div>
             </li>
         </ul>
         <footer>
@@ -82,54 +79,8 @@
     </section>
 </section>
 <div class="rgbEffect"></div>
-<script>
-    async function loadBalance() {
-        try {
-            const response = await fetch("/api/balance");
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
+<script src="/script/requestBalance.js"></script>
+<script src="/script/requestStrategy.js"></script>
 
-            const balance = await response.json();
-
-            renderBalance("futureBalance", balance.future);
-            renderBalance("spotBalance", balance.spot);
-            //renderBalance("fondoBalance", balance.spot);
-            //renderBalance("totalBalance", balance.spot);
-
-
-        } catch (error) {
-            console.error("Error obteniendo el balance:", error);
-        }
-    }
-
-    function renderBalance(elementId, balances) {
-        const list = document.getElementById(elementId);
-
-        // Limpiar contenido anterior
-        list.innerHTML = "";
-        if (Object.entries(balances).length > 0) {
-            for (const [asset, amount] of Object.entries(balances)) {
-                const li = document.createElement("li");
-                const strong = document.createElement("strong");
-                strong.textContent = asset;
-
-                li.appendChild(strong);
-                li.append(` ${amount}`);
-
-                list.appendChild(li);
-            }
-        }else {
-            const li = document.createElement("li");
-            const strong = document.createElement("strong");
-            strong.textContent = "Sin Fondos";
-            li.appendChild(strong);
-            list.appendChild(li);
-        }
-
-    }
-    loadBalance();
-
-</script>
 </body>
 </html>

@@ -1,7 +1,9 @@
 package dev.cerez.titan.core;
 
 import dev.cerez.titan.connector.Connector;
+import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.event.Listener;
+import dev.cerez.titan.core.strategy.BalanceRiskManager;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.core.strategy.Manager;
 import dev.cerez.titan.core.event.SupplierEvent;
@@ -10,11 +12,10 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.math.BigDecimal;
+import java.util.*;
 import java.util.function.Consumer;
 
 public abstract class BaseManager<C extends BaseConfig, P, O extends Connector, L extends Listener> implements Manager<C>, SupplierEvent<L> {
@@ -27,6 +28,7 @@ public abstract class BaseManager<C extends BaseConfig, P, O extends Connector, 
     @Getter @NotNull protected final Set<L> listeners = new HashSet<>();
 
     @Getter @Setter @NotNull protected String name = id.toString();
+    @Getter @Setter @Nullable protected BalanceRiskManager balanceRiskManager;
     @Getter @Setter(value = AccessLevel.NONE) protected boolean running = false;
 
     public BaseManager(@NotNull Provider<C> config,
@@ -82,5 +84,37 @@ public abstract class BaseManager<C extends BaseConfig, P, O extends Connector, 
     protected void savePersistence(P persistence){
         storageManager.savePersistence(persistence);
     }
+
+    protected Map<String, BigDecimal> fGetBalance(){
+        if (balanceRiskManager == null){
+            if (connector instanceof BinanceConnector binanceConnector) {
+                return binanceConnector.fGetBalance();
+            }else {
+                return Collections.emptyMap();
+            }
+        }else {
+            return balanceRiskManager.futuroBalance(this);
+        }
+    }
+
+    protected Map<String, BigDecimal> fGetBalanceTotal(){
+        if (balanceRiskManager == null){
+            if (connector instanceof BinanceConnector binanceConnector) {
+                return binanceConnector.fGetBalance();
+            }else {
+                return Collections.emptyMap();
+            }
+        }else {
+            return balanceRiskManager.futuroBalanceTotal(this);
+        }
+    }
+    protected Map<String, BigDecimal> sGetBalance(){
+        if (balanceRiskManager == null){
+            return connector.sGetBalance();
+        }else {
+            return balanceRiskManager.spotBalance(this);
+        }
+    }
+
 
 }

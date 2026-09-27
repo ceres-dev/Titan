@@ -18,8 +18,8 @@ public class PriceAlarm implements Switch {
     private final String symbol;
     private final HashSet<Alarm> alarms = new HashSet<>();
 
-    public void addAlarm(boolean forBuy, @NotNull BigDecimal price, @NotNull Runnable amount) {
-        alarms.add(new Alarm(forBuy, price, amount));
+    public void addAlarm(boolean forBuy, @NotNull BigDecimal price, @NotNull Runnable runnable) {
+        alarms.add(new Alarm(forBuy, price, runnable));
     }
 
     @Override
