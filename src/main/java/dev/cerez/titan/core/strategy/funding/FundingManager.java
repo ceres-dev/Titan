@@ -54,10 +54,7 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
     }
 
     @Override
-    public void start() {
-        if (running){
-            return;
-        } else running = true;
+    protected void internalStart() {
         connector.getConfig().setLogsRequest(getConfig().logsEndPoints);
         status = Status.CHECK;
         // Activar el margen Aislado
@@ -117,11 +114,7 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
     }
 
     @Override
-    public void stop() {
-        if (!running) {
-            return;
-        }else running = false;
-        connector.stop();
+    protected void internalStop() {
         BinanceConnector.FuturePosition position = connector.fGetPosition(symbol);
         BinanceConnector.AssetMargin balanceQuote = connector.miGetBalance(symbol).quote();
         if (position == null) {

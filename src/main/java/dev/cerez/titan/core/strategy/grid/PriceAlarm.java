@@ -40,14 +40,14 @@ public class PriceAlarm implements Switch {
                     }
                 }
             }
-        }), symbol);
+        }), null, symbol);
     }
 
     @Override
     public void stop() {
         if (!running) return;
         running = false;
-        connector.wfRemoveBookTicker(symbol);
+        connector.wfRemoveBookTicker(null, symbol);
         alarms.clear();
     }
 

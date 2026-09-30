@@ -1,5 +1,6 @@
 package dev.cerez.titan.core;
 
+import dev.cerez.titan.Log;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.event.Listener;
@@ -8,6 +9,7 @@ import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.core.strategy.Manager;
 import dev.cerez.titan.core.event.SupplierEvent;
 import dev.cerez.titan.utils.Provider;
+import dev.cerez.titan.utils.Utils;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,12 +18,14 @@ import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.function.Consumer;
 
 public abstract class BaseManager<C extends BaseConfig, P, O extends Connector, L extends Listener> implements Manager<C>, SupplierEvent<L> {
 
     @NotNull private final Provider<C> configProvider;
     @NotNull private final Provider<P> persistenceProvider;
+    @NotNull protected final ScheduledExecutorService executor = Executors.newScheduledThreadPool(6, Utils.getThreadFactory());
     @Getter @NotNull protected final O connector;
     @Getter @NotNull protected final UUID id = UUID.randomUUID();
     @Getter @NotNull protected final StorageManager storageManager;
@@ -108,6 +112,7 @@ public abstract class BaseManager<C extends BaseConfig, P, O extends Connector, 
             return balanceRiskManager.futuroBalanceTotal(this);
         }
     }
+
     protected Map<String, BigDecimal> sGetBalance(){
         if (balanceRiskManager == null){
             return connector.sGetBalance();
@@ -115,6 +120,30 @@ public abstract class BaseManager<C extends BaseConfig, P, O extends Connector, 
             return balanceRiskManager.spotBalance(this);
         }
     }
+
+    @Override
+    public final void start() {
+        if (running)return;
+        running = true;
+        long currentTime = System.currentTimeMillis();
+        Log.info("<cian>Iniciando: %s:%s", this.getClass().getSimpleName(), getName());
+        CompletableFuture.runAsync(this::internalStart, executor).join();
+        Log.info("<green>Iniciado: %s:%s %.2fs", this.getClass().getSimpleName(), getName(), (System.currentTimeMillis() - currentTime) / 1000d);
+    }
+
+    @Override
+    public final void stop() {
+        if (!running)return;
+        running = false;
+        long currentTime = System.currentTimeMillis();
+        Log.info("<cian>Deteniendo: %s:%s", this.getClass().getSimpleName(), getName());
+        CompletableFuture.runAsync(this::internalStop, executor).join();
+        Log.info("<green>Detenido: %s:%s %.2fs", this.getClass().getSimpleName(), getName(), (System.currentTimeMillis() - currentTime) / 1000d);
+    }
+
+    protected abstract void internalStart();
+
+    protected abstract void internalStop();
 
 
 }

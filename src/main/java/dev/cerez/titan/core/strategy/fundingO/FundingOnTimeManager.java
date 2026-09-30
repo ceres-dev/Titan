@@ -1,5 +1,6 @@
 package dev.cerez.titan.core.strategy.fundingO;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
@@ -27,40 +28,56 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
 public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.FundingMangerConfiguration, PersistenceNope, BinanceConnector, FundingOnTimeManagerListener> {
 
-    private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(4, Utils.getThreadFactory());
+    private final long windowSize = TimeUnit.SECONDS.toMillis(5);
     private final BigDecimal fundingRateMin = BigDecimal.valueOf(0.003);
     private volatile BinanceConnector.BookTick currentBookTick = null;
+    private volatile OrderToClosePosition order = null;
 
     public FundingOnTimeManager(@NotNull Provider<FundingMangerConfiguration> config, @NonNull BinanceConnector connector, @NotNull StorageManager storageManager) {
         super(config, PersistenceNope.class, connector, storageManager);
     }
 
     @Override
-    public void start() {
-        if(running)return;
-        running = true;
-        while (running) {
-            Log.info("Starting FundingManger");
-            searchFunding();
-            LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(5));
-        }
+    protected void internalStart() {
+        connector.wuCreateEventAccountUpdate((jsonNode -> {
+            Log.info("DEBUG: " + order + " | " + jsonNode.toString());
+            if (order == null) return;
+            if (jsonNode.get("a").get("m").asText().equals("FUNDING_FEE")){
+                JsonNode node = jsonNode.get("S");
+                if (node != null && node.asText().equals(order.symbol)){
+                    closePositionNow();
+                }
+            }
+        }), null, true);
+        executor.execute(() -> {
+            while (running) {
+                Log.info("Starting FundingManger");
+                searchFunding();
+                LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(5));
+            }
+        });
+    }
+
+    private synchronized void closePositionNow() {
+        if (order == null) return;
+        Log.info("Send order close: %s".formatted(order.symbol));
+        if (getConfig().isSendTrade()) connector.fSendOrderToMkt(order.symbol, order.sideOrderToClose, order.quantity, null, true);
+        closePositionCheck(order.symbol);
+        callEvent(FundingOnTimeManagerListener::onClosePosition);
+        order = null;
     }
 
     @Override
-    public void stop() {
-        if(!running)return;
-        running = false;
+    protected void internalStop() {
+        connector.wuDeleteEventAccountUpdate(null);
     }
 
-    private final long windowSize = TimeUnit.SECONDS.toMillis(10);
 
     private void searchFunding(){
         Instant now = Instant.now();
@@ -94,75 +111,82 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
         }
 
         try {
-            connector.wfCreateBookTicker(bookTick -> this.currentBookTick = bookTick, target.symbol());
-            this.currentBookTick = connector.fGetBookTick(target.symbol());
             connector.fSetLeverage(target.symbol(), 1);
+            connector.wfCreateBookTicker(bookTick -> this.currentBookTick = bookTick, null, target.symbol());
+            this.currentBookTick = connector.fGetBookTick(target.symbol());
 
             if (target.nextFundingRate().abs().compareTo(fundingRateMin) < 0){
-                Log.info("Funding rate is out of range %.4f%%", target.nextFundingRate().multiply(new BigDecimal(100)));
+                Log.warning("Abort: Funding rate is out of range %.4f%%", target.nextFundingRate().multiply(new BigDecimal(100)));
                 // Elminar el return solo para testnet TODO: volder a poner en real
-//            return;
+//                callEvent(FundingOnTimeManagerListener::abort);
+//                return;
             }
             Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
-            waitForFunding(remote, target);
-            callEvent(FundingOnTimeManagerListener::onPostExecute);
+            waitForFunding(remote, symbols.get(target.symbol()), target);
+            executor.schedule(this::closePositionNow, 10, TimeUnit.SECONDS);
         }finally {
-            LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
-            closePosition(target.symbol());
-            connector.wfRemoveBookTicker(target.symbol());
+            connector.wfRemoveBookTicker(null, target.symbol());
         }
     }
 
     private void waitForFunding(@NotNull RangeTime remote,
+                                @NotNull Symbol symbol,
                                 @NotNull BinanceConnector.FundingRate target) {
+
         long fundingTimeLocal = target.nextFundingTime() - remote.avg();
-
-        long openTime = (fundingTimeLocal - windowSize / 2);
-
-        if (openTime < 500){
-            Log.info("Abort: out window", openTime);
-            return;
-        }
 
         SideOrder sideOpen = target.nextFundingRate().signum() > 0 ? SideOrder.SELL : SideOrder.BUY;
         SideOrder sideClose = sideOpen.inverse();
 
-        BigDecimal quantityQuote = getConfig().getQuantityQuote();
-        BigDecimal quantity = sideOpen.isBuy()
-                ? /*currentBookTick.askQty().min*/(quantityQuote.divide(currentBookTick.askPrice(), 12, RoundingMode.DOWN))
-                : /*currentBookTick.bidQty().min*/(quantityQuote.divide(currentBookTick.bidPrice(), 12, RoundingMode.DOWN));
+
+        long waitPrice = ((fundingTimeLocal - TimeUnit.SECONDS.toMillis(2)) - windowSize);
+        long currentTimePrice = System.currentTimeMillis();
+        long deltaWaitPrice = waitPrice - currentTimePrice;
+        if (deltaWaitPrice < 500){
+            callEvent(FundingOnTimeManagerListener::onAbort);
+            Log.warning("Abort: out window price %dms", deltaWaitPrice);
+            return;
+        }
+        Log.info("Espera del precio: %.3fs".formatted((waitPrice- currentTimePrice)/1_000d));
+        parkUntil(waitPrice);
+
+        BigDecimal quantityQuoteMax = getConfig().getQuantityQuote();
+        BigDecimal quantityBase = sideOpen.isBuy()
+                ? /*currentBookTick.askQty().min*/(symbol.realMinNotionalBase(currentBookTick.askPrice()))
+                : /*currentBookTick.bidQty().min*/(symbol.realMinNotionalBase(currentBookTick.bidPrice()));
+        BigDecimal quantityQuote = sideOpen.isBuy()
+                ? symbol.realMinNotionalQuote(currentBookTick.askPrice())
+                : symbol.realMinNotionalQuote(currentBookTick.bidPrice());
 
         Log.info(
                 "symbol=%s price=%s qty=%s notional=%s leverage=%s",
                 target.symbol(),
                 sideOpen.isBuy() ? currentBookTick.askPrice() : currentBookTick.bidPrice(),
-                quantity,
-                quantity.multiply(
-                        sideOpen.isBuy()
-                                ? currentBookTick.askPrice()
-                                : currentBookTick.bidPrice()
-                ),
+                quantityBase,
+                quantityQuote,
                 1
         );
 
+        long waitFinal = (fundingTimeLocal - windowSize);
+        long currentTimeFinal = System.currentTimeMillis();
+        long deltaWaitFinal = waitFinal - currentTimeFinal;
+        if (deltaWaitFinal < 500){
+            callEvent(FundingOnTimeManagerListener::onAbort);
+            Log.warning("Abort: out window final %dms", deltaWaitFinal);
+            return;
+        }
+
+        Log.info("Espera final: %.3fs".formatted((waitFinal- currentTimeFinal)/1_000d));
         // Esperar hasta el momento de apertura
-        parkUntil(openTime);
-
-        Log.info("Send order open: %s %d".formatted(target.symbol(), openTime));
-        CompletableFuture.runAsync(() ->
-                connector.fSendOrderToMkt(target.symbol(), sideOpen, quantity, null, false)
-        );
-
-        // Esperar hasta el funding
-        parkUntil(fundingTimeLocal);
-
-        Log.info("Send order close: %s %d".formatted(target.symbol(), fundingTimeLocal));
-        CompletableFuture.runAsync(() ->
-                connector.fSendOrderToMkt(target.symbol(), sideClose, quantity, null, true)
-        );
+        parkUntil(waitFinal);
+        Log.info("Send order open: %s".formatted(target.symbol()));
+        if (getConfig().isSendTrade()) {
+            connector.fSendOrderToMkt(target.symbol(), sideOpen, quantityBase, null, false);
+            this.order = new OrderToClosePosition(target.symbol(), quantityBase, sideClose);
+        }
     }
 
-    private void closePosition(String symbol){
+    private void closePositionCheck(String symbol){
         BinanceConnector.FuturePosition position = connector.fGetPosition(symbol);
         if (position == null) {
             Log.info("Cierre de la posición exitosa");
@@ -172,13 +196,15 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
         }
         SideOrder sideOrder = Utils.toSide(position.sidePosition()).inverse();
 
-        connector.fSendOrderToMkt(symbol,
+        if (getConfig().isSendTrade()) connector.fSendOrderToMkt(symbol,
                 sideOrder,
                 position.quantity(),
                 "close-" + Utils.uuidToBase36(UUID.randomUUID()),
                 true
         );
-        closePosition(symbol);
+        // Una pequeña espera para que se actualize la cache
+        LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
+        closePositionCheck(symbol);
     }
 
     @SuppressWarnings("SameParameterValue")
@@ -235,6 +261,9 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
     @SuperBuilder
     public static class FundingMangerConfiguration extends BaseConfig {
         @Builder.Default private BigDecimal quantityQuote = new BigDecimal("20");
+        @Builder.Default private boolean sendTrade = false;
     }
+
+    private record OrderToClosePosition(String symbol, BigDecimal quantity, SideOrder sideOrderToClose){}
 
 }

@@ -36,11 +36,11 @@ public class Log {
         LOGGER.error(formatColor("<red_light>" + message + "<reset>"));
     }
 
-    public static synchronized void exception(String message, Exception exception) {
+    public static synchronized void exception(String message, Throwable exception) {
         LOGGER.error(message, exception);
     }
 
-    public static synchronized void exception(Exception exception) {
+    public static synchronized void exception(Throwable exception) {
         LOGGER.error("No especificado", exception);
     }
 

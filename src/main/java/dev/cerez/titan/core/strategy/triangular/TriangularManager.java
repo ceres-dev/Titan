@@ -44,10 +44,8 @@ public class TriangularManager extends BaseManager<TriangularManager.TriangularM
         this.engine = getConfig().getEngine().getConstructor(SearchTriangularEngine.EngineConfigurationProvider.class).newInstance(getConfig());
     }
 
-    @Blocking
-    public void start() {
-        if (running) return;
-        running = true;
+    @Override
+    protected void internalStart() {
         if (getConfig().getEngine() == null) throw new IllegalStateException("Engine is not setting");
         CompletableFuture<Map<String, Symbol>> allSymbolsMapFuture = CompletableFuture.supplyAsync(
                 connector::sGetAllSymbols
@@ -72,8 +70,6 @@ public class TriangularManager extends BaseManager<TriangularManager.TriangularM
             Log.info("<green>Engine Ready: %s.", engine.getClass().getName());
             Log.info("Starting Api...");
             connector.wsSubscribeBookTicker(streamListener = this::onBookTickerUpdate, symbolsToSubscribe);
-            connector.start();
-            Log.info("<green>Connector Running: %s", connector.getClass().getName());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             Log.exception("Error iniciando stream de arbitraje", e);
@@ -87,14 +83,12 @@ public class TriangularManager extends BaseManager<TriangularManager.TriangularM
         }
     }
 
-    public void stop() {
-        if (!running) return;
-        running = false;
+    @Override
+    protected void internalStop() {
         Consumer<BookTickDouble> listener = streamListener;
         if (listener != null) {
             connector.wsUnsubscribeBookTicker(listener);
         }
-        connector.stop();
         streamListener = null;
         allSymbolsMap = null;
     }

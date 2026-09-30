@@ -98,8 +98,6 @@ public final class GeminiConnector extends BaseConnector implements AutoCloseabl
             if ((i % 100) == 0) LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(250));
             i++;
         }
-        cachedSymbols.clear();
-        cachedSymbols.putAll(symbols);
         return symbols;
     }
 

@@ -3,7 +3,9 @@ package dev.cerez.titan.command.commands;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.core.event.events.FundingOnTimeManagerListener;
 import dev.cerez.titan.core.strategy.BalanceRiskManager;
+import dev.cerez.titan.core.strategy.fundingO.FundingOnTimeManager;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.core.strategy.grid.GridManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
@@ -26,7 +28,12 @@ public class GridCommand extends BaseCommand {
 
     @Override
     public void execute(@NotNull List<String> args) {
-        GridManager.GridManagerConfiguration config = GridManager.GridManagerConfiguration.builder()
+
+        StorageManager storageManager = new StorageManagerJsonLocal(Utils.getRootId());
+        BinanceConnector binanceConnector = new BinanceConnector(storageManager.getProviderOrSaveConfig(BaseConnector.ConnectorConfig.builder().build()));
+        binanceConnector.start();
+
+        GridManager.GridManagerConfiguration gridConfig = GridManager.GridManagerConfiguration.builder()
                 .baseAsset("SPY")
                 .quoteAsset("USDT")
                 .stepSizeHighActivity(new BigDecimal("0.7"))
@@ -38,15 +45,36 @@ public class GridCommand extends BaseCommand {
                 .sideGrid(SideGrid.LONG)
                 .amountPriceOffset(15)
                 .build();
-        StorageManager storageManager = new StorageManagerJsonLocal(Utils.getRootId());
-        BinanceConnector binanceConnector = new BinanceConnector(storageManager.getProviderOrSaveConfig(BaseConnector.ConnectorConfig.builder().build()));
-        binanceConnector.start();
-        GridManager manager = new GridManager(Provider.from(config), binanceConnector, storageManager);
+        GridManager gridManager = new GridManager(Provider.from(gridConfig), binanceConnector, storageManager);
+        gridManager.setBalanceRiskManager(new BalanceRiskManager(binanceConnector, Map.of("SPY", BigDecimal.ONE)));
+        gridManager.setName("SPY");
+        gridManager.start();
+
+        FundingOnTimeManager.FundingMangerConfiguration fundingConfig = FundingOnTimeManager.FundingMangerConfiguration.builder()
+                .sendTrade(false)
+                .build();
+        FundingOnTimeManager fundingOnTimeManager = new FundingOnTimeManager(Provider.from(fundingConfig), binanceConnector, storageManager);
+        fundingOnTimeManager.setName("Funding");
+        fundingOnTimeManager.start();
+
+        fundingOnTimeManager.registerListener(new FundingOnTimeManagerListener() {
+            @Override
+            public void onPrepare() {
+                gridManager.stop();
+            }
+            @Override
+            public void onClosePosition() {
+                gridManager.start();
+            }
+            @Override
+            public void onAbort() {
+                gridManager.start();
+            }
+        });
+
         DiscordConnector discordConnector = new DiscordConnector(storageManager.getProviderOrSaveConfig(DiscordConnector.DiscordConfig.builder().build()));
-        discordConnector.setStatusProfiler(manager);
+        discordConnector.setStatusProfiler(gridManager);
         discordConnector.start();
-        manager.setBalanceRiskManager(new BalanceRiskManager(binanceConnector, Map.of("SPY", BigDecimal.ONE)));
-        manager.setName("SPY");
-        manager.start();
+
     }
 }

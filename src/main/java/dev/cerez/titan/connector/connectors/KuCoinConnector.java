@@ -102,8 +102,6 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
 //                    new BigDecimal("0") // TODO: consultar en la api
 //            ));
         }
-        cachedSymbols.clear();
-        cachedSymbols.putAll(symbols);
         return symbols;
     }
 

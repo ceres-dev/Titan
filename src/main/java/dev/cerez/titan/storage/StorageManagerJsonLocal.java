@@ -7,6 +7,7 @@ import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.utils.Provider;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
 import java.io.File;
@@ -15,6 +16,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Objects;
 import java.util.UUID;
 
 public class StorageManagerJsonLocal implements StorageManager {
@@ -66,9 +68,13 @@ public class StorageManagerJsonLocal implements StorageManager {
     }
 
     @Override
-    public <C extends BaseConfig> Provider<C> getConfigProvider(Class<C> c, String nameProfiler) {
+    public <C extends BaseConfig> Provider<C> getConfigProvider(Class<C> c, @Nullable String nameProfiler) {
         return () -> {
-            try (FileReader reader = new FileReader(path.resolve(c.getSimpleName() + "-" + nameProfiler + EXTENSION).toFile())) {
+            try (FileReader reader = new FileReader(
+                    path.resolve(
+                            c.getSimpleName() + "-" + Objects.requireNonNullElse(nameProfiler, "default") + EXTENSION
+                    ).toFile())
+            ) {
                 return gson.fromJson(reader, c);
             } catch (IOException e) {
                 Log.exception(e);

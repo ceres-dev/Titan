@@ -22,19 +22,19 @@ public class BalanceRiskManager {
 
     public Map<String, BigDecimal> futuroBalance(Manager<?> manager) {
         Map<String, BigDecimal> result = new HashMap<>();
-        connector.fGetBalance().forEach((s, amount) -> result.put(manager.getName(), amount.multiply(balanceRisk.getOrDefault(s, BigDecimal.ZERO))));
+        connector.fGetBalance().forEach((s, amount) -> result.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
         return result;
     }
 
     public Map<String, BigDecimal> futuroBalanceTotal(Manager<?> manager) {
         Map<String, BigDecimal> result = new HashMap<>();
-        connector.fGetBalanceTotal().forEach((s, amount) -> result.put(manager.getName(), amount.multiply(balanceRisk.getOrDefault(s, BigDecimal.ZERO))));
+        connector.fGetBalanceTotal().forEach((s, amount) -> result.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
         return result;
     }
 
     public Map<String, BigDecimal> spotBalance(Manager<?> manager) {
         Map<String, BigDecimal> result = new HashMap<>();
-        connector.sGetBalance().forEach((s, amount) -> result.put(manager.getName(), amount.multiply(balanceRisk.getOrDefault(s, BigDecimal.ZERO))));
+        connector.sGetBalance().forEach((s, amount) -> result.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
         return result;
     }
 

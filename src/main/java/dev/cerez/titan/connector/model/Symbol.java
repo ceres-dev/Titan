@@ -69,21 +69,56 @@ public class Symbol {
                 .doubleValue();
     }
 
-    public BigDecimal roundPrice(BigDecimal value) {
+    public @NotNull BigDecimal roundPrice(@NotNull BigDecimal value) {
         return value
                 .divide(priceStepSize, 0, RoundingMode.DOWN)
                 .multiply(priceStepSize);
     }
 
-    public BigDecimal roundQuoteQuantity(BigDecimal amountQuote) {
+    public @NotNull BigDecimal roundQuoteQuantity(@NotNull BigDecimal amountQuote) {
         return amountQuote
                 .setScale(quotePrecision, RoundingMode.DOWN);
     }
 
-    public BigDecimal roundBaseQuantity(BigDecimal value) {
+    public @NotNull BigDecimal roundBaseQuantity(@NotNull BigDecimal value) {
         return value
                 .divide(quantityStepSize, 0, RoundingMode.DOWN)
                 .multiply(quantityStepSize);
+    }
+
+    private @NotNull BigDecimal roundBaseQuantityUp(@NotNull BigDecimal value) {
+        if (quantityStepSize.signum() == 0) {
+            return value;
+        }
+
+        BigDecimal steps = value.divide(
+                quantityStepSize,
+                0,
+                RoundingMode.CEILING
+        );
+
+        return steps.multiply(quantityStepSize);
+    }
+
+    public @NotNull BigDecimal realMinNotionalQuote(@NotNull BigDecimal price) {
+        if (price.signum() <= 0) {
+            throw new IllegalArgumentException("Price must be greater than zero");
+        }
+        BigDecimal minBaseFromQuote = minNotionalQuote.divide(price, 18, RoundingMode.CEILING);
+        BigDecimal realMinBase = minNotionalBase.max(minBaseFromQuote);
+        realMinBase = roundBaseQuantityUp(realMinBase);
+
+        return realMinBase.multiply(price).setScale(quotePrecision, RoundingMode.CEILING);
+    }
+
+    public @NotNull BigDecimal realMinNotionalBase(@NotNull BigDecimal price) {
+        if (price.signum() <= 0) {
+            throw new IllegalArgumentException("Price must be greater than zero");
+        }
+        BigDecimal minBaseFromQuote = minNotionalQuote.divide(price, 18, RoundingMode.CEILING);
+        BigDecimal realMinBase = minNotionalBase.max(minBaseFromQuote);
+
+        return roundBaseQuantityUp(realMinBase);
     }
 
     @Override

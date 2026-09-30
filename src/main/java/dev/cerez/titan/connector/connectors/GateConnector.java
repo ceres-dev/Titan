@@ -97,8 +97,7 @@ public final class GateConnector extends BaseConnector implements AutoCloseable 
 //            ));
         }
         synchronized (cachedSymbols) {
-            cachedSymbols.clear();
-            cachedSymbols.putAll(symbols);
+            cachedSymbols.delete();
         }
         return symbols;
     }
@@ -106,11 +105,11 @@ public final class GateConnector extends BaseConnector implements AutoCloseable 
     @Override
     public @NotNull Map<String, BookTickDouble> sGetAllBooks() {
         Map<String, BookTickDouble> result = new HashMap<>();
-        if (cachedSymbols.isEmpty()) {
+        if (cachedSymbols.get() == null) {
             sGetAllSymbols();
         }
         synchronized (cachedSymbols) {
-            for (Symbol symbol : cachedSymbols.values()) {
+            for (Symbol symbol : cachedSymbols.get().values()) {
                 TreeMap<String, Object> params = new TreeMap<>();
                 params.put("currency_pair", symbol.name());
                 params.put("limit", 1);

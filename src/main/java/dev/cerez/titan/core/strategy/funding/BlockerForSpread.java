@@ -72,8 +72,8 @@ public class BlockerForSpread {
             /*
              * Es importante crear ambas suscripciones antes de bloquear.
              */
-            connector.wfCreateBookTicker(futuresListener,symbol);
-            connector.wsCreateBookTicker(spotListener,symbol);
+            connector.wfCreateBookTicker(futuresListener, null, symbol);
+            connector.wsCreateBookTicker(spotListener, null, symbol);
 
             /*
              * Puede que el spread ya cumpla el objetivo antes
@@ -84,8 +84,8 @@ public class BlockerForSpread {
                 LockSupport.park(this);
             }
         } finally {
-            connector.wsRemoveBookTicker(symbol);
-            connector.wfRemoveBookTicker(symbol);
+            connector.wsRemoveBookTicker(null, symbol);
+            connector.wfRemoveBookTicker(null, symbol);
             connector.stop();
         }
     }

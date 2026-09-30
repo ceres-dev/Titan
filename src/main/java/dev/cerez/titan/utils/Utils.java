@@ -6,6 +6,7 @@ import dev.cerez.titan.connector.model.StatusOrder;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
 import lombok.Getter;
+import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -95,11 +96,22 @@ public class Utils {
                         .skip(1)
                         .findFirst()
                         .map(StackWalker.StackFrame::getClassName)
-                        .orElse("Unknown"));
+                        .orElse("Unknown")
+                        .replaceFirst("dev.cerez.titan.", "")
+                );
         String id = Utils.uuidToBase36(UUID.randomUUID());
         return Thread.ofVirtual()
                 .name(id + "-" + className + "-", 0)
                 .factory();
+    }
+
+    public String getClassNameCallPrevious(){
+        return StackWalker.getInstance()
+                .walk(stack -> stack
+                        .skip(1)
+                        .findFirst()
+                        .map(StackWalker.StackFrame::getClassName)
+                        .orElse("Unknown"));
     }
 
     public @NotNull @Unmodifiable List<BinanceConnector.OrderFuture> filterFilled(@NotNull List<BinanceConnector.OrderFuture> orders) {

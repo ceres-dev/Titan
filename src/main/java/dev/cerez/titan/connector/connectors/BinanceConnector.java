@@ -10,6 +10,7 @@ import dev.cerez.titan.connector.model.*;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
 import dev.cerez.titan.utils.Order;
 import dev.cerez.titan.utils.Provider;
+import dev.cerez.titan.utils.Utils;
 import lombok.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -101,7 +102,7 @@ public final class BinanceConnector extends BaseConnector {
         }
         String key = wwsURL + (stream.isEmpty() ? "" : "@") + stream;
 
-        Set<Consumer<JsonNode>> consumerSet = consumerStreamsMap.computeIfAbsent(key, k -> new HashSet<>());
+        Collection<Consumer<JsonNode>> consumerSet = consumerStreamsMap.computeIfAbsent(key, k -> new HashMap<>()).values();
         if (consumerSet.isEmpty()) return;
         if (node.has("data")) {
             consumerSet.forEach(c -> c.accept(node.get("data")));
@@ -111,21 +112,21 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     @Override
-    public void start(){
+    protected void internalStart(){
         initWebSocket(config.isTestNet() ? BASE_TESTNET_WWS : BASE_WWS);
         initWebSocket(this.fGetWWS());
         initWebSocket(this.sGetWWS());
-        super.start();
+        super.internalStart();
         fStartUserData();
         initWebSocket(this.uGetWWS());
     }
 
     @Override
-    public void stop(){
+    protected void internalStop(){
         if (listenKey != null) {
             fCloseUserData();
         }
-        super.stop();
+        super.internalStop();
     }
 
     @Override
@@ -181,8 +182,7 @@ public final class BinanceConnector extends BaseConnector {
                     minNotionalBase
             ));
         }
-        cachedSymbols.clear();
-        cachedSymbols.putAll(symbols);
+        cachedSymbols.set(symbols);
         return symbols;
     }
 
@@ -238,9 +238,9 @@ public final class BinanceConnector extends BaseConnector {
         params.put("side", sideOrder);
         params.put("type", "MARKET");
         if (amountInBaseAsset) {
-            params.put("quantity", cachedSymbols.get(symbol).roundBaseQuantity(amount));
+            params.put("quantity", cachedSymbols.getOrCompute().get(symbol).roundBaseQuantity(amount));
         } else {
-            params.put("quoteOrderQty", cachedSymbols.get(symbol).roundQuoteQuantity(amount));
+            params.put("quoteOrderQty", cachedSymbols.getOrCompute().get(symbol).roundQuoteQuantity(amount));
         }
 //        params.put("isIsolated", true);
 //        params.put("newClientOrderId", nameOrder);
@@ -390,26 +390,27 @@ public final class BinanceConnector extends BaseConnector {
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
     }
 
-    public void wsCreateBookTicker(@NotNull Consumer<BookTick> consumer, @NotNull String symbol){
+    public void wsCreateBookTicker(@NotNull Consumer<BookTick> consumer, @Nullable String id, @NotNull String symbol){
         UUID uuid = UUID.randomUUID();
         String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
-        addConsumerStreams(sGetWWS() + "@" + stream, (payload) -> {
+        String defaultName = Utils.getClassNameCallPrevious();
+        if (addConsumerStreams(sGetWWS() + "@" + stream, Objects.requireNonNullElse(id, defaultName), (payload) -> {
             String[] split = payload.toString().split("\"");
             consumer.accept(new BookTick(new BigDecimal(split[9]), new BigDecimal(split[13]), new BigDecimal(split[17]), new BigDecimal(split[21])));
-        }, false);
-
-        sendWebSocket(sGetWWS(), """
-                {"method": "SUBSCRIBE","params": ["%s"],"id": "%s"}
-                """.formatted(stream, uuid.toString().replace("-", "")));
+        }, false))
+            sendWebSocket(sGetWWS(), """
+                    {"method": "SUBSCRIBE","params": ["%s"],"id": "%s"}
+                    """.formatted(stream, uuid.toString().replace("-", "")));
     }
 
-    public void wsRemoveBookTicker(@NotNull String symbol) {
+    public void wsRemoveBookTicker(@Nullable String id, @NotNull String symbol) {
         UUID uuid = UUID.randomUUID();
         String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
-        removeConsumerStreams(sGetWWS() + "@" + stream);
-        sendWebSocket(sGetWWS(), """
-                {"method": "UNSUBSCRIBE","params": ["%s"],"id": "%s"}
-                """.formatted(stream, uuid.toString().replace("-", "")));
+        String defaultName = Utils.getClassNameCallPrevious();
+        if (removeConsumerStreams(sGetWWS() + "@" + stream, Objects.requireNonNullElse(id, defaultName)))
+            sendWebSocket(sGetWWS(), """
+                    {"method": "UNSUBSCRIBE","params": ["%s"],"id": "%s"}
+                    """.formatted(stream, uuid.toString().replace("-", "")));
     }
 
     private @NotNull String fGetHttps(){
@@ -613,6 +614,16 @@ public final class BinanceConnector extends BaseConnector {
         return new BigDecimal(sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/premiumIndex", params).get("markPrice").asText());
     }
 
+    @Contract(" -> new")
+    public @NotNull Map<String, BigDecimal> fGetAllPrice() {
+        JsonNode raw = sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/premiumIndex");
+        HashMap<String, BigDecimal> priceMap = new HashMap<>();
+        for (JsonNode node : raw) {
+            priceMap.put(node.get("symbol").asText(), new BigDecimal(node.get("markPrice").asText()));
+        }
+        return priceMap;
+    }
+
     @Contract("_ -> new")
     public @NotNull BinanceConnector.BookTick fGetBookTick(@NotNull String symbol) {
         Map<String, Object> params = new HashMap<>();
@@ -697,31 +708,34 @@ public final class BinanceConnector extends BaseConnector {
         sendSignedRequest(fGetHttps(), Method.DELETE, "/fapi/v1/listenKey");
     }
 
-    public void wfCreateBookTicker(@NotNull Consumer<BookTick> consumer, @NotNull String symbol) {
+    public void wfCreateBookTicker(@NotNull Consumer<BookTick> consumer, @Nullable String id, @NotNull String symbol) {
         UUID uuid = UUID.randomUUID();
         String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
-        addConsumerStreams(fGetWWS() + "@" + stream, (payload) -> {
+        String defaultName = Utils.getClassNameCallPrevious();
+        if (addConsumerStreams(fGetWWS() + "@" + stream, Objects.requireNonNullElse(id, defaultName), (payload) -> {
             String[] split = payload.toString().split("\"");
             consumer.accept(new BookTick(new BigDecimal(split[17]), new BigDecimal(split[21]), new BigDecimal(split[25]), new BigDecimal(split[29])));
-        }, true);
-
-        sendWebSocket(fGetWWS(), """
-                {"method":"SUBSCRIBE","params":["%s"],"id":"%s"}
-                """.formatted(stream, uuid.toString().replace("-", "")));
+        }, true))
+            sendWebSocket(fGetWWS(), """
+                    {"method":"SUBSCRIBE","params":["%s"],"id":"%s"}
+                    """.formatted(stream, uuid.toString().replace("-", "")));
     }
 
-    public void wfRemoveBookTicker(@NotNull String symbol) {
+    public void wfRemoveBookTicker(@Nullable String id, @NotNull String symbol) {
         UUID uuid = UUID.randomUUID();
         String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
-        removeConsumerStreams(fGetWWS() + "@" + stream);
-        sendWebSocket(fGetWWS(), """
-                {"method":"UNSUBSCRIBE","params":["%s"],"id":"%s"}
-                """.formatted(stream, uuid.toString().replace("-", "")));
+        String defaultName = Utils.getClassNameCallPrevious();
+        if (removeConsumerStreams(fGetWWS() + "@" + stream, Objects.requireNonNullElse(id, defaultName)))
+            sendWebSocket(fGetWWS(), """
+                    {"method":"UNSUBSCRIBE","params":["%s"],"id":"%s"}
+                    """.formatted(stream, uuid.toString().replace("-", "")));
     }
 
-    public void wuEventOrderTradeUpdate(Consumer<OrderUpdate> consumer, boolean muliThreading){
-        addConsumerStreams(uGetWWS(), (payload) -> {
-            if (payload.get("e").asText().equals("ORDER_TRADE_UPDATE")) {
+    public void wuCreateEventOrderTradeUpdate(Consumer<OrderUpdate> consumer, @Nullable String id, boolean muliThreading){
+        String defaultName = Utils.getClassNameCallPrevious();
+        String type = "ORDER_TRADE_UPDATE";
+        addConsumerStreams(uGetWWS(), Objects.requireNonNullElse(id, defaultName) + "-" + type, (payload) -> {
+            if (payload.get("e").asText().equals(type)) {
                 JsonNode node = payload.get("o");
                 StatusOrder statusOrder = StatusOrder.parse(node.get("x").asText());
                 String nameOrder = node.get("c").asText();
@@ -731,6 +745,28 @@ public final class BinanceConnector extends BaseConnector {
                 consumer.accept(new OrderUpdate(nameOrder, symbol, sideOrder, statusOrder));
             }
         }, muliThreading);
+    }
+
+    public void wuDeleteEventOrderTradeUpdate(@Nullable String id) {
+        String defaultName = Utils.getClassNameCallPrevious();
+        String type = "ORDER_TRADE_UPDATE";
+        removeConsumerStreams(uGetWWS(), Objects.requireNonNullElse(id, defaultName) + "-" + type);
+    }
+
+    public void wuCreateEventAccountUpdate(Consumer<JsonNode> consumer, @Nullable String id, boolean muliThreading){
+        String defaultName = Utils.getClassNameCallPrevious();
+        String type = "ACCOUNT_UPDATE";
+        addConsumerStreams(uGetWWS(), Objects.requireNonNullElse(id, defaultName) + "-" + type, (payload) -> {
+            if (payload.get("e").asText().equals(type)) {
+                consumer.accept(payload);
+            }
+        }, muliThreading);
+    }
+
+    public void wuDeleteEventAccountUpdate(@Nullable String id) {
+        String defaultName = Utils.getClassNameCallPrevious();
+        String type = "ACCOUNT_UPDATE";
+        removeConsumerStreams(uGetWWS(), Objects.requireNonNullElse(id, defaultName) + "-" + type);
     }
 
     public boolean cPossibleConvert(@NotNull String fromAsset, @NotNull String toAsset) {
@@ -923,9 +959,9 @@ public final class BinanceConnector extends BaseConnector {
         params.put("newOrderRespType", "RESULT");
         params.put("type", "MARKET");
         if (amountInBaseAsset) {
-            params.put("quantity", cachedSymbols.get(symbol).roundBaseQuantity(amount));
+            params.put("quantity", cachedSymbols.getOrCompute().get(symbol).roundBaseQuantity(amount));
         } else {
-            params.put("quoteOrderQty", cachedSymbols.get(symbol).roundQuoteQuantity(amount));
+            params.put("quoteOrderQty", cachedSymbols.getOrCompute().get(symbol).roundQuoteQuantity(amount));
         }
         params.put("isIsolated", true);
         params.put("newClientOrderId", nameOrder);

@@ -58,16 +58,12 @@ public class EnvironmentManager extends BaseManager<ConfigNope, PersistenceNope,
     }
 
     @Override
-    public void start() {
-        if (running) return;
-        running = true;
+    protected void internalStart() {
         connector.start();
     }
 
     @Override
-    public void stop() {
-        if (!running) return;
-        running = false;
+    protected void internalStop() {
     }
 
     @Override

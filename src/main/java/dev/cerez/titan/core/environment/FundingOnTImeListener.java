@@ -16,7 +16,7 @@ public class FundingOnTImeListener implements FundingOnTimeManagerListener {
                 .forEach(GridManager::stop);
     }
 
-    public void onPostExecute(){
+    public void onClosePosition(){
         environment.getManager().values().stream()
                 .filter(m -> m instanceof GridManager)
                 .map(m -> (GridManager)m)

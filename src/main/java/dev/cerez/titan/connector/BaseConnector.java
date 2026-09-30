@@ -11,6 +11,7 @@ import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.utils.Provider;
+import dev.cerez.titan.utils.TemporalRefence;
 import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.telemtry.TelemetryConnector;
 import lombok.*;
@@ -32,10 +33,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
 
@@ -47,7 +46,7 @@ public abstract class BaseConnector implements Connector {
 
     @NotNull  protected final ObjectMapper mapper = new ObjectMapper();
     @NotNull  protected final HttpClient clientHttp = HttpClient.newHttpClient();
-    @NotNull  protected final HashMap<String, Symbol> cachedSymbols = new HashMap<>();
+    @NotNull  protected final TemporalRefence<Map<String, Symbol>> cachedSymbols = new TemporalRefence<>(TimeUnit.MINUTES, 5);
     @NotNull  protected final ExecutorService executor = Executors.newFixedThreadPool(8, Utils.getThreadFactory());
     @NotNull  protected final Map<String, WebSocketContainer> webSockets = new HashMap<>();
     @Getter
@@ -56,7 +55,7 @@ public abstract class BaseConnector implements Connector {
 
     @NotNull  private final Object streamIncomingLock = new Object();
     @NotNull  private final StringBuilder streamIncomingMessage = new StringBuilder();
-    @NotNull  protected final HashMap<String, Set<Consumer<JsonNode>>> consumerStreamsMap = new HashMap<>();
+    @NotNull  protected final HashMap<String, Map<String, Consumer<JsonNode>>> consumerStreamsMap = new HashMap<>();
 
     protected volatile boolean waitingForPong = false;
     protected volatile long delayPingPongNanoTime = -1;
@@ -69,20 +68,40 @@ public abstract class BaseConnector implements Connector {
 
     public BaseConnector(@NotNull Provider<ConnectorConfig> config) {
         this.config = config.get();
+        cachedSymbols.setProvider(this::sGetAllSymbols);
     }
 
     public void invalidateCache() {
-        cachedSymbols.clear();
+        cachedSymbols.delete();
     }
 
     @Override
-    public void start(){
+    public final void start(){
+        if (running)return;
+        running = true;
+        long currentTime = System.currentTimeMillis();
+        Log.info("<cian>Iniciando Conector: %s", this.getClass().getSimpleName());
+        CompletableFuture.runAsync(this::internalStart, executor).join();
+        Log.info("<green>Conector Iniciado: %s %.2fs", this.getClass().getSimpleName(), (System.currentTimeMillis() - currentTime) / 1000d);
+    }
+
+    @Override
+    public final void stop() {
+        if (running)return;
+        running = true;
+        long currentTime = System.currentTimeMillis();
+        Log.info("<cian>Deteniendo Conector: %s", this.getClass().getSimpleName());
+        CompletableFuture.runAsync(this::internalStop, executor).join();
+        Log.info("<green>Conector Detenido: %s %.2fs", this.getClass().getSimpleName(), (System.currentTimeMillis() - currentTime) / 1000d);
+    }
+
+    protected void internalStart(){
         initWebSocket(sGetWWS());
+        syncTimeServer();
         runLoopers();
     }
 
-    @Override
-    public void stop() {
+    protected void internalStop(){
         for (Map.Entry<String, WebSocketContainer> entry : webSockets.entrySet()) {
             entry.getValue().getWebSocket().sendClose(0, "The program has ended.");;
         }
@@ -91,6 +110,7 @@ public abstract class BaseConnector implements Connector {
     }
 
     public void syncTimeServer(){
+
         deltaClienteToServer = getTimeSever() - System.currentTimeMillis();
     }
 
@@ -98,8 +118,8 @@ public abstract class BaseConnector implements Connector {
         running = true;
         executor.execute(() -> {
             while (running) {
-                syncTimeServer();
                 LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(60));
+                syncTimeServer();
             }
         });
         executor.execute(() -> {
@@ -146,7 +166,7 @@ public abstract class BaseConnector implements Connector {
                     @SuppressWarnings("CallToPrintStackTrace")
                     public void onError(WebSocket webSocket, Throwable error) {
                         Log.error("WebSocket@%s error: reason=%s cause=%s".formatted(wwsURL, error.getMessage(), error.getCause()));
-                        error.printStackTrace();
+                        Log.exception(error);
                         WebSocket.Listener.super.onError(webSocket, error);
                     }
 
@@ -395,16 +415,31 @@ public abstract class BaseConnector implements Connector {
         }
     }
 
-    protected void removeConsumerStreams(@NotNull String key) {
-        consumerStreamsMap.remove(key);
+    protected boolean removeConsumerStreams(@NotNull String key, @NotNull String id) {
+        Map<String, Consumer<JsonNode>> consumerMap = consumerStreamsMap.get(key);
+        consumerMap.remove(id);
+        if (consumerMap.isEmpty()) {
+            consumerStreamsMap.remove(key);
+            return true;
+        }else {
+            return false;
+        }
     }
 
-    protected void addConsumerStreams(@NotNull String key, @NotNull Consumer<JsonNode> consumer, boolean muliThreading) {
+    protected boolean addConsumerStreams(@NotNull String key, @NotNull String id, @NotNull Consumer<JsonNode> consumer, boolean muliThreading) {
+        final AtomicBoolean isNew = new AtomicBoolean(false);
         if (muliThreading) {
-            consumerStreamsMap.computeIfAbsent(key, k -> new HashSet<>()).add((json) -> executor.execute(() -> consumer.accept(json)));
+            consumerStreamsMap.computeIfAbsent(key, k -> {
+                isNew.set(true);
+                return new HashMap<>();
+            }).put(id, (json) -> executor.execute(() -> consumer.accept(json)));
         }else {
-            consumerStreamsMap.computeIfAbsent(key, k -> new HashSet<>()).add(consumer);
+            consumerStreamsMap.computeIfAbsent(key, k -> {
+                isNew.set(true);
+                return new HashMap<>();
+            }).put(id, consumer);
         }
+        return isNew.get();
     }
 
     protected abstract void handleStreamRawExpress(@NotNull String wwsURL, @NotNull String contentToParse);

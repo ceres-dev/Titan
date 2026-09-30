@@ -1,5 +1,6 @@
 package dev.cerez.titan.command.commands;
 
+import dev.cerez.titan.Log;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
@@ -22,6 +23,12 @@ public class FundingOnTimeCommand extends BaseCommand {
         StorageManager storage = new StorageManagerJsonLocal(Utils.getRootId());
         BinanceConnector connector = new BinanceConnector(storage.getConfigProvider(BaseConnector.ConnectorConfig.class, "testnet"));
         connector.start();
+        connector.wuCreateEventAccountUpdate((jsonNode -> {
+            Log.info(jsonNode.toPrettyString());
+        }), null, false);
+        connector.wuCreateEventOrderTradeUpdate((a) -> {
+            Log.info(a.toString());
+        }, null, true);
         FundingOnTimeManager fundingManger = new FundingOnTimeManager(Provider.from(FundingOnTimeManager.FundingMangerConfiguration.builder().build()),connector, new StorageManagerJsonLocal(Utils.getRootId()));
         fundingManger.start();
     }

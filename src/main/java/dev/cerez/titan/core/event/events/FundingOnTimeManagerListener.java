@@ -6,7 +6,8 @@ public interface FundingOnTimeManagerListener extends Listener {
 
     default void onPrepare() {}
 
-    default void onPostExecute() {}
+    default void onClosePosition() {}
 
+    default void onAbort() {}
 
 }

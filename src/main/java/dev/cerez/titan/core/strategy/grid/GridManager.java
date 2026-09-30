@@ -70,10 +70,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
     }
 
     @Override
-    public void start() {
-        if (running) return;
-        running = true;
-        Log.info("Iniciando...");
+    public void internalStart() {
         connector.getConfig().setLogsRequest(getConfig().logsEndPoints);
 
         connector.fGetAllSymbols();
@@ -108,36 +105,36 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
             }
             return 1;
         }));
-        applyAttributes.add(new RemoveIf((order, c) -> {
-               if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
-                   switch(c.config().getSideGrid()) {
-                       case LONG -> {
-                           if (order.getSideOrder() == SideOrder.BUY){
-                               return lastOrderFilled.getPrice().compareTo(order.getPrice()) <= 0;
-                           }else {
-                               return false;
-                           }
-                       }
-                       case SHORT -> {
-                            if (order.getSideOrder() == SideOrder.SELL){
-                                return lastOrderFilled.getPrice().compareTo(order.getPrice()) >= 0;
-                            }else {
-                                return false;
-                            }
-                       }
-                       case BOTH -> {
-                            return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
-                       }
-                   }
-               }
-               return false;
-        }));
 //        applyAttributes.add(new RemoveIf((order, c) -> {
-//            if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
-//                return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
-//            }
-//            return false;
+//               if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
+//                   switch(c.config().getSideGrid()) {
+//                       case LONG -> {
+//                           if (order.getSideOrder() == SideOrder.BUY){
+//                               return lastOrderFilled.getPrice().compareTo(order.getPrice()) <= 0;
+//                           }else {
+//                               return false;
+//                           }
+//                       }
+//                       case SHORT -> {
+//                            if (order.getSideOrder() == SideOrder.SELL){
+//                                return lastOrderFilled.getPrice().compareTo(order.getPrice()) >= 0;
+//                            }else {
+//                                return false;
+//                            }
+//                       }
+//                       case BOTH -> {
+//                            return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
+//                       }
+//                   }
+//               }
+//               return false;
 //        }));
+        applyAttributes.add(new RemoveIf((order, c) -> {
+            if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
+                return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
+            }
+            return false;
+        }));
         applyAttributes.add(new CallOnUpdate((order, c) -> {
             priceAlarm.clear();
             BigDecimal stepSize = c.config().getStepSize();
@@ -158,7 +155,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
         }));
 
         Log.info("Balance disponible %.4f %s", fGetBalance().get(getConfig().quoteAsset), getConfig().quoteAsset);
-        connector.wuEventOrderTradeUpdate(orderUpdate -> {
+        connector.wuCreateEventOrderTradeUpdate(orderUpdate -> {
             if (!orderUpdate.symbol().equals(symbol)) {
                 return;
             }
@@ -173,8 +170,8 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
             // Es para que actualize la caché de binance al momentó de obtener los datos
             LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
             updateGrid();
-        }, true);
-        Titan.getInstance().getExecutor().execute(() -> {
+        }, null, true);
+        executor.execute(() -> {
             while (running) {
                 // Para actualizar la gráfica periódicamente para detectar cambios en el precio
                 LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(1));
@@ -185,12 +182,9 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
     }
 
     @Override
-    public void stop() {
-        if (!running) return;
-        running = false;
-        connector.stop();
-
+    public void internalStop() {
         applyAttributes.clear();
+        connector.wuDeleteEventOrderTradeUpdate(null);
         connector.fCancelOrderAll(symbol);
     }
 

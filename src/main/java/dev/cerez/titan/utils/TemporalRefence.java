@@ -15,21 +15,21 @@ public class TemporalRefence<R>  {
     private final long time;
 
     private volatile R reference;
-    private volatile boolean isAviated = true;
-    private Future<Boolean> isAviatedFuture = CompletableFuture.completedFuture(true);
+    private volatile boolean isUseble = true;
+    private Future<Boolean> isUsebleFuture = CompletableFuture.completedFuture(true);
 
     @Setter
     private Provider<R> provider;
 
     public R set(@NotNull R r){
         this.reference = r;
-        if (!isAviatedFuture.isDone()) isAviatedFuture.cancel(true);
-        isAviatedFuture = executor.schedule(() -> isAviated = false, time, unit);
+        if (!isUsebleFuture.isDone()) isUsebleFuture.cancel(true);
+        isUsebleFuture = executor.schedule(() -> isUseble = false, time, unit);
         return reference;
     }
 
     public @Nullable R get(){
-        if (isAviated && reference != null) {
+        if (isUseble && reference != null) {
             return reference;
         }else {
             return null;
@@ -52,5 +52,10 @@ public class TemporalRefence<R>  {
             return set(provider.get());
         }
         return this.reference;
+    }
+
+    public void delete() {
+        isUseble = false;
+        isUsebleFuture.cancel(true);
     }
 }
