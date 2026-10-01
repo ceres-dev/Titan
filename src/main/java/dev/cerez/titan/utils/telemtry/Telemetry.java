@@ -23,7 +23,7 @@ public class Telemetry implements TelemetryConnector, Configurable<Telemetry.Tel
 
     @Getter
     private final TelemetryConfig config;
-    private final Executor executor = Executors.newSingleThreadExecutor(Utils.getThreadFactory());
+    private final Executor executor = Executors.newSingleThreadExecutor(Utils.getThreadFactory(this));
 
     @NotNull
     private LinkedList<Long> deltaDelayComputeNanoTimeList = new LinkedList<>();

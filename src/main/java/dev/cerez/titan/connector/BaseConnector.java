@@ -47,7 +47,7 @@ public abstract class BaseConnector implements Connector {
     @NotNull  protected final ObjectMapper mapper = new ObjectMapper();
     @NotNull  protected final HttpClient clientHttp = HttpClient.newHttpClient();
     @NotNull  protected final TemporalRefence<Map<String, Symbol>> cachedSymbols = new TemporalRefence<>(TimeUnit.MINUTES, 5);
-    @NotNull  protected final ExecutorService executor = Executors.newFixedThreadPool(8, Utils.getThreadFactory());
+    @NotNull  protected final ExecutorService executor = Executors.newFixedThreadPool(8, Utils.getThreadFactory(this));
     @NotNull  protected final Map<String, WebSocketContainer> webSockets = new HashMap<>();
     @Getter
     @NotNull  protected final ConnectorConfig config;

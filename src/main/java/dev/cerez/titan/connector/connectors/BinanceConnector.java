@@ -220,7 +220,6 @@ public final class BinanceConnector extends BaseConnector {
         Map<String, BigDecimal> result = new HashMap<>();
         for (JsonNode node : raw.get("balances")) {
             BigDecimal balance =  new BigDecimal(node.get("free").asText());
-            if (balance.compareTo(BigDecimal.ZERO) <= 0) continue;
             result.put(node.get("asset").asText(), balance);
         }
         return result;
@@ -430,7 +429,6 @@ public final class BinanceConnector extends BaseConnector {
         Map<String, BigDecimal> result = new HashMap<>();
         for (JsonNode node : raw){
             BigDecimal balance =  new BigDecimal(node.get("maxWithdrawAmount").asText());
-            if (balance.compareTo(BigDecimal.ZERO) <= 0) continue;
             result.put(node.get("asset").asText(), balance);
         }
         return result;

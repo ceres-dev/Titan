@@ -30,7 +30,7 @@ public final class Titan implements Switch {
     private static final Titan instance = new Titan();
     private static final CommandHander commandHandler = new CommandHander();
     @Getter
-    private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(16, Utils.getThreadFactory());
+    private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(16, Utils.getThreadFactory(this));
     public static final boolean IS_TESTNET = false;
 
     @Getter private final TitanApplication titanApplication = new TitanApplication();

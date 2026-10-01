@@ -46,7 +46,6 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
     @Override
     protected void internalStart() {
         connector.wuCreateEventAccountUpdate((jsonNode -> {
-            Log.info("DEBUG: " + order + " | " + jsonNode.toString());
             if (order == null) return;
             if (jsonNode.get("a").get("m").asText().equals("FUNDING_FEE")){
                 JsonNode node = jsonNode.get("S");
@@ -86,8 +85,8 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
                 .plus(1, ChronoUnit.HOURS);
         Duration remaining = Duration.between(now, nextHour);
 
-        Log.info("Balance: %.4f USDT", connector.fGetBalance().get("USDT"));
-        Log.info("waiting for funding seconds:%s", remaining.toSeconds());
+        Log.info("Balance: %.4f USDT", fGetBalance().get("USDT"));
+        Log.info("Espera del Financiación: %ds", remaining.toSeconds());
 
         LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
 
@@ -138,17 +137,18 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
         SideOrder sideOpen = target.nextFundingRate().signum() > 0 ? SideOrder.SELL : SideOrder.BUY;
         SideOrder sideClose = sideOpen.inverse();
 
-
-        long waitPrice = ((fundingTimeLocal - TimeUnit.SECONDS.toMillis(2)) - windowSize);
-        long currentTimePrice = System.currentTimeMillis();
-        long deltaWaitPrice = waitPrice - currentTimePrice;
-        if (deltaWaitPrice < 500){
+        long waitFinal = (fundingTimeLocal - windowSize);
+        long currentTimeFinal = System.currentTimeMillis();
+        long deltaWaitFinal = waitFinal - currentTimeFinal;
+        if (deltaWaitFinal < 500){
             callEvent(FundingOnTimeManagerListener::onAbort);
-            Log.warning("Abort: out window price %dms", deltaWaitPrice);
+            Log.warning("Abort: out window final %dms", deltaWaitFinal);
             return;
         }
-        Log.info("Espera del precio: %.3fs".formatted((waitPrice- currentTimePrice)/1_000d));
-        parkUntil(waitPrice);
+
+        Log.info("Espera final: %.3fs".formatted((waitFinal- currentTimeFinal)/1_000d));
+        // Esperar hasta el momento de apertura
+        parkUntil(waitFinal);
 
         BigDecimal quantityQuoteMax = getConfig().getQuantityQuote();
         BigDecimal quantityBase = sideOpen.isBuy()
@@ -167,18 +167,6 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
                 1
         );
 
-        long waitFinal = (fundingTimeLocal - windowSize);
-        long currentTimeFinal = System.currentTimeMillis();
-        long deltaWaitFinal = waitFinal - currentTimeFinal;
-        if (deltaWaitFinal < 500){
-            callEvent(FundingOnTimeManagerListener::onAbort);
-            Log.warning("Abort: out window final %dms", deltaWaitFinal);
-            return;
-        }
-
-        Log.info("Espera final: %.3fs".formatted((waitFinal- currentTimeFinal)/1_000d));
-        // Esperar hasta el momento de apertura
-        parkUntil(waitFinal);
         Log.info("Send order open: %s".formatted(target.symbol()));
         if (getConfig().isSendTrade()) {
             connector.fSendOrderToMkt(target.symbol(), sideOpen, quantityBase, null, false);

@@ -29,7 +29,10 @@ public class FundingOnTimeCommand extends BaseCommand {
         connector.wuCreateEventOrderTradeUpdate((a) -> {
             Log.info(a.toString());
         }, null, true);
-        FundingOnTimeManager fundingManger = new FundingOnTimeManager(Provider.from(FundingOnTimeManager.FundingMangerConfiguration.builder().build()),connector, new StorageManagerJsonLocal(Utils.getRootId()));
+        FundingOnTimeManager.FundingMangerConfiguration config = FundingOnTimeManager.FundingMangerConfiguration.builder()
+                .sendTrade(true)
+                .build();
+        FundingOnTimeManager fundingManger = new FundingOnTimeManager(Provider.from(config),connector, new StorageManagerJsonLocal(Utils.getRootId()));
         fundingManger.start();
     }
 }

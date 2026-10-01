@@ -90,28 +90,23 @@ public class Utils {
         throw new IllegalArgumentException();
     }
 
-    public ThreadFactory getThreadFactory() {
-        String className = StackWalker.getInstance()
-                .walk(stack -> stack
-                        .skip(1)
-                        .findFirst()
-                        .map(StackWalker.StackFrame::getClassName)
-                        .orElse("Unknown")
-                        .replaceFirst("dev.cerez.titan.", "")
-                );
+    public @NotNull ThreadFactory getThreadFactory(@NotNull Object o) {
         String id = Utils.uuidToBase36(UUID.randomUUID());
         return Thread.ofVirtual()
-                .name(id + "-" + className + "-", 0)
+                .name(id + "-" + o.getClass().getSimpleName() + "-", 0)
                 .factory();
     }
 
     public String getClassNameCallPrevious(){
-        return StackWalker.getInstance()
+        return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
                 .walk(stack -> stack
-                        .skip(1)
+                        .filter(frame -> frame.getDeclaringClass() != Utils.class)
                         .findFirst()
-                        .map(StackWalker.StackFrame::getClassName)
-                        .orElse("Unknown"));
+                        .map(StackWalker.StackFrame::getDeclaringClass)
+                        .map(Class::getName)
+                        .orElse("Unknown")
+                        .replaceFirst("^dev\\.cerez\\.titan\\.", "")
+                );
     }
 
     public @NotNull @Unmodifiable List<BinanceConnector.OrderFuture> filterFilled(@NotNull List<BinanceConnector.OrderFuture> orders) {

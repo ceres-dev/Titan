@@ -10,7 +10,7 @@ import java.util.concurrent.*;
 @RequiredArgsConstructor
 public class TemporalRefence<R>  {
 
-    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(Utils.getThreadFactory());
+    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(Utils.getThreadFactory(this));
     private final TimeUnit unit;
     private final long time;
 

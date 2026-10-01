@@ -29,7 +29,7 @@ public class DataRecoveryCommand extends BaseCommand {
         super("dataRecovery", "dr");
     }
 
-    private final Executor executor = Executors.newFixedThreadPool(2, Utils.getThreadFactory());
+    private final Executor executor = Executors.newFixedThreadPool(2, Utils.getThreadFactory(this));
 
     // TODO: crear una clase más organizada
 

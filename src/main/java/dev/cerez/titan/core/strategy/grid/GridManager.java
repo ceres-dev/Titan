@@ -71,8 +71,6 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
 
     @Override
     public void internalStart() {
-        connector.getConfig().setLogsRequest(getConfig().logsEndPoints);
-
         connector.fGetAllSymbols();
         connector.fSetLeverage(symbol, getConfig().leverage);
 
@@ -189,6 +187,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
     }
 
     public synchronized void updateGrid() {
+        if (!running) return;
         waitForCancel.clear();
         forOpen.clear();
         callEvent(GridManagerListener::onUpdate);
@@ -210,6 +209,8 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
                 ? balance
                 // En caso de que tenga una posición con PNL negativo se descuenta del margen usable
                 : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO)).multiply(new BigDecimal(getConfig().getLeverage()));
+
+        if (position == null) System.out.println("Position is null");
 
         Context context = new Context(balanceUse, currentPrice, getConfig(), position, orders);
 

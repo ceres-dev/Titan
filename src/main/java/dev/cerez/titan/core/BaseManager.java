@@ -25,7 +25,7 @@ public abstract class BaseManager<C extends BaseConfig, P, O extends Connector, 
 
     @NotNull private final Provider<C> configProvider;
     @NotNull private final Provider<P> persistenceProvider;
-    @NotNull protected final ScheduledExecutorService executor = Executors.newScheduledThreadPool(6, Utils.getThreadFactory());
+    @NotNull protected final ScheduledExecutorService executor = Executors.newScheduledThreadPool(6, Utils.getThreadFactory(this));
     @Getter @NotNull protected final O connector;
     @Getter @NotNull protected final UUID id = UUID.randomUUID();
     @Getter @NotNull protected final StorageManager storageManager;
@@ -104,7 +104,7 @@ public abstract class BaseManager<C extends BaseConfig, P, O extends Connector, 
     protected Map<String, BigDecimal> fGetBalanceTotal(){
         if (balanceRiskManager == null){
             if (connector instanceof BinanceConnector binanceConnector) {
-                return binanceConnector.fGetBalance();
+                return binanceConnector.fGetBalanceTotal();
             }else {
                 return Collections.emptyMap();
             }
@@ -144,6 +144,5 @@ public abstract class BaseManager<C extends BaseConfig, P, O extends Connector, 
     protected abstract void internalStart();
 
     protected abstract void internalStop();
-
 
 }

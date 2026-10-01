@@ -29,7 +29,7 @@ public class WaitableSet<T> {
         }
     }
 
-    public void addAll(Iterable<T> elements) {
+    public void addAll(@NotNull Iterable<T> elements) {
         lock.lock();
         try {
             for (T element : elements) {
@@ -39,6 +39,7 @@ public class WaitableSet<T> {
             lock.unlock();
         }
     }
+
     public void addAll(Collection<T> elements) {
         lock.lock();
         try {
