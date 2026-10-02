@@ -11,7 +11,7 @@ import java.util.List;
 public class CheckFundingCommand extends BaseCommand {
 
     public CheckFundingCommand() {
-        super("check");
+        super("check", "c");
     }
 
     @Override

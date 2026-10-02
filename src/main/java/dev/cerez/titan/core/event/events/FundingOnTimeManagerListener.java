@@ -12,4 +12,6 @@ public interface FundingOnTimeManagerListener extends Listener {
 
     default void onAbort() {}
 
+    default void onOpenPosition() {}
+
 }

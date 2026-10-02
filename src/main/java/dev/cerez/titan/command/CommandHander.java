@@ -8,11 +8,13 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class CommandHander {
 
     private final HashMap<String, BaseCommand> commands = new HashMap<>();
     private final HashMap<String, String> aliases = new HashMap<>();
+    private final HashMap<Integer, String> indexCommands = new HashMap<>();
     private final InputUser input = new InputUser();
 
     @Contract(pure = true)
@@ -38,11 +40,26 @@ public class CommandHander {
 
     @Blocking
     public void init() {
+        if (running) return;
         running = true;
-        while (running) {
-            String input = this.input.in("");
-            dispatch(input.split(" "));
+        int i = 0;
+        for (Map.Entry<String, String> entry : aliases.entrySet()) {
+            int index = i++;
+            System.out.printf("\t[%d/%s]: %s%n", index, entry.getKey(), entry.getValue());
+            indexCommands.put(index, entry.getValue());
         }
+        String raw = input.in("Select: ");
+        String commandName = aliases.get(raw);
+        if (commandName == null) {
+            dispatch(indexCommands.get(Integer.parseInt(raw)));
+        }else {
+            dispatch(commandName);
+        }
+
+        // Limpiar consola
+//        System.out.print("\033[H\033[2J");
+//        System.out.flush();
+        while (running) dispatch(input.in(""));
     }
 
     public void stop(){

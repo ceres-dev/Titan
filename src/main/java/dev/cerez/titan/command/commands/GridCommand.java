@@ -51,11 +51,15 @@ public class GridCommand extends BaseCommand {
         gridManager.start();
 
         FundingOnTimeManager.FundingMangerConfiguration fundingConfig = FundingOnTimeManager.FundingMangerConfiguration.builder()
-                .sendTrade(false)
+                .sendTrade(true)
                 .build();
         FundingOnTimeManager fundingOnTimeManager = new FundingOnTimeManager(Provider.from(fundingConfig), binanceConnector, storageManager);
         fundingOnTimeManager.setName("Funding");
         fundingOnTimeManager.start();
+
+        DiscordConnector discordConnector = new DiscordConnector(storageManager.getProviderOrSaveConfig(DiscordConnector.DiscordConfig.builder().build()));
+        discordConnector.setStatusProfiler(gridManager);
+        discordConnector.start();
 
         fundingOnTimeManager.registerListener(new FundingOnTimeManagerListener() {
             @Override
@@ -74,11 +78,12 @@ public class GridCommand extends BaseCommand {
             public void onEndWindow(){
                 gridManager.start();
             }
+            @Override
+            public void onOpenPosition() {
+                discordConnector.sendMessage("Posición abierta ya sabes owo");
+            }
         });
 
-        DiscordConnector discordConnector = new DiscordConnector(storageManager.getProviderOrSaveConfig(DiscordConnector.DiscordConfig.builder().build()));
-        discordConnector.setStatusProfiler(gridManager);
-        discordConnector.start();
 
     }
 }

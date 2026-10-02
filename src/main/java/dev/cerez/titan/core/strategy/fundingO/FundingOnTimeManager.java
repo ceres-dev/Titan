@@ -34,7 +34,6 @@ import java.util.concurrent.locks.LockSupport;
 public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.FundingMangerConfiguration, PersistenceNope, BinanceConnector, FundingOnTimeManagerListener> {
 
     private final long windowSize = TimeUnit.SECONDS.toMillis(1);
-    private final BigDecimal fundingRateMin = BigDecimal.valueOf(0.003);
     private volatile BinanceConnector.BookTick currentBookTick = null;
     private volatile OrderToClosePosition order = null;
 
@@ -78,33 +77,44 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
 
 
     private void searchFunding(){
+        var config = getConfig();
         Instant now = Instant.now();
         Instant nextHour = now
                 .truncatedTo(ChronoUnit.HOURS)
                 .plus(1, ChronoUnit.HOURS);
         Duration remaining = Duration.between(now, nextHour);
 
-        Log.info("Balance: %.4f USDT", fGetBalance().get("USDT"));
         Log.info("Espera del Financiación: %ds", remaining.toSeconds());
-
         LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
-
         callEvent(FundingOnTimeManagerListener::onPrepare);
+
         CompletableFuture<Map<String, BinanceConnector.FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
         CompletableFuture<RangeTime> remoteFuture = CompletableFuture.supplyAsync(() -> getDeltaClockRemote(TimeUnit.SECONDS, 20));
         CompletableFuture<Map<String, Symbol>> symbolsFuture = CompletableFuture.supplyAsync(connector::fGetAllSymbols);
+        CompletableFuture<Map<String, BigDecimal>> balanceAvailableFuture = CompletableFuture.supplyAsync(this::fGetBalance);
 
         Map<String, BinanceConnector.FundingRate> funding = fundingFuture.join();
         RangeTime remote = remoteFuture.join();
         Map<String, Symbol> symbols = symbolsFuture.join();
+        Map<String, BigDecimal> balanceAvailable = balanceAvailableFuture.join();
+
+        BigDecimal balance = balanceAvailable.get("USDT");
+        Log.info("Balance Disponible: %.4f USDT", balance);
+
+        if (config.getMaxQuantityQuote().compareTo(balance) >= 0){
+            Log.info("Abort: Insufficient balance");
+            callEvent(FundingOnTimeManagerListener::onAbort);
+            return;
+        }
 
         BinanceConnector.FundingRate target = funding.values().stream()
                 .filter((f) -> (f.nextFundingTime() - System.currentTimeMillis()) < TimeUnit.HOURS.toMillis(1))
+                .filter(f -> f.symbol().endsWith("USDT"))
                 .max(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRateAbs))
                 .orElse(null);
 
         if (target == null) {
-            Log.info("No funding rate found");
+            Log.info("Abort: No funding rate found");
             callEvent(FundingOnTimeManagerListener::onAbort);
             return;
         }
@@ -114,11 +124,10 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
             connector.wfCreateBookTicker(bookTick -> this.currentBookTick = bookTick, null, target.symbol());
             this.currentBookTick = connector.fGetBookTick(target.symbol());
 
-            if (target.nextFundingRate().abs().compareTo(fundingRateMin) < 0){
+            if (target.nextFundingRate().abs().compareTo(getConfig().fundingRateMin) < 0){
                 Log.warning("Abort: Funding rate is out of range %.4f%%", target.nextFundingRate().multiply(new BigDecimal(100)));
-                // Elminar el return solo para testnet TODO: volder a poner en real
-//                callEvent(FundingOnTimeManagerListener::onAbort);
-//                return;
+                callEvent(FundingOnTimeManagerListener::onAbort);
+                return;
             }
             Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
             waitForFunding(remote, symbols.get(target.symbol()), target);
@@ -133,7 +142,7 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
                                 @NotNull BinanceConnector.FundingRate target) {
 
         long fundingTimeLocal = target.nextFundingTime() - remote.avg();
-
+        var config = getConfig();
         SideOrder sideOpen = target.nextFundingRate().signum() > 0 ? SideOrder.SELL : SideOrder.BUY;
         SideOrder sideClose = sideOpen.inverse();
 
@@ -151,7 +160,7 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
         // Esperar hasta el momento de apertura
         parkUntil(waitFinal);
 
-        BigDecimal quantityQuoteMax = getConfig().getQuantityQuote();
+        BigDecimal quantityQuoteMax = config.getMaxQuantityQuote();
         BigDecimal quantityBase = sideOpen.isBuy()
                 ? /*currentBookTick.askQty().min*/(symbol.realMinNotionalBase(currentBookTick.askPrice()))
                 : /*currentBookTick.bidQty().min*/(symbol.realMinNotionalBase(currentBookTick.bidPrice()));
@@ -168,8 +177,14 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
                 1
         );
 
+        if (quantityQuoteMax.compareTo(quantityQuote) <= 0){
+            Log.warning("Abort: max Quantity %.4f > %.4f", quantityQuote,  quantityQuoteMax);
+            callEvent(FundingOnTimeManagerListener::onAbort);
+        }
+
         Log.info("Send order open: %s".formatted(target.symbol()));
-        if (getConfig().isSendTrade()) {
+        if (config.isSendTrade()) {
+            callEvent(FundingOnTimeManagerListener::onOpenPosition);
             connector.fSendOrderToMkt(target.symbol(), sideOpen, quantityBase, null, false);
             this.order = new OrderToClosePosition(target.symbol(), quantityBase, sideClose);
         }
@@ -249,7 +264,8 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
     @EqualsAndHashCode(callSuper = true)
     @SuperBuilder
     public static class FundingMangerConfiguration extends BaseConfig {
-        @Builder.Default private BigDecimal quantityQuote = new BigDecimal("20");
+        @Builder.Default private BigDecimal maxQuantityQuote = new BigDecimal("6");
+        @Builder.Default private BigDecimal fundingRateMin = BigDecimal.valueOf(0.0025);
         @Builder.Default private boolean sendTrade = false;
     }
 

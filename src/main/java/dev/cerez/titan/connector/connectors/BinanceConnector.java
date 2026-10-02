@@ -452,7 +452,6 @@ public final class BinanceConnector extends BaseConnector {
         return result;
     }
 
-
     public void fSendOrderToMkt(@NotNull String symbol, @NotNull SideOrder sideOrder, BigDecimal amountBase, @Nullable String nameOrder, boolean reduceOnly) throws ReduceOnlyRejectException {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
@@ -727,6 +726,9 @@ public final class BinanceConnector extends BaseConnector {
             sendWebSocket(fGetWWS(), """
                     {"method":"UNSUBSCRIBE","params":["%s"],"id":"%s"}
                     """.formatted(stream, uuid.toString().replace("-", "")));
+    }
+
+    public void wfSendOrderToMkt(@NotNull String symbol, @NotNull SideOrder sideOrder, BigDecimal amountBase, @Nullable String nameOrder, boolean reduceOnly) throws ReduceOnlyRejectException {
     }
 
     public void wuCreateEventOrderTradeUpdate(Consumer<OrderUpdate> consumer, @Nullable String id, boolean muliThreading){
