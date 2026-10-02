@@ -4,7 +4,7 @@ import dev.cerez.titan.Log;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.core.strategy.fundingO.FundingOnTimeManager;
+import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.storage.StorageManagerJsonLocal;
 import dev.cerez.titan.utils.Provider;

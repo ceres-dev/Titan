@@ -1,4 +1,4 @@
-package dev.cerez.titan.core.strategy.funding;
+package dev.cerez.titan.core.strategy.funding.neutral;
 
 import dev.cerez.titan.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;

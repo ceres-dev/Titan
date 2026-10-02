@@ -14,11 +14,10 @@ import org.jetbrains.annotations.Unmodifiable;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ThreadFactory;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 @UtilityClass
 public class Utils {
@@ -131,6 +130,11 @@ public class Utils {
 
     public <T extends Order> @NotNull @Unmodifiable Optional<T> getMax(@NotNull List<T> orders) {
         return orders.stream().max(Comparator.comparing(Order::getPrice));
+    }
+
+    public <M extends Map<K, V>, K, V> M removeIf(@NotNull M map, @NotNull BiFunction<K, V, Boolean> filter) {
+        map.entrySet().removeIf(entry -> filter.apply(entry.getKey(), entry.getValue()));
+        return map;
     }
 
     @Getter

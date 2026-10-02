@@ -1,4 +1,4 @@
-package dev.cerez.titan.core.strategy.funding;
+package dev.cerez.titan.core.strategy.funding.neutral;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

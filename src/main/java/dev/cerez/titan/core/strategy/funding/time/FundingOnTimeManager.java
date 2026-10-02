@@ -1,4 +1,4 @@
-package dev.cerez.titan.core.strategy.fundingO;
+package dev.cerez.titan.core.strategy.funding.time;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.Log;
@@ -124,12 +124,12 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
             connector.wfCreateBookTicker(bookTick -> this.currentBookTick = bookTick, null, target.symbol());
             this.currentBookTick = connector.fGetBookTick(target.symbol());
 
+            Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
             if (target.nextFundingRate().abs().compareTo(getConfig().fundingRateMin) < 0){
                 Log.warning("Abort: Funding rate is out of range %.4f%%", target.nextFundingRate().multiply(new BigDecimal(100)));
                 callEvent(FundingOnTimeManagerListener::onAbort);
                 return;
             }
-            Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
             waitForFunding(remote, symbols.get(target.symbol()), target);
             executor.schedule(this::closePositionNow, 10, TimeUnit.SECONDS);
         }finally {

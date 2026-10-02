@@ -5,7 +5,7 @@ import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.event.events.FundingOnTimeManagerListener;
 import dev.cerez.titan.core.strategy.BalanceRiskManager;
-import dev.cerez.titan.core.strategy.fundingO.FundingOnTimeManager;
+import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.core.strategy.grid.GridManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;

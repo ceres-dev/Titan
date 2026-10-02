@@ -7,6 +7,7 @@ import dev.cerez.titan.infrastructure.model.Strategy;
 import dev.cerez.titan.infrastructure.model.Time;
 import dev.cerez.titan.infrastructure.user.custom.CustomUserDetails;
 import dev.cerez.titan.utils.TemporalRefence;
+import dev.cerez.titan.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,7 +29,12 @@ public class ApiController {
     @GetMapping("/balance")
     public ResponseEntity<Balance> getBalance(@AuthenticationPrincipal CustomUserDetails user) {
         var port = getPort(user);
-        return ResponseEntity.ok(balance.getOrCompute(() -> new Balance(port.getSpotBalance(), port.getFutureBalance())));
+        return ResponseEntity.ok(balance.getOrCompute(() ->
+                new Balance(
+                        Utils.removeIf(port.getSpotBalance(), (k, v) -> v.signum() != 0),
+                        Utils.removeIf(port.getFutureBalance(), (k, v) -> v.signum() != 0)
+                )
+        ));
     }
 
     @GetMapping("/time/exchange")
