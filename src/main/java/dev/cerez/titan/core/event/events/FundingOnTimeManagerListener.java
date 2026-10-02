@@ -8,6 +8,8 @@ public interface FundingOnTimeManagerListener extends Listener {
 
     default void onClosePosition() {}
 
+    default void onEndWindow() {}
+
     default void onAbort() {}
 
 }

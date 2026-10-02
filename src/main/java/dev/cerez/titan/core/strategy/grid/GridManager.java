@@ -1,7 +1,6 @@
 package dev.cerez.titan.core.strategy.grid;
 
 import dev.cerez.titan.Log;
-import dev.cerez.titan.Titan;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.exception.exchange.MarginNotSufficienException;
 import dev.cerez.titan.connector.exception.exchange.PostOnlyRejectException;
@@ -10,20 +9,23 @@ import dev.cerez.titan.connector.exception.exchange.UnknownOrderException;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
 import dev.cerez.titan.core.BaseConfig;
+import dev.cerez.titan.core.BaseManager;
 import dev.cerez.titan.core.PersistenceNope;
 import dev.cerez.titan.core.event.events.GridManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
-import dev.cerez.titan.core.strategy.grid.attribute.attributes.*;
-import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.core.strategy.grid.attribute.ApplyAttributes;
 import dev.cerez.titan.core.strategy.grid.attribute.SideAffected;
+import dev.cerez.titan.core.strategy.grid.attribute.attributes.*;
 import dev.cerez.titan.core.strategy.grid.model.Context;
 import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
-import dev.cerez.titan.core.BaseManager;
+import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.*;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
@@ -33,10 +35,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
 public class GridManager extends BaseManager<GridManager.GridManagerConfiguration, PersistenceNope, BinanceConnector, GridManagerListener> implements StatusProfiler {
@@ -62,7 +64,7 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
     public @NotNull StatusProfiler.PresenceProfile getPresenceProfile() {
         BigDecimal balance = connector.fGetBalanceTotal().get(getConfig().quoteAsset);
         BigDecimal unPnl = connector.fGetUnPNL().get(getConfig().quoteAsset);
-        String label = "Bal: %.2f PNL: %.4f Sy: %s St: %s".formatted(balance, unPnl, symbol, MarketSession.getSession(GridManagerConfiguration.ZONE_NEW_YORK));
+        String label = "Bal: %.2f PNL: %.4f Sy: %s St: %s".formatted(balance, unPnl, symbol, MarketSession.of(getConfig().getBaseAsset()));
         return new PresenceProfile(
                 OnlineStatus.ONLINE,
                 Activity.of(Activity.ActivityType.PLAYING, label)
@@ -323,16 +325,26 @@ public class GridManager extends BaseManager<GridManager.GridManagerConfiguratio
         private boolean logsEndPoints;
         private int amountPriceOffset;
 
-        private static final ZoneId ZONE_NEW_YORK = ZoneId.of("America/New_York");
-        private final TemporalRefence<BigDecimal> lastStepSizeTemporal = new TemporalRefence<>(TimeUnit.MINUTES, 1);
+        @Getter(AccessLevel.NONE)
+        private transient final AtomicReference<MarketSessionState> lastMarketSession = new AtomicReference<>();
+        @Getter(AccessLevel.NONE)
+        private transient final TemporalRefence<MarketSessionState> lastMarketSessionTemporal =new TemporalRefence<>(TimeUnit.MINUTES, 2);
+
 
         @Contract
         public BigDecimal getStepSize() {
-            return lastStepSizeTemporal.getOrCompute(() -> switch (MarketSession.getSession(ZONE_NEW_YORK)){
+            MarketSessionState marketSessionStatus = lastMarketSessionTemporal.getOrCompute(() -> MarketSession.of(baseAsset));
+            BigDecimal stepSize = switch (marketSessionStatus) {
                 case CLOSED, PRE_MARKET, POST_MARKET -> stepSizeMediumActivity;
                 case OVERNIGHT -> stepSizeLowActivity;
                 case REGULAR -> stepSizeHighActivity;
-            });
+            };
+            boolean noEquals = !marketSessionStatus.equals(lastMarketSession.get());
+            if (noEquals) {
+                Log.info("Cambio de horario %s -> %s StepSize=%.4f", lastMarketSession.get(), marketSessionStatus, stepSize);
+                lastMarketSession.set(marketSessionStatus);
+            }
+            return stepSize;
         }
     }
 }

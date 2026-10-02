@@ -22,7 +22,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -34,7 +33,7 @@ import java.util.concurrent.locks.LockSupport;
 
 public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.FundingMangerConfiguration, PersistenceNope, BinanceConnector, FundingOnTimeManagerListener> {
 
-    private final long windowSize = TimeUnit.SECONDS.toMillis(5);
+    private final long windowSize = TimeUnit.SECONDS.toMillis(1);
     private final BigDecimal fundingRateMin = BigDecimal.valueOf(0.003);
     private volatile BinanceConnector.BookTick currentBookTick = null;
     private volatile OrderToClosePosition order = null;
@@ -106,6 +105,7 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
 
         if (target == null) {
             Log.info("No funding rate found");
+            callEvent(FundingOnTimeManagerListener::onAbort);
             return;
         }
 
@@ -117,7 +117,7 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
             if (target.nextFundingRate().abs().compareTo(fundingRateMin) < 0){
                 Log.warning("Abort: Funding rate is out of range %.4f%%", target.nextFundingRate().multiply(new BigDecimal(100)));
                 // Elminar el return solo para testnet TODO: volder a poner en real
-//                callEvent(FundingOnTimeManagerListener::abort);
+//                callEvent(FundingOnTimeManagerListener::onAbort);
 //                return;
             }
             Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
@@ -140,6 +140,7 @@ public class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.Fundi
         long waitFinal = (fundingTimeLocal - windowSize);
         long currentTimeFinal = System.currentTimeMillis();
         long deltaWaitFinal = waitFinal - currentTimeFinal;
+        executor.schedule(() -> callEvent(FundingOnTimeManagerListener::onEndWindow), deltaWaitFinal + 15_000, TimeUnit.MILLISECONDS);
         if (deltaWaitFinal < 500){
             callEvent(FundingOnTimeManagerListener::onAbort);
             Log.warning("Abort: out window final %dms", deltaWaitFinal);

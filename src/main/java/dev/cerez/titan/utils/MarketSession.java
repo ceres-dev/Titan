@@ -1,47 +1,75 @@
 package dev.cerez.titan.utils;
 
-import org.jetbrains.annotations.NotNull;
+import lombok.Getter;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.util.Set;
 
 public enum MarketSession {
-    OVERNIGHT,
-    PRE_MARKET,
-    REGULAR,
-    POST_MARKET,
-    CLOSED;
+    NEW_YORK_STOCK_EXCHANGE(
+            MarketSessionProfiler.builder(ZoneId.of("UTC-5"))
+                    .session(
+                            LocalTime.of(3, 0),
+                            LocalTime.of(8, 30),
+                            MarketSessionState.PRE_MARKET,
+                            DayOfWeek.MONDAY,
+                            DayOfWeek.TUESDAY,
+                            DayOfWeek.WEDNESDAY,
+                            DayOfWeek.THURSDAY,
+                            DayOfWeek.FRIDAY
+                    )
+                    .session(
+                            LocalTime.of(8, 30),
+                            LocalTime.of(15, 0),
+                            MarketSessionState.REGULAR,
+                            DayOfWeek.MONDAY,
+                            DayOfWeek.TUESDAY,
+                            DayOfWeek.WEDNESDAY,
+                            DayOfWeek.THURSDAY,
+                            DayOfWeek.FRIDAY
+                    )
+                    .session(
+                            LocalTime.of(15, 0),
+                            LocalTime.of(19, 0),
+                            MarketSessionState.POST_MARKET,
+                            DayOfWeek.MONDAY,
+                            DayOfWeek.TUESDAY,
+                            DayOfWeek.WEDNESDAY,
+                            DayOfWeek.THURSDAY,
+                            DayOfWeek.FRIDAY
+                    )
+                    .session(
+                            LocalTime.of(19, 0),
+                            LocalTime.of(3, 0),
+                            MarketSessionState.OVERNIGHT,
+                            DayOfWeek.SUNDAY,
+                            DayOfWeek.MONDAY,
+                            DayOfWeek.TUESDAY,
+                            DayOfWeek.WEDNESDAY
+                            // El viernes no hay Noche
+                    )
+                    .build(),
+            "SPY", "QQQ"
+    );
 
 
-    public static MarketSession getSession(@NotNull ZoneId zoneId) {
-        ZonedDateTime now = ZonedDateTime.now(zoneId);
+    private final MarketSessionProfiler profiler;
+    @Getter
+    private final Set<String> assets;
 
-        DayOfWeek day = now.getDayOfWeek();
+    MarketSession(MarketSessionProfiler profiler, String... assets) {
+        this.profiler = profiler;
+        this.assets = Set.of(assets);
+    }
 
-        if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) {
-            return MarketSession.CLOSED;
+    public static MarketSessionState of(String asset) {
+        for (MarketSession marketSession : MarketSession.values()) {
+            if (marketSession.assets.contains(asset)){
+                return marketSession.profiler.getState();
+            }
         }
-
-        LocalTime time = now.toLocalTime();
-
-        if (time.isBefore(LocalTime.of(3, 0))) {
-            return MarketSession.OVERNIGHT;
-        }
-
-        if (time.isBefore(LocalTime.of(8, 30))) {
-            return MarketSession.PRE_MARKET;
-        }
-
-        if (time.isBefore(LocalTime.of(15, 0))) {
-            return MarketSession.REGULAR;
-        }
-
-        if (time.isBefore(LocalTime.of(19, 0))) {
-            return MarketSession.POST_MARKET;
-        }
-
-        return MarketSession.OVERNIGHT;
+        return MarketSessionState.CLOSED;
     }
 }

@@ -36,7 +36,7 @@ public class GridCommand extends BaseCommand {
         GridManager.GridManagerConfiguration gridConfig = GridManager.GridManagerConfiguration.builder()
                 .baseAsset("SPY")
                 .quoteAsset("USDT")
-                .stepSizeHighActivity(new BigDecimal("0.7"))
+                .stepSizeHighActivity(new BigDecimal("0.8"))
                 .stepSizeMediumActivity(new BigDecimal("0.5"))
                 .stepSizeLowActivity(new BigDecimal("0.4"))
                 .sizePerOrderBaseAsset(new BigDecimal("0.01"))
@@ -68,6 +68,10 @@ public class GridCommand extends BaseCommand {
             }
             @Override
             public void onAbort() {
+                gridManager.start();
+            }
+            @Override
+            public void onEndWindow(){
                 gridManager.start();
             }
         });
