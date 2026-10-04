@@ -20,6 +20,7 @@ import org.jetbrains.annotations.Unmodifiable;
 import java.math.BigDecimal;
 import java.net.http.HttpRequest;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
@@ -31,14 +32,17 @@ public final class BinanceConnector extends BaseConnector {
     private static final String BASE_HTTPS = "https://api.binance.com";
     private static final String BASE_TESTNET_HTTPS = "https://testnet.binance.vision";
 
+    private static final String BASE_HTTPS_FUTURE = "https://fapi.binance.com";
+    private static final String BASE_TESTNET_HTTPS_FUTURE = "https://testnet.binancefuture.com";
+
     private static final String BASE_WWS = "wss://ws-api.binance.com:443/ws-api/v3";
     private static final String BASE_TESTNET_WWS = "wss://demo-ws-api.binance.com:443/ws-api/v3";
 
+    private static final String BASE_WWS_FUTURE = "wss://ws-fapi.binance.com/ws-fapi/v1";
+    private static final String BASE_TESTNET_WWS_FUTURE = "wss://testnet.binancefuture.com/ws-fapi/v1";
+
     private static final String BASE_WWS_STREAM = "wss://stream.binance.com:9443/stream";
     private static final String BASE_TESTNET_WWS_STREAM = "wss://demo-stream.binance.com:9443/stream";
-
-    private static final String BASE_HTTPS_FUTURE = "https://fapi.binance.com";
-    private static final String BASE_TESTNET_HTTPS_FUTURE = "https://testnet.binancefuture.com";
 
     private static final String BASE_WWS_FUTURE_STREAM = "wss://fstream.binance.com/stream";
     private static final String BASE_WWS_FUTURE_USERDATA = "wss://fstream.binance.com/private/ws/%s";
@@ -94,6 +98,7 @@ public final class BinanceConnector extends BaseConnector {
 
     @Override
     protected void handleStreamRaw(@NotNull String wwsURL, @NotNull JsonNode node) {
+        // Es un Streams
         String stream;
         if (node.has("stream")) {
             stream = node.get("stream").asText();
@@ -103,17 +108,23 @@ public final class BinanceConnector extends BaseConnector {
         String key = wwsURL + (stream.isEmpty() ? "" : "@") + stream;
 
         Collection<Consumer<JsonNode>> consumerSet = consumerStreamsMap.computeIfAbsent(key, k -> new HashMap<>()).values();
-        if (consumerSet.isEmpty()) return;
-        if (node.has("data")) {
-            consumerSet.forEach(c -> c.accept(node.get("data")));
-        }else {
-            consumerSet.forEach(c -> c.accept(node));
+        if (!consumerSet.isEmpty()) {
+            if (node.has("data")) {
+                consumerSet.forEach(c -> c.accept(node.get("data")));
+            } else {
+                consumerSet.forEach(c -> c.accept(node));
+            }
+            return;
         }
+        // Es una repuesta de una solicitud
+        Consumer<JsonNode> consumer = webSockets.get(wwsURL).getPendingResponse().remove(node.get("id").asText());
+        if (consumer != null) consumer.accept(node);
     }
 
     @Override
     protected void internalStart(){
         initWebSocket(config.isTestNet() ? BASE_TESTNET_WWS : BASE_WWS);
+        initWebSocket(this.fGetWWStream());
         initWebSocket(this.fGetWWS());
         initWebSocket(this.sGetWWS());
         super.internalStart();
@@ -416,8 +427,12 @@ public final class BinanceConnector extends BaseConnector {
         return config.isTestNet() ? BASE_TESTNET_HTTPS_FUTURE : BASE_HTTPS_FUTURE;
     }
 
-    public @NotNull String fGetWWS(){
+    public @NotNull String fGetWWStream(){
         return BASE_WWS_FUTURE_STREAM;
+    }
+
+    private @NotNull String fGetWWS() {
+        return config.isTestNet() ? BASE_TESTNET_WWS_FUTURE: BASE_WWS_FUTURE;
     }
 
     public @NotNull String uGetWWS(){
@@ -709,11 +724,11 @@ public final class BinanceConnector extends BaseConnector {
         UUID uuid = UUID.randomUUID();
         String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
         String defaultName = Utils.getClassNameCallPrevious();
-        if (addConsumerStreams(fGetWWS() + "@" + stream, Objects.requireNonNullElse(id, defaultName), (payload) -> {
+        if (addConsumerStreams(fGetWWStream() + "@" + stream, Objects.requireNonNullElse(id, defaultName), (payload) -> {
             String[] split = payload.toString().split("\"");
             consumer.accept(new BookTick(new BigDecimal(split[17]), new BigDecimal(split[21]), new BigDecimal(split[25]), new BigDecimal(split[29])));
         }, true))
-            sendWebSocket(fGetWWS(), """
+            sendWebSocket(fGetWWStream(), """
                     {"method":"SUBSCRIBE","params":["%s"],"id":"%s"}
                     """.formatted(stream, uuid.toString().replace("-", "")));
     }
@@ -722,13 +737,21 @@ public final class BinanceConnector extends BaseConnector {
         UUID uuid = UUID.randomUUID();
         String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
         String defaultName = Utils.getClassNameCallPrevious();
-        if (removeConsumerStreams(fGetWWS() + "@" + stream, Objects.requireNonNullElse(id, defaultName)))
-            sendWebSocket(fGetWWS(), """
+        if (removeConsumerStreams(fGetWWStream() + "@" + stream, Objects.requireNonNullElse(id, defaultName)))
+            sendWebSocket(fGetWWStream(), """
                     {"method":"UNSUBSCRIBE","params":["%s"],"id":"%s"}
                     """.formatted(stream, uuid.toString().replace("-", "")));
     }
 
-    public void wfSendOrderToMkt(@NotNull String symbol, @NotNull SideOrder sideOrder, BigDecimal amountBase, @Nullable String nameOrder, boolean reduceOnly) throws ReduceOnlyRejectException {
+    public CompletableFuture<JsonNode> wfSendOrderToMkt(@NotNull String symbol, @NotNull SideOrder sideOrder, BigDecimal amountBase, @Nullable String nameOrder, boolean reduceOnly) throws ReduceOnlyRejectException {
+        Map<String, Object> params = new HashMap<>();
+        params.put("symbol", symbol.toLowerCase(Locale.US));
+        params.put("side", sideOrder);
+        params.put("quantity", amountBase);
+        params.put("reduceOnly", reduceOnly);
+        params.put("type", "MARKET");
+        if (nameOrder != null) params.put("nameOrder", nameOrder);
+        return sendSignedWebSocketRequest(fGetWWS(), "order.place", Utils.uuidToBase36(UUID.randomUUID()), params);
     }
 
     public void wuCreateEventOrderTradeUpdate(Consumer<OrderUpdate> consumer, @Nullable String id, boolean muliThreading){

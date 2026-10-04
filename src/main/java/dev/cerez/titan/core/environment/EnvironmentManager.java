@@ -25,7 +25,7 @@ import java.util.*;
 
 @Setter
 @Getter
-public class EnvironmentManager extends BaseManager<ConfigNope, PersistenceNope, BinanceConnector, EnvironmentManagerListener> {
+public final class EnvironmentManager extends BaseManager<ConfigNope, PersistenceNope, BinanceConnector, EnvironmentManagerListener> {
 
     private UUID idOwner;
     private final Map<UUID, Manager<?>> manager = new HashMap<>();

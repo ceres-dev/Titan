@@ -41,7 +41,7 @@ public class Log {
     }
 
     public static synchronized void exception(Throwable exception) {
-        LOGGER.error("No especificado", exception);
+        LOGGER.error(exception.getClass().getName()+"="+exception.getMessage(), exception);
     }
 
     private static String formatColor(String s){

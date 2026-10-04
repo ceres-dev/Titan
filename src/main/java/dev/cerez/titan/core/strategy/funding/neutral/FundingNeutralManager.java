@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public class FundingManager extends BaseManager<FundingManager.FundingManagerConfiguration, FundingManager.FundingManagerPersistan, BinanceConnector, FundingManagerListener> implements StatusProfiler, Status<FundingManager.Status> {
+public final class FundingNeutralManager extends BaseManager<FundingNeutralManager.FundingManagerConfiguration, FundingNeutralManager.FundingManagerPersistan, BinanceConnector, FundingManagerListener> implements StatusProfiler, Status<FundingNeutralManager.Status> {
 
     @NotNull private final InputUser inputUser = new InputUser();
     @NotNull private final String baseAsset;
@@ -38,7 +38,7 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
     @NotNull @Getter private final String symbol;
     @NotNull @Getter private Status status = Status.READY;
 
-    public FundingManager(@NotNull Provider<FundingManagerConfiguration> config, @NotNull BinanceConnector connector, @NotNull StorageManager storageManager) {
+    public FundingNeutralManager(@NotNull Provider<FundingManagerConfiguration> config, @NotNull BinanceConnector connector, @NotNull StorageManager storageManager) {
         super(config, FundingManagerPersistan.class, connector, storageManager);
         FundingManagerPersistan persistan = getPersistence();
         this.baseAsset = getConfig().getBaseAsset();
@@ -260,7 +260,7 @@ public class FundingManager extends BaseManager<FundingManager.FundingManagerCon
         private final UUID uuid;
 
         @Contract(pure = true)
-        public FundingManagerPersistan(@NotNull FundingManager manager) {
+        public FundingManagerPersistan(@NotNull FundingNeutralManager manager) {
             this.status = manager.status;
             this.isActive = manager.running;
             this.uuid = manager.uuid;

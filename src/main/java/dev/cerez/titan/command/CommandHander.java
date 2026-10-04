@@ -5,14 +5,11 @@ import org.jetbrains.annotations.Blocking;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class CommandHander {
 
-    private final HashMap<String, BaseCommand> commands = new HashMap<>();
+    private final HashMap<String, BaseCommand> commands = new LinkedHashMap<>();
     private final HashMap<String, String> aliases = new HashMap<>();
     private final HashMap<Integer, String> indexCommands = new HashMap<>();
     private final InputUser input = new InputUser();

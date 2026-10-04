@@ -5,6 +5,7 @@ import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.strategy.BalanceRiskManager;
+import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.core.strategy.Manager;
 import dev.cerez.titan.core.event.SupplierEvent;

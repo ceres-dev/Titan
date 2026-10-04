@@ -41,7 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
-public class GridManager extends BaseManager<GridManager.GridManagerConfiguration, PersistenceNope, BinanceConnector, GridManagerListener> implements StatusProfiler {
+public final class GridManager extends BaseManager<GridManager.GridManagerConfiguration, PersistenceNope, BinanceConnector, GridManagerListener> implements StatusProfiler {
 
     @Nullable
     private BinanceConnector.OrderFuture lastOrderFilled = null;

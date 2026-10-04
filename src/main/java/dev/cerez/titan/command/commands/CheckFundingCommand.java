@@ -2,7 +2,7 @@ package dev.cerez.titan.command.commands;
 
 import dev.cerez.titan.Log;
 import dev.cerez.titan.command.BaseCommand;
-import dev.cerez.titan.core.strategy.funding.neutral.FundingManager;
+import dev.cerez.titan.core.strategy.funding.neutral.FundingNeutralManager;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
@@ -24,7 +24,7 @@ public class CheckFundingCommand extends BaseCommand {
         if (args.size() < 2) {
             return;
         }
-        FundingManager.FundingManagerConfiguration config = FundingManager.FundingManagerConfiguration.builder()
+        FundingNeutralManager.FundingManagerConfiguration config = FundingNeutralManager.FundingManagerConfiguration.builder()
                 .sizePosition(new BigDecimal(12))
                 .booking(new BigDecimal("0.1"))
                 .baseAsset("ONG")

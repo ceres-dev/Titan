@@ -48,7 +48,7 @@ public enum MarketSession {
                             DayOfWeek.MONDAY,
                             DayOfWeek.TUESDAY,
                             DayOfWeek.WEDNESDAY
-                            // El viernes no hay Noche
+                            // El viernes no hay Noche, pasa directo a close
                     )
                     .build(),
             "SPY", "QQQ"

@@ -32,12 +32,12 @@ public final class Titan implements Switch {
 
     static {
         commandHandler.registerCommand(
+                new SpringBootCommand(),
                 new ExitCommand(),
                 new TriangularCommand(),
                 new FundingCommand(),
                 new CheckFundingCommand(),
                 new GridCommand(),
-                new SpringBootCommand(),
                 new FundingOnTimeCommand()
         );
     }

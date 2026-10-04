@@ -3,6 +3,7 @@ package dev.cerez.titan.connector;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.cerez.titan.Log;
 import dev.cerez.titan.connector.exception.ApiException;
 import dev.cerez.titan.connector.exception.DefaultApiException;
@@ -209,6 +210,68 @@ public abstract class BaseConnector implements Connector {
         container.setLastRequest(content);
         container.getWebSocket().sendText(content.replaceAll("\\s", ""), true);
     }
+
+    protected CompletableFuture<JsonNode> sendSignedWebSocketRequest(@NotNull String endpoint, @NotNull String id, @NotNull String method) {
+        return sendSignedWebSocketRequest(endpoint, method, id, new HashMap<>());
+    }
+
+    protected CompletableFuture<JsonNode> sendSignedWebSocketRequest(
+            @NotNull String url,
+            @NotNull String method,
+            @NotNull String id,
+            @NotNull Map<String, Object> params
+    ) {
+        if (config.secret == null
+                || config.key == null
+                || config.secret.isBlank()
+                || config.key.isBlank()) {
+
+            throw new NotSetApiKeysException("API Key not set");
+        }
+
+        // Parámetros obligatorios para una request firmada
+        params.put("apiKey", config.key);
+        params.put("timestamp", System.currentTimeMillis() + deltaClienteToServer);
+
+        /*
+         * Binance requiere que los parámetros utilizados para la firma
+         * estén ordenados alfabéticamente por nombre.
+         */
+        TreeMap<String, Object> signingParams = new TreeMap<>(params);
+        String queryString = buildQueryString(signingParams);
+
+        try {
+            String signature = hmacSha256(queryString, config.secret);
+
+            ObjectNode request = mapper.createObjectNode();
+            request.put("id", id);
+            request.put("method", method);
+            ObjectNode requestParams = mapper.createObjectNode();
+
+            for (Map.Entry<String, Object> entry : params.entrySet()) {
+                requestParams.set(
+                        entry.getKey(),
+                        mapper.valueToTree(entry.getValue())
+                );
+            }
+
+            requestParams.put("signature", signature);
+
+            request.set("params", requestParams);
+
+            if (config.isLogsRequest()) {
+                Log.info("P wws=%s", request);
+            }
+
+            sendWebSocket(url, request.toString());
+            CompletableFuture<JsonNode> future = new CompletableFuture<>();
+            webSockets.get(url).getPendingResponse().put(id, future::complete);
+            return future;
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 
     protected @NotNull JsonNode sendSignedRequest(@NotNull Method method,
                                                   @NotNull String endpoint
@@ -468,7 +531,8 @@ public abstract class BaseConnector implements Connector {
         private WebSocket webSocket = null;
         @Nullable
         private String lastRequest = null;
-        private final List<String> pendingRequest = Collections.synchronizedList(new LinkedList<>());
+        @NotNull private final List<String> pendingRequest = Collections.synchronizedList(new LinkedList<>());
+        @NotNull private final Map<String, Consumer<JsonNode>> pendingResponse = new ConcurrentHashMap<>();
 
         public boolean isClosed(){
             return webSocket == null || webSocket.isInputClosed() || webSocket.isOutputClosed();

@@ -29,7 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 
-public class TriangularManager extends BaseManager<TriangularManager.TriangularManagerConfiguration, PersistenceNope, Connector, TriangularManagerListener> implements StatusProfiler {
+public final class TriangularManager extends BaseManager<TriangularManager.TriangularManagerConfiguration, PersistenceNope, Connector, TriangularManagerListener> implements StatusProfiler {
 
     @Setter @Nullable private SearchTriangularEngine engine;
     @Setter @Nullable private Consumer<SearchTriangularEngine.OnOpportunities> onUpdate;

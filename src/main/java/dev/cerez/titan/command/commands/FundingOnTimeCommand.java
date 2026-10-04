@@ -4,6 +4,7 @@ import dev.cerez.titan.Log;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.storage.StorageManagerJsonLocal;
@@ -11,6 +12,7 @@ import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public class FundingOnTimeCommand extends BaseCommand {
