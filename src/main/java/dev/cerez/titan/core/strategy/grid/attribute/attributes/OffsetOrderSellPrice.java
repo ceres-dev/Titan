@@ -32,6 +32,7 @@ public class OffsetOrderSellPrice extends BaseAttribute {
             BigDecimal stepSize = config.getStepSize();
             if (order.getPrice().subtract(stepSize).compareTo(context.context().currentPrice()) >= 0) {
                 context.orderUse().add(new OrderPreview(Utils.uuidToBase36(UUID.randomUUID()),
+                        config.getBaseAsset() + config.getQuoteAsset(),
                         order.getPrice().subtract(stepSize),
                         config.getSizePerOrderBaseAsset(),
                         SideOrder.SELL,

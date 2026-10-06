@@ -36,7 +36,7 @@ public class GridCommand extends BaseCommand {
         GridManager.GridManagerConfiguration gridConfig = GridManager.GridManagerConfiguration.builder()
                 .baseAsset("SPY")
                 .quoteAsset("USDT")
-                .stepSizeHighActivity(new BigDecimal("0.8"))
+                .stepSizeHighActivity(new BigDecimal("0.7"))
                 .stepSizeMediumActivity(new BigDecimal("0.5"))
                 .stepSizeLowActivity(new BigDecimal("0.4"))
                 .sizePerOrderBaseAsset(new BigDecimal("0.01"))

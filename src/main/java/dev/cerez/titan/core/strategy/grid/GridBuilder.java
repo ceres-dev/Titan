@@ -135,7 +135,7 @@ public class GridBuilder {
 
     @Contract(pure = true, value = "_, _, _, _ -> new")
     private @NotNull OrderPreview newOrder(BigDecimal price, SideOrder side, BigDecimal amountPerOrder, boolean reduce){
-        return new OrderPreview(Utils.uuidToBase36(UUID.randomUUID()), price, amountPerOrder, side, reduce);
+        return new OrderPreview(config.getBaseAsset() + config.getQuoteAsset(), Utils.uuidToBase36(UUID.randomUUID()), price, amountPerOrder, side, reduce);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////

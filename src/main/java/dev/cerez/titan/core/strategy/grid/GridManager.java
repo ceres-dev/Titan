@@ -205,7 +205,7 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
         BigDecimal balance = balanceFuture.join();
 
         List<BinanceConnector.OrderFuture> ordersActive = Utils.filterNew(orders);
-        lastOrderFilled = orders.stream().filter(order -> StatusOrder.FILLED.equals(order.getStatusOrder())).max(Comparator.comparingLong(BinanceConnector.OrderFuture::getDateFilled)).orElse(null);
+        lastOrderFilled = orders.stream().filter(orderFuture -> orderFuture.getSymbol().equals(symbol)).filter(order -> StatusOrder.FILLED.equals(order.getStatusOrder())).max(Comparator.comparingLong(BinanceConnector.OrderFuture::getDateFilled)).orElse(null);
 
         BigDecimal balanceUse = position == null
                 ? balance
@@ -253,7 +253,7 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
             try {
                 connector.fCancelOrder(symbol, order.getNameOrder());
                 Log.info("Orden Cancelada: %s", order.getNameOrder());
-            } catch (UnknownOrderException e) {
+            } catch (UnknownOrderException uoe) {
                 Log.info("La orden ya no existe: %s", order.getNameOrder());
             }
         }
@@ -335,8 +335,8 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
         public BigDecimal getStepSize() {
             MarketSessionState marketSessionStatus = lastMarketSessionTemporal.getOrCompute(() -> MarketSession.of(baseAsset));
             BigDecimal stepSize = switch (marketSessionStatus) {
-                case CLOSED, PRE_MARKET, POST_MARKET -> stepSizeMediumActivity;
-                case OVERNIGHT -> stepSizeLowActivity;
+                case PRE_MARKET, POST_MARKET -> stepSizeMediumActivity;
+                case CLOSED, OVERNIGHT -> stepSizeLowActivity;
                 case REGULAR -> stepSizeHighActivity;
             };
             boolean noEquals = !marketSessionStatus.equals(lastMarketSession.get());

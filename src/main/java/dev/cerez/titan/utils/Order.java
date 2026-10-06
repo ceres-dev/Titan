@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 @Data
 @AllArgsConstructor
 public abstract class Order {
+    protected final String symbol;
     protected final String nameOrder;
     protected BigDecimal price;
     protected BigDecimal amountBaseAsset;

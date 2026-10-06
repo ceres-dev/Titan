@@ -2,11 +2,9 @@ package dev.cerez.titan.core.strategy.grid.model;
 
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.utils.Order;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
-import org.jetbrains.annotations.Contract;
 
 import java.math.BigDecimal;
 
@@ -15,7 +13,7 @@ import java.math.BigDecimal;
 @ToString(callSuper = true)
 public final class OrderPreview extends Order {
 
-    public OrderPreview(String nameOrder, BigDecimal price, BigDecimal amountBaseAsset, SideOrder sideOrder, boolean reduceOnly) {
-        super(nameOrder, price, amountBaseAsset, sideOrder, reduceOnly);
+    public OrderPreview(String symbol, String nameOrder, BigDecimal price, BigDecimal amountBaseAsset, SideOrder sideOrder, boolean reduceOnly) {
+        super(symbol, nameOrder, price, amountBaseAsset, sideOrder, reduceOnly);
     }
 }

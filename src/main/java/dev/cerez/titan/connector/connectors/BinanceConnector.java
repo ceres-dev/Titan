@@ -117,8 +117,11 @@ public final class BinanceConnector extends BaseConnector {
             return;
         }
         // Es una repuesta de una solicitud
-        Consumer<JsonNode> consumer = webSockets.get(wwsURL).getPendingResponse().remove(node.get("id").asText());
-        if (consumer != null) consumer.accept(node);
+        JsonNode nodeId = node.get("id");
+        if (nodeId != null){
+            Consumer<JsonNode> consumer = webSockets.get(wwsURL).getPendingResponse().remove(nodeId.asText());
+            if (consumer != null) consumer.accept(node);
+        }
     }
 
     @Override
@@ -593,6 +596,7 @@ public final class BinanceConnector extends BaseConnector {
         List<OrderFuture> orders = new ArrayList<>();
         for (JsonNode node : raw) {
             orders.add(new OrderFuture(
+                    node.get("symbol").asText(),
                     node.get("clientOrderId").asText(),
                     new BigDecimal(node.get("price").asText()),
                     new BigDecimal(node.get("origQty").asText()),
@@ -1066,8 +1070,8 @@ public final class BinanceConnector extends BaseConnector {
         private final long dateCreate;
         private final long dateFilled;
 
-        public OrderFuture(String nameOrder, BigDecimal price, BigDecimal amountBaseAsset, SideOrder sideOrder, boolean reduceOnly, StatusOrder statusOrder, long dateCreate, long dateFilled) {
-            super(nameOrder, price, amountBaseAsset, sideOrder, reduceOnly);
+        public OrderFuture(String symbol, String nameOrder, BigDecimal price, BigDecimal amountBaseAsset, SideOrder sideOrder, boolean reduceOnly, StatusOrder statusOrder, long dateCreate, long dateFilled) {
+            super(symbol, nameOrder, price, amountBaseAsset, sideOrder, reduceOnly);
             this.statusOrder = statusOrder;
             this.dateCreate = dateCreate;
             this.dateFilled = dateFilled;

@@ -56,7 +56,7 @@ public abstract class BaseConnector implements Connector {
 
     @NotNull  private final Object streamIncomingLock = new Object();
     @NotNull  private final StringBuilder streamIncomingMessage = new StringBuilder();
-    @NotNull  protected final HashMap<String, Map<String, Consumer<JsonNode>>> consumerStreamsMap = new HashMap<>();
+    @NotNull  protected final Map<String, Map<String, Consumer<JsonNode>>> consumerStreamsMap = new ConcurrentHashMap<>();
 
     protected volatile boolean waitingForPong = false;
     protected volatile long delayPingPongNanoTime = -1;
