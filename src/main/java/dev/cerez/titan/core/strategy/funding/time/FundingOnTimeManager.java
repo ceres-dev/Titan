@@ -216,7 +216,8 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
             connector.fSendOrderToMkt(target.symbol(), sideOpen, quantityBase, null, false);
             this.order = new OrderToClosePosition(target.symbol(), quantityBase, sideClose, System.currentTimeMillis());
         }
-        parkUntil(fundingTimeLocal + 300); // 40 no funciona, 60 bien
+        // Está entre 225 a 250
+        parkUntil(fundingTimeLocal + 240); // 40 no funciona, 60 bien
     }
 
     private void closePositionCheck(String symbol){

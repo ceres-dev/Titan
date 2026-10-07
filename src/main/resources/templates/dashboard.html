@@ -17,70 +17,107 @@
         <h1>Titan</h1>
         <p id="timeLocal">Local --:--:--</p>
         <p id="timeRemote">Remote --:--:--</p>
-        <p id="timeEchange">Exchange --:--:--</p>
+        <p id="timeExchange">Exchange --:--:--</p>
     </nav>
 </header>
 <section class="mainSections" style="display: grid; grid-template-columns: 1fr 1fr;">
-    <section class="box">
-        <h2>Ordenes</h2>
+    <section class="window" id="logsWindow">
+        <header class="windowHeader">
+            <span>titan://root/logs</span>
+            <button class="windowCloser">X</button>
+        </header>
+        <div class="windowContent">
+            <h2>Logs</h2>
+        </div>
     </section>
-    <section class="box">
-        <h2>Balance</h2>
-        <ul>
-            <li>
-                <h3>Futuros</h3>
-                <ul class="listSmall" id="futureBalance">
-                    <li>
-                        <div class="loader loaderSmall"></div>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <h3>Spot</h3>
-                <ul class="listSmall" id="spotBalance">
-                    <li>
-                        <div class="loader loaderSmall"></div>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <h3>Fondos</h3>
-                <ul class="listSmall" id="fondoBalance">
-                    <li>
-                        <div class="loader loaderSmall"></div>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <h3>Total</h3>
-                <ul class="listSmall" id="totalBalance">
-                    <li>
-                        <div class="loader loaderSmall"></div>
-                    </li>
-                </ul>
-            </li>
-        </ul>
+
+    <section class="window" id="balanceWindow">
+        <header class="windowHeader">
+            <span>titan://root/balance</span>
+            <button class="windowCloser">X</button>
+        </header>
+        <div class="windowContent">
+            <h2>Balance</h2>
+            <ul>
+                <li>
+                    <h3>Futuros</h3>
+                    <ul class="listSmall" id="futureBalance">
+                        <li>
+                            <div class="loader loaderSmall"></div>
+                        </li>
+                    </ul>
+                </li>
+                <li>
+                    <h3>Spot</h3>
+                    <ul class="listSmall" id="spotBalance">
+                        <li>
+                            <div class="loader loaderSmall"></div>
+                        </li>
+                    </ul>
+                </li>
+                <li>
+                    <h3>Fondos</h3>
+                    <ul class="listSmall" id="fondoBalance">
+                        <li>
+                            <div class="loader loaderSmall"></div>
+                        </li>
+                    </ul>
+                </li>
+                <li>
+                    <h3>Total</h3>
+                    <ul class="listSmall" id="totalBalance">
+                        <li>
+                            <div class="loader loaderSmall"></div>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
     </section>
-    <section class="box">
-        <h2>Estrategias</h2>
-        <ul id="strategy">
-            <li>
-                <div class="loader loaderSmall"></div>
-            </li>
-        </ul>
-        <footer>
-            <button>
-                StopAll
-            </button>
-            <button>
-                New
-            </button>
-        </footer>
+    <section class="window" id="strategyWindow">
+        <header class="windowHeader">
+            <span>titan://root/strategy</span>
+            <button class="windowCloser">X</button>
+        </header>
+        <div class="windowContent">
+            <h2>Estrategias</h2>
+            <ul id="strategy">
+                <li>
+                    <div class="loader loaderSmall"></div>
+                </li>
+            </ul>
+            <footer>
+                <button>
+                    StopAll
+                </button>
+                <button>
+                    New
+                </button>
+            </footer>
+        </div>
+    </section>
+    <section class="window" id="telemetryWindow">
+        <header class="windowHeader">
+            <span>titan://root/telemetry</span>
+            <button class="windowCloser">X</button>
+        </header>
+        <div class="windowContent">
+            <h2>Telemetría</h2>
+        </div>
     </section>
 </section>
 <div class="rgbEffect"></div>
 <script src="/script/requestBalance.js"></script>
 <script src="/script/requestStrategy.js"></script>
+
+<script src="/script/window.js"></script>
+<script src="../static/script/window.js"></script>
+<script>
+    createWindow({id: "logsWindow",});
+    createWindow({id: "balanceWindow",});
+    createWindow({id: "strategyWindow",});
+    createWindow({id: "telemetryWindow",});
+</script>
 
 </body>
 </html>

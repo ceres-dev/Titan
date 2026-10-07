@@ -83,15 +83,7 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
         }, false).addCondicion(c -> c.context().position() != null));
         applyAttributes.add(new MultiplyFirstOrderSize(SideAffected.AGAINST, (orders, c) -> {
             // Cantidad APROXIMADA no puede ser que no sea la cantidad real
-            BigDecimal amountOrderApproximate = c.balanceUsdt()
-                    .divide(c.currentPrice(), 12, RoundingMode.HALF_EVEN)
-                    .divide(getConfig().getSizePerOrderBaseAsset(), 12, RoundingMode.HALF_EVEN)
-                    // Entre dos ya que lo ideal es que tenga la misma cantidad de órdenes de compra y de venta
-                    .divide(BigDecimal.TWO, 12, RoundingMode.HALF_EVEN)
-                    .add(BigDecimal.ONE);
-
-            final int amountOrder = amountOrderApproximate.intValue();
-
+            final int amountOrder = getAmountOrderAprox(c);
             switch(c.config().getSideGrid()) {
                 case LONG -> {
                     return Math.max(amountOrder - Utils.filterBuy(orders).size(), 1);
@@ -101,6 +93,19 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
                 }
                 case BOTH -> {
                     return Math.max(amountOrder - Math.min(Utils.filterSell(orders).size(), Utils.filterBuy(orders).size()), 1);
+                }
+            }
+            return 1;
+        }));
+        applyAttributes.add(new MultiplyFirstOrderSize(SideAffected.FAVOR, (orders, c) -> {
+            // Cantidad APROXIMADA no puede ser que no sea la cantidad real
+            final int amountOrder = getAmountOrderAprox(c);
+            switch(c.config().getSideGrid()) {
+                case LONG -> {
+                    return Math.max(amountOrder/3 - Utils.filterSell(orders).size(), 1);
+                }
+                case SHORT -> {
+                    return Math.max(amountOrder/3 - Utils.filterBuy(orders).size(), 1);
                 }
             }
             return 1;
@@ -181,6 +186,17 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
         updateGrid();
     }
 
+    private int getAmountOrderAprox(@NotNull Context c) {
+        BigDecimal amountOrderApproximate = c.balanceUsdt()
+                .divide(c.currentPrice(), 12, RoundingMode.HALF_EVEN)
+                .divide(getConfig().getSizePerOrderBaseAsset(), 12, RoundingMode.HALF_EVEN)
+                // Entre dos ya que lo ideal es que tenga la misma cantidad de órdenes de compra y de venta
+                .divide(BigDecimal.TWO, 12, RoundingMode.HALF_EVEN)
+                .add(BigDecimal.ONE);
+
+        return amountOrderApproximate.intValue();
+    }
+
     @Override
     public void internalStop() {
         applyAttributes.clear();
@@ -205,7 +221,11 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
         BigDecimal balance = balanceFuture.join();
 
         List<BinanceConnector.OrderFuture> ordersActive = Utils.filterNew(orders);
-        lastOrderFilled = orders.stream().filter(orderFuture -> orderFuture.getSymbol().equals(symbol)).filter(order -> StatusOrder.FILLED.equals(order.getStatusOrder())).max(Comparator.comparingLong(BinanceConnector.OrderFuture::getDateFilled)).orElse(null);
+        lastOrderFilled = orders.stream()
+                .filter(orderFuture -> orderFuture.getSymbol().equals(symbol))
+                .filter(order -> StatusOrder.FILLED.equals(order.getStatusOrder()))
+                .max(Comparator.comparingLong(BinanceConnector.OrderFuture::getDateFilled))
+                .orElse(null);
 
         BigDecimal balanceUse = position == null
                 ? balance

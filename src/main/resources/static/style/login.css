@@ -1,11 +1,13 @@
 :root {
-    --main-login-color: #275e02;
+    --main-login-color: #218c00;
+    --main-color: var(--main-login-color);
 }
+/* Sobre escribir */
 body{
     background: black;
     margin: 0;
     color: var(--main-login-color);
-    background: radial-gradient(ellipse at center, #101808 0%, #000000 40%);
+    background: radial-gradient(ellipse at center, hsl(from var(--main-login-color) h s calc(l - 20)) 0%, #000000 40%);
     font-family: CascadiaCode, monospace, serif
 }
 #screen {
@@ -15,22 +17,38 @@ body{
     justify-content: center;
     flex-direction: column;
 }
+#loginButton{
+    margin-bottom: 15px;
+}
+#desktop{
+    justify-content: center;
+    align-items: center;
+}
+.windowContent{
+    padding-bottom: 0;
+}
+.title{
+    font-size: 80px;
+    margin: 0;
+}
+/* Formulario */
 form{
     display: flex;
     flex-direction: column;
+    align-items: center;
 }
-
 input {
     border: var(--main-login-color);
     margin: 0;
     background: transparent;
     color: var(--main-login-color);
+    filter: brightness(120%);
     font-family: var(--font-family-monospace), serif;
     transition: filter 0.3s ease;
     font-size: 15px;
 }
-input:hover {
-    filter: brightness(150%);
+input:hover, input:focus {
+    filter: brightness(170%);
 }
 input:focus {
     outline: none;
@@ -44,7 +62,7 @@ button {
     border: none;
     cursor: pointer;
     transition: filter 0.2s ease;
-    margin-bottom: 40px;
+    width: min-content;
 }
 button:hover {
     filter: brightness(150%);
@@ -52,13 +70,17 @@ button:hover {
 button:active {
     filter: brightness(0.7);
 }
-
 label{
     padding: 10px;
     margin-bottom: 15px;
+    background: rgba(0, 0, 0, 0.13);
+    width: min-content;
     border: 2px solid var(--main-login-color);
 }
-.title{
-    font-size: 80px;
-    margin: 0;
+/* Alto Contraste */
+@media (prefers-contrast: more) {
+    body {
+        background-color: #000000;
+        color: #ffffff;
+    }
 }

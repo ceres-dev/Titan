@@ -53,6 +53,50 @@ body{
 footer{
     margin-top: auto;
 }
+/* Ventana */
+#desktop{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: flex;
+}
+.windowHeader{
+    position: relative;
+    padding: 0.3rem;
+    min-width: 20rem;
+    display: flex;
+    align-items: center;
+    cursor: move;
+    margin-bottom: 4px;
+    outline: 3px solid var(--main-color);
+}
+.windowContent{
+    position: relative;
+    padding: 0.8rem;
+    text-align: left;
+    min-height: 7rem;
+}
+.window{
+    border: 10px double var(--main-color);
+    flex-grow: 1;
+    display: flex;
+    pointer-events: all;
+    flex-direction: column;
+    backdrop-filter: blur(5px);
+}
+.windowAbsolute{
+    position: absolute;
+}
+.windowCloser{
+    background: none;
+    color: var(--main-color);
+    font-size: 20px;
+    margin-left: auto;
+    margin-right: 0.3rem;
+}
 /* Texto */
 h1{
     text-align: center;
@@ -123,7 +167,7 @@ li:last-child{
     pointer-events: none;
     inset: 0;
     z-index: 0;
-    opacity: 40%;
+    opacity: 80%;
     background: repeating-linear-gradient( to top, transparent 0px, transparent 3px, rgba(0, 0, 0, 0.25) 3px, rgba(0, 0, 0, 0.25) 4px );
 }
 .loader {
