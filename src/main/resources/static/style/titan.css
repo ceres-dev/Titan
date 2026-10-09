@@ -27,7 +27,6 @@ body{
 .box{
     border : 3px solid var(--main-color);
     flex-grow: 1;
-    border-radius: 10px;
     padding: 1rem;
     display: flex;
     flex-direction: column;
@@ -96,6 +95,7 @@ footer{
     font-size: 20px;
     margin-left: auto;
     margin-right: 0.3rem;
+    content: 'X';
 }
 /* Texto */
 h1{
@@ -111,6 +111,9 @@ p{
 small{
     opacity: 80%;
 }
+ul{
+    list-style-type: none;
+}
 
 /* Interactivo */
 
@@ -121,7 +124,6 @@ button {
     font-size: 15px;
     background: var(--main-color);
     border: none;
-    border-radius: 6px;
     padding: 2px;
     cursor: pointer;
 }
@@ -170,7 +172,11 @@ li:last-child{
     opacity: 80%;
     background: repeating-linear-gradient( to top, transparent 0px, transparent 3px, rgba(0, 0, 0, 0.25) 3px, rgba(0, 0, 0, 0.25) 4px );
 }
-.loader {
+.cliLoader::after {
+    content: "/";
+    animation: cli-loader 0.8s steps(1) infinite;
+}
+.Gradientloader {
     --color-1: rgba(38, 50, 56, 0);
     --color-2: #051d38;
 
@@ -181,11 +187,16 @@ li:last-child{
             var(--color-1) 75%
     );
     background-size: 200% 100%;
-    animation: loading-gradient 1.5s infinite linear;
+    animation: gradient-loader 1.5s infinite linear;
     border-radius: 4px;
 }
-
-@keyframes loading-gradient {
+@keyframes cli-loader {
+    0%   { content: "/"; }
+    25%  { content: "-"; }
+    50%  { content: "\\"; }
+    75%  { content: "|"; }
+}
+@keyframes gradient-loader {
     0% {
         background-position: 200% 0;
     }

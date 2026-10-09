@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.FundingMangerConfiguration, PersistenceNope, BinanceConnector, FundingOnTimeManagerListener> {
 
@@ -78,6 +79,7 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
                                         elapsedNanos/1_000_000f,
                                         System.currentTimeMillis() - order.openDate
                                 );
+                                this.order = null;
                             }catch (NullPointerException e) {
                                 Log.error("Order: %s", jsonNode.toString());
                             }
@@ -126,41 +128,47 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
             return;
         }
         long current = System.currentTimeMillis();
-        BinanceConnector.FundingRate target = funding.values().stream()
-                .filter((f) -> (f.nextFundingTime() - current) < TimeUnit.HOURS.toMillis(1))
-                .filter(f -> f.symbol().endsWith("USDT"))
-                .max(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRateAbs))
-                .orElse(null);
 
-        if (target == null) {
+        List<BinanceConnector.FundingRate> targetFiltered  = funding.values().stream()
+                .filter(f -> (f.nextFundingTime() - current) < TimeUnit.HOURS.toMillis(1))
+                .filter(f -> f.symbol().endsWith("USDT"))
+                .filter(f -> f.nextFundingRateAbs().compareTo(new BigDecimal("0.002")) > 0)
+                .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRateAbs))
+                .toList();
+
+        List<String> symbolsName = new LinkedList<>();
+        for (BinanceConnector.FundingRate f : targetFiltered) symbolsName.add(f.symbol() + "@" + f.nextFundingRate());
+        Log.info("Symbols Disponible: %s", String.join(", ", symbolsName));
+
+        List<BinanceConnector.FundingRate> targetLimited = targetFiltered.stream().limit(6).toList();
+
+        if (targetLimited.isEmpty()) {
             Log.info("Abort: No funding rate found");
+            callEvent(FundingOnTimeManagerListener::onAbort);
+        }
+
+        if (targetLimited.size() < 3) {
+            Log.info("Abort: Mucha competencia %d", targetLimited.size());
             callEvent(FundingOnTimeManagerListener::onAbort);
             return;
         }
 
-        try {
-            try {
-                connector.fSetLeverage(target.symbol(), 2);
-                connector.wfCreateBookTicker(bookTick -> this.currentBookTick = bookTick, null, target.symbol());
-                this.currentBookTick = connector.fGetBookTick(target.symbol());
+        BinanceConnector.FundingRate target = targetLimited.getLast();
 
-                Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
-                Log.info("Delta temporal: Avg: %dms, Max: %dms, Min: %dms", remote.avg(), remote.max(), remote.min());
-                if (target.nextFundingRate().abs().compareTo(getConfig().fundingRateMin) < 0){
-                    Log.warning("Abort: Funding rate is out of range %.4f%%", target.nextFundingRate().multiply(new BigDecimal(100)));
-                    callEvent(FundingOnTimeManagerListener::onAbort);
-                    return;
-                }
-                waitForFunding(remote, symbols.get(target.symbol()), target);
-                closePositionNow();
-                this.order = null;
-            } catch (Exception e) {
-                callEvent(FundingOnTimeManagerListener::onAbort);
-                Log.warning("Abort: Error: %s", e);
-            } finally {
-                executor.schedule(this::closePositionNow, config.windowSize + TimeUnit.SECONDS.toMillis(2), TimeUnit.MILLISECONDS);
-            }
-        }finally {
+        try {
+            connector.fSetLeverage(target.symbol(), 2);
+            connector.wfCreateBookTicker(bookTick -> this.currentBookTick = bookTick, null, target.symbol());
+            this.currentBookTick = connector.fGetBookTick(target.symbol());
+
+            Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
+            Log.info("Delta temporal: Avg: %dms, Max: %dms, Min: %dms", remote.avg(), remote.max(), remote.min());
+
+            waitForFunding(remote, symbols.get(target.symbol()), target);
+        } catch (Exception e) {
+            callEvent(FundingOnTimeManagerListener::onAbort);
+            Log.warning("Abort: Error: %s", e);
+        } finally {
+            executor.schedule(this::closePositionNow, config.windowSize + TimeUnit.SECONDS.toMillis(5), TimeUnit.MILLISECONDS);
             connector.wfRemoveBookTicker(null, target.symbol());
         }
     }
@@ -177,7 +185,7 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
         long waitFinal = (fundingTimeLocal - config.windowSize);
         long currentTimeFinal = System.currentTimeMillis();
         long deltaWaitFinal = waitFinal - currentTimeFinal;
-        executor.schedule(() -> callEvent(FundingOnTimeManagerListener::onEndWindow), deltaWaitFinal + 15_000, TimeUnit.MILLISECONDS);
+        executor.schedule(() -> callEvent(FundingOnTimeManagerListener::onEndWindow), deltaWaitFinal + 5_000, TimeUnit.MILLISECONDS);
         if (deltaWaitFinal < 500){
             callEvent(FundingOnTimeManagerListener::onAbort);
             Log.warning("Abort: out window final %dms", deltaWaitFinal);
@@ -189,12 +197,14 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
         parkUntil(waitFinal);
 
         BigDecimal quantityQuoteMax = config.getMaxQuantityQuote();
-        BigDecimal quantityBase = sideOpen.isBuy()
+        BigDecimal quantityBase =( sideOpen.isBuy()
                 ? /*currentBookTick.askQty().min*/(symbol.realMinNotionalBase(currentBookTick.askPrice()))
-                : /*currentBookTick.bidQty().min*/(symbol.realMinNotionalBase(currentBookTick.bidPrice()));
-        BigDecimal quantityQuote = sideOpen.isBuy()
+                : /*currentBookTick.bidQty().min*/(symbol.realMinNotionalBase(currentBookTick.bidPrice()))
+        ).multiply(new BigDecimal("1.1"));
+        BigDecimal quantityQuote = (sideOpen.isBuy()
                 ? symbol.realMinNotionalQuote(currentBookTick.askPrice())
-                : symbol.realMinNotionalQuote(currentBookTick.bidPrice());
+                : symbol.realMinNotionalQuote(currentBookTick.bidPrice())
+        ).multiply(new BigDecimal("1.1"));
 
         Log.info(
                 "symbol=%s price=%s qty=%s notional=%s leverage=%s",
@@ -217,7 +227,7 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
             this.order = new OrderToClosePosition(target.symbol(), quantityBase, sideClose, System.currentTimeMillis());
         }
         // Está entre 225 a 250
-        parkUntil(fundingTimeLocal + 240); // 40 no funciona, 60 bien
+        parkUntil(fundingTimeLocal/* + 249*/); // 40 no funciona, 60 bien
     }
 
     private void closePositionCheck(String symbol){

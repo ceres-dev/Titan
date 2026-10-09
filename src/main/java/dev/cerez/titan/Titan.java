@@ -2,17 +2,22 @@ package dev.cerez.titan;
 
 import dev.cerez.titan.command.CommandHander;
 import dev.cerez.titan.command.commands.*;
+import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.environment.EnvironmentManager;
 import dev.cerez.titan.infrastructure.TitanApplication;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.Utils;
 import lombok.Getter;
 
+import java.math.BigDecimal;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public final class Titan implements Switch {
 

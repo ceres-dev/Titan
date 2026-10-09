@@ -232,8 +232,6 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
                 // En caso de que tenga una posición con PNL negativo se descuenta del margen usable
                 : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO)).multiply(new BigDecimal(getConfig().getLeverage()));
 
-        if (position == null) System.out.println("Position is null");
-
         Context context = new Context(balanceUse, currentPrice, getConfig(), position, orders);
 
         List<OrderPreview> orderPreviews = gridBuilder.buildGrid(context);
