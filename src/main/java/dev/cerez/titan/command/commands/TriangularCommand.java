@@ -2,6 +2,7 @@ package dev.cerez.titan.command.commands;
 
 import dev.cerez.titan.Log;
 import dev.cerez.titan.command.BaseCommand;
+import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.strategy.triangular.TriangularManager;
@@ -26,7 +27,7 @@ public class TriangularCommand extends BaseCommand {
     @Override
     public void execute(@NotNull List<String> args) {
         Log.info("Starting...");
-        long startTime = System.currentTimeMillis();
+
         ExecutorCycles.ExecutorCyclesConfig configExecutor = ExecutorCycles.ExecutorCyclesConfig.builder()
                 .maxLag(20L)
                 .minProfit(0.1d)
@@ -37,25 +38,28 @@ public class TriangularCommand extends BaseCommand {
                 .stepsAddDelayComputeNanoTime(10)
                 .build();
         TriangularManager.TriangularManagerConfiguration triangularManagerConfig = TriangularManager.TriangularManagerConfiguration.builder()
-                .maxSymbols(900)
+                .maxSymbolsHighVolumen(100)
+                .maxSymbolsLowVolumen(800)
                 .banAssets(Set.of("TRY"))
-                .maxCycleLength(4)
+                .maxCycleLength(3)
                 .minCycleLength(3)
                 .engine(SearchTriangularEngineJava.class)
                 .build();
 
-        Connector connector =           new BinanceConnector();
+
+
         Telemetry telemetry =           new Telemetry(telemetryConfig);
         Loader loader =                 new Loader();
-        ExecutorCycles executorCycles = new ExecutorCycles(configExecutor, connector);
         StorageManager storageManager = new StorageManagerJsonLocal(Utils.getRootId());
+        Connector connector =           new BinanceConnector(storageManager.getConfigProvider(BaseConnector.ConnectorConfig.class, null));
+        ExecutorCycles executorCycles = new ExecutorCycles(configExecutor, connector);
 
         connector.setTelemetry(telemetry);
+        connector.start();
         TriangularManager manager = new TriangularManager(Provider.from(triangularManagerConfig), connector, storageManager);
         manager.setTelemetry(telemetry);
-        manager.setOnUpdate(executorCycles::onOpportunities);
+        manager.setOnOpportunities(executorCycles::onOpportunities);
         manager.start();
-        Log.info("<green>Ready! %.2fs", (System.currentTimeMillis() - startTime)/1000d);
         loader.printLoader(telemetry);
     }
 }

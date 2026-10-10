@@ -3,6 +3,7 @@ package dev.cerez.titan.storage;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.utils.Provider;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -16,7 +17,7 @@ public interface StorageManager {
 
     <C extends BaseConfig> void saveConfig(C configurationProvider);
 
-    <C extends BaseConfig> Provider<C> getConfigProvider(Class<C> t, String nameProfiler);
+    <C extends BaseConfig> Provider<C> getConfigProvider(Class<C> t, @Nullable String nameProfiler);
 
     default <P> void savePersistence(@NotNull Provider<P> provider) {
         savePersistence(provider.get());

@@ -19,7 +19,6 @@ import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.telemtry.Telemetry;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.jetbrains.annotations.Blocking;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -32,7 +31,7 @@ import java.util.function.Consumer;
 public final class TriangularManager extends BaseManager<TriangularManager.TriangularManagerConfiguration, PersistenceNope, Connector, TriangularManagerListener> implements StatusProfiler {
 
     @Setter @Nullable private SearchTriangularEngine engine;
-    @Setter @Nullable private Consumer<SearchTriangularEngine.OnOpportunities> onUpdate;
+    @Setter @Nullable private Consumer<SearchTriangularEngine.OnOpportunities> onOpportunities;
     @Setter @Nullable private Telemetry telemetry;
 
     @Nullable private Map<String, Symbol> allSymbolsMap = null;
@@ -105,7 +104,7 @@ public final class TriangularManager extends BaseManager<TriangularManager.Trian
                             // Si es nulo se hará una analizáis total al grafo
                             updatedTicker
                     );
-            onUpdate.accept(new SearchTriangularEngine.OnOpportunities(list, currentNanoTime));
+            onOpportunities.accept(new SearchTriangularEngine.OnOpportunities(list, currentNanoTime));
             if (telemetry != null) {
                 telemetry.addDeltaDelayComputeNanoTime(System.nanoTime() - currentNanoTime);
                 telemetry.incrementUpdateCounter();
@@ -152,9 +151,19 @@ public final class TriangularManager extends BaseManager<TriangularManager.Trian
         }
 
         candidates.sort((a, b) -> Double.compare(b.volumeUsdt(), a.volumeUsdt()));
-        int limit = Math.min(getConfig().getMaxSymbols(), candidates.size());
+        return getCandidates(candidates);
+
+    }
+
+    private @NotNull Set<String> getCandidates(@NotNull List<SymbolVolume> candidates) {
+        int limit = Math.min(getConfig().getMaxSymbolsHighVolumen() + getConfig().getMaxSymbolsLowVolumen(), candidates.size());
         Set<String> result = new HashSet<>(limit);
-        for (int i = 0; i < limit; i++) {
+        int maxHighVolumen = getConfig().getMaxSymbolsHighVolumen();
+        for (int i = 0; i < maxHighVolumen; i++) {
+            result.add(candidates.get(i).symbol());
+        }
+        int maxLowVolumen = getConfig().getMaxSymbolsLowVolumen();
+        for (int i = maxLowVolumen; i >= 0; i--) {
             result.add(candidates.get(i).symbol());
         }
         return result;
@@ -237,7 +246,8 @@ public final class TriangularManager extends BaseManager<TriangularManager.Trian
     @SuperBuilder
     @EqualsAndHashCode(callSuper = true)
     public static class TriangularManagerConfiguration extends SearchTriangularEngine.EngineConfigurationProvider {
-        @Builder.Default public int maxSymbols = 1500;
+        @Builder.Default public int maxSymbolsHighVolumen = 500;
+        @Builder.Default public int maxSymbolsLowVolumen = 500;
         @Builder.Default public Set<String> banAssets = Set.of();
         @Builder.Default public final Class<? extends SearchTriangularEngine> engine = SearchTriangularEngineJava.class;
     }

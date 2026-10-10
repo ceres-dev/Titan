@@ -457,7 +457,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
         for (String cycleKey : lastTriangular.keySet()) {
             String[] assets = cycleKey.split("->");
             int limit = Math.max(0, assets.length - 1); // el último repite el inicio
-            trackedAssets.addAll(Arrays.asList(assets).subList(0, limit).stream().map(NameAssetIndexed::new).toList());
+            trackedAssets.addAll(Arrays.asList(assets).subList(0, limit).stream().map(nameAssetCache::get).toList());
         }
         return trackedAssets;
     }
