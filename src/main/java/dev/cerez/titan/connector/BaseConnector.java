@@ -110,8 +110,20 @@ public abstract class BaseConnector implements Connector {
         stopLoopers();
     }
 
-    public void syncTimeServer(){
+    public void checkWebSockets() {
+        List<String> wwsForOpen = new LinkedList<>();
+        for (Map.Entry<String, WebSocketContainer> entry : webSockets.entrySet()) {
+            if (entry.getValue().isClosed()){
+                wwsForOpen.add(entry.getKey());
+            }
+        }
+        for  (String wws : wwsForOpen) {
+            Log.info("WebSocket reopen: %s", wws);
+            initWebSocket(wws);
+        }
+    }
 
+    public void syncTimeServer(){
         deltaClienteToServer = getTimeSever() - System.currentTimeMillis();
     }
 
@@ -164,7 +176,6 @@ public abstract class BaseConnector implements Connector {
                     }
 
                     @Override
-                    @SuppressWarnings("CallToPrintStackTrace")
                     public void onError(WebSocket webSocket, Throwable error) {
                         Log.error("WebSocket@%s error: reason=%s cause=%s".formatted(wwsURL, error.getMessage(), error.getCause()));
                         Log.exception(error);

@@ -87,10 +87,6 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
         Map<String, BinanceConnector.FundingRate> funding = fundingFuture.join();
         RangeTime remote = remoteFuture.join();
         Map<String, Symbol> symbols = symbolsFuture.join();
-        Map<String, BigDecimal> balanceAvailable = fGetBalance();
-
-        BigDecimal balance = balanceAvailable.get("USDT");
-        Log.info("Balance Disponible: %.4f USDT", balance);
 
         long current = System.currentTimeMillis();
 
@@ -101,17 +97,18 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
                 .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRateAbs))
                 .toList();
 
+        List<BinanceConnector.FundingRate> targetLimited = targetFiltered.stream().limit(6).toList();
+
         Log.info("Symbols Disponible: %s",
                 String.join(", ",
                         targetFiltered.stream().map(f ->f.symbol() + "@" + f.nextFundingRate()).toList()
                 )
         );
 
-        List<BinanceConnector.FundingRate> targetLimited = targetFiltered.stream().limit(6).toList();
-
         if (targetLimited.isEmpty()) {
             Log.info("Abort: No funding rate found");
             callEvent(FundingOnTimeManagerListener::onAbort);
+            return;
         }
 
         if (targetLimited.size() < 3) {
@@ -121,6 +118,11 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
         }
 
         callEvent(FundingOnTimeManagerListener::onPrepare);
+        LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
+        Map<String, BigDecimal> balanceAvailable = fGetBalance();
+
+        BigDecimal balance = balanceAvailable.get("USDT");
+        Log.info("Balance Disponible: %.4f USDT", balance);
 
         if (config.getMaxQuantityQuote().compareTo(balance) >= 0){
             Log.info("Abort: Insufficient balance");
@@ -301,14 +303,20 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
                 if (config.isSendTrade())
                     connector.wfSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true)
                             .thenAccept((jsonNode -> {
+                                int status = jsonNode.get("status").asInt();
                                 try {
                                     long elapsedNanos = System.nanoTime() - startTime;
                                     Log.info("Order status: %d, Delay: %.2fms (%dms) symbol=%s",
-                                            jsonNode.get("status").asInt(),
+                                            status,
                                             elapsedNanos/1_000_000f,
                                             System.currentTimeMillis() - order.openDate,
                                             order.symbol()
                                     );
+                                    if (status != 200){
+                                        Log.info("Enviando orden de emergencia");
+                                        connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true);
+                                        connector.checkWebSockets();
+                                    }
                                     order = null;
                                 }catch (NullPointerException e) {
                                     Log.error("Order: %s", jsonNode.toString());
