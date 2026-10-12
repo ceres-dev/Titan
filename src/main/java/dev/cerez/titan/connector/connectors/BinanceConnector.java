@@ -206,6 +206,18 @@ public final class BinanceConnector extends BaseConnector {
         Map<String, Object> params = new HashMap<>();
         params.put("symbolStatus", "TRADING");
         JsonNode raw = sendPublicRequest(Method.GET, "/api/v3/ticker/bookTicker", params);
+        for (JsonNode node : raw) {
+            String symbol = node.get("symbol").asText();
+            result.put(symbol,
+                    new BookTickDouble(
+                            symbol,
+                            node.get("bidPrice").asDouble(),
+                            node.get("bidQty").asDouble(),
+                            node.get("askPrice").asDouble(),
+                            node.get("askQty").asDouble()
+                    )
+            );
+        }
         return result;
     }
 

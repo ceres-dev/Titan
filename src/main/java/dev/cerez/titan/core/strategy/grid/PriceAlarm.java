@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
-import java.util.HashSet;
+import java.util.*;
 
 @RequiredArgsConstructor
 public class PriceAlarm implements Switch {
@@ -16,10 +16,12 @@ public class PriceAlarm implements Switch {
     private boolean running = false;
     private final BinanceConnector connector;
     private final String symbol;
-    private final HashSet<Alarm> alarms = new HashSet<>();
+    private final Set<Alarm> alarms = Collections.synchronizedSet(new HashSet<>());
 
     public void addAlarm(boolean forBuy, @NotNull BigDecimal price, @NotNull Runnable runnable) {
-        alarms.add(new Alarm(forBuy, price, runnable));
+        synchronized (this.alarms) {
+            alarms.add(new Alarm(forBuy, price, runnable));
+        }
     }
 
     @Override
@@ -27,18 +29,22 @@ public class PriceAlarm implements Switch {
         if (running) return;
         running = true;
         connector.wfCreateBookTicker((bookTick -> {
-            for (Alarm alarm : alarms) {
-                if (alarm.forBuy){
-                    if (bookTick.bidPrice().compareTo(alarm.price) >= 0) {
-                        alarms.remove(alarm);
-                        alarm.runnable().run();
-                    }
-                }else {
-                    if (bookTick.askPrice().compareTo(alarm.price) <= 0) {
-                        alarms.remove(alarm);
-                        alarm.runnable().run();
+            synchronized (alarms){
+                LinkedList<Alarm> alarmsForRemove = new LinkedList<>();
+                for (Alarm alarm : List.copyOf(alarms)) {
+                    if (alarm.forBuy){
+                        if (bookTick.bidPrice().compareTo(alarm.price) > 0) {
+                            alarmsForRemove.add(alarm);
+                            alarm.runnable().run();
+                        }
+                    }else {
+                        if (bookTick.askPrice().compareTo(alarm.price) < 0) {
+                            alarmsForRemove.add(alarm);
+                            alarm.runnable().run();
+                        }
                     }
                 }
+                alarmsForRemove.forEach(alarms::remove);
             }
         }), null, symbol);
     }

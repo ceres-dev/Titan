@@ -141,19 +141,20 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
             return false;
         }));
         applyAttributes.add(new CallOnUpdate((order, c) -> {
-            priceAlarm.clear();
             BigDecimal stepSize = c.config().getStepSize();
             OrderPreview sell = order.stream().filter(OrderPreview::isSell).min(Comparator.comparing(OrderPreview::getPrice)).orElse(null);
             OrderPreview buy = order.stream().filter(OrderPreview::isBuy).max(Comparator.comparing(OrderPreview::getPrice)).orElse(null);
             if (sell != null){
-                priceAlarm.addAlarm(false, sell.getPrice().subtract(stepSize), () -> {
-                    Log.info("Sell price: %.2f Alarm!!!", c.currentPrice());
+                BigDecimal delta = sell.getPrice().subtract(stepSize);
+                priceAlarm.addAlarm(false, delta, () -> {
+                    Log.info("Sell price: %.2f Alarm: %.2f", c.currentPrice(), delta);
                     updateGrid();
                 });
             }
             if (buy != null){
-                priceAlarm.addAlarm(true, buy.getPrice().add(stepSize), () -> {
-                    Log.info("Buy price: %.2f Alarm!!!", c.currentPrice());
+                BigDecimal delta = buy.getPrice().add(stepSize);
+                priceAlarm.addAlarm(true, delta, () -> {
+                    Log.info("Buy price: %.2f Alarm: %2.2f", c.currentPrice(), delta);
                     updateGrid();
                 });
             }
@@ -176,14 +177,14 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
             LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
             updateGrid();
         }, null, true);
+        priceAlarm.start();
         executor.execute(() -> {
             while (running) {
                 // Para actualizar la gráfica periódicamente para detectar cambios en el precio
                 LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(1));
-                updateGrid();
+//                updateGrid();
             }
         });
-        updateGrid();
     }
 
     private int getAmountOrderAprox(@NotNull Context c) {
@@ -200,6 +201,7 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
     @Override
     public void internalStop() {
         applyAttributes.clear();
+        priceAlarm.stop();
         connector.wuDeleteEventOrderTradeUpdate(null);
         connector.fCancelOrderAll(symbol);
     }
@@ -310,8 +312,8 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
         }
         // Se vuelve a intentar
         if (retry) {
-            Log.info("Operación fallida reintentado calculo en 5 segundos...");
-            LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(5));
+            Log.info("Operación fallida reintentado calculo en 20 segundos...");
+            LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(20));
             updateGrid();
         }
     }

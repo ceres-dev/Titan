@@ -90,14 +90,16 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
 
         long current = System.currentTimeMillis();
 
-        List<BinanceConnector.FundingRate> targetFiltered  = funding.values().stream()
+        List<BinanceConnector.FundingRate> targetFiltered = funding.values().stream()
                 .filter(f -> (f.nextFundingTime() - current) < TimeUnit.HOURS.toMillis(1))
                 .filter(f -> f.symbol().endsWith("USDT"))
-                .filter(f -> f.nextFundingRateAbs().compareTo(new BigDecimal("0.002")) > 0)
-                .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRateAbs))
+                .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateMin()) > 0)
                 .toList();
 
-        List<BinanceConnector.FundingRate> targetLimited = targetFiltered.stream().limit(6).toList();
+        List<BinanceConnector.FundingRate> targetLimited = targetFiltered.stream()
+                .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRateAbs).reversed())
+                .limit(6)
+                .toList();
 
         Log.info("Symbols Disponible: %s",
                 String.join(", ",
@@ -117,7 +119,9 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
             return;
         }
 
+        // Preparación para mover fondo o cancelar otras ordenes
         callEvent(FundingOnTimeManagerListener::onPrepare);
+        // Esperar que se actualize la cache
         LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
         Map<String, BigDecimal> balanceAvailable = fGetBalance();
 
@@ -130,15 +134,16 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
             return;
         }
 
-        List<SymbolTarget> targets = List.of(targetLimited.stream()
+        List<SymbolTarget> targets = List.of(
+                targetLimited.stream()
                 .map(fundingRate -> new SymbolTarget(config, symbols.get(fundingRate.symbol()), fundingRate))
                 .toList()
-                .getLast());
+                .getLast()
+        );
 
         try {
             Log.info("Delta temporal: Avg: %dms, Max: %dms, Min: %dms", remote.avg(), remote.max(), remote.min());
             symbolsPending.clear();
-            targets.forEach(symbolTarget -> symbolsPending.put(symbolTarget.getTarget().symbol(), symbolTarget));
             waitForFunding(remote, targets);
         } catch (Exception e) {
             callEvent(FundingOnTimeManagerListener::onAbort);
@@ -171,6 +176,7 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
         // Esperar hasta el momento de apertura
         parkUntil(waitFinal);
 
+        symbols.forEach(symbolTarget -> symbolsPending.put(symbolTarget.getTarget().symbol(), symbolTarget));
         symbols.forEach(SymbolTarget::openPosition);
         // Está entre 225 a 250
         parkUntil(fundingTimeLocal/* + 249*/); // 40 no funciona, 60 bien
@@ -232,9 +238,9 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
     @SuperBuilder
     public static class FundingMangerConfiguration extends BaseConfig {
         @Builder.Default private BigDecimal maxQuantityQuote = new BigDecimal("6");
-        @Builder.Default private BigDecimal fundingRateMin = BigDecimal.valueOf(0.0025);
+        @Builder.Default private BigDecimal fundingRateMin = BigDecimal.valueOf(0.0015);
         @Builder.Default private boolean sendTrade = false;
-        @Builder.Default private long windowSize = 500; // MS
+        @Builder.Default private long windowSize = 1000; // MS
     }
 
     @Getter
@@ -292,6 +298,7 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
                 callEvent(FundingOnTimeManagerListener::onOpenPosition);
                 connector.fSendOrderToMkt(target.symbol(), sideOpen, quantityBase, null, false);
                 this.order = new OrderToClosePosition(target.symbol(), quantityBase, sideClose, System.currentTimeMillis());
+                Log.info("Posición Abierta");
             }
         }
 
@@ -335,17 +342,29 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
             if (position == null) {
                 Log.info("Cierre de la posición exitoso");
                 return;
-            }else {
-                Log.info("Posición abierta: %s", position);
             }
+            Log.info("Posición abierta: %s", position);
+            Log.info("Send order close: %s".formatted(target.symbol()));
             SideOrder sideOrder = Utils.toSide(position.sidePosition()).inverse();
 
-            if (config.isSendTrade()) connector.fSendOrderToMkt(target.symbol(),
+            if (config.isSendTrade()) connector.wfSendOrderToMkt(target.symbol(),
                     sideOrder,
                     position.quantity(),
                     "close-" + Utils.uuidToBase36(UUID.randomUUID()),
                     true
-            );
+            ).thenAccept((jsonNode -> {
+                int status = jsonNode.get("status").asInt();
+                Log.info("Order status: %d, symbol=%s",
+                        status,
+                        order.symbol()
+                );
+                if (status != 200){
+                    Log.info("Enviando orden de emergencia");
+                    connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true);
+                    connector.checkWebSockets();
+                }
+            }));
+            Log.info("Posición Cerrada");
             // Una pequeña espera para que se actualize la cache
             LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
             closePositionCheck();

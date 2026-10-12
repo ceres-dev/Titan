@@ -45,7 +45,7 @@ public final class TriangularManager extends BaseManager<TriangularManager.Trian
 
     @Override
     protected void internalStart() {
-        if (getConfig().getEngine() == null) throw new IllegalStateException("Engine is not setting");
+        if (engine == null) throw new IllegalStateException("Engine is not setting");
         CompletableFuture<Map<String, Symbol>> allSymbolsMapFuture = CompletableFuture.supplyAsync(
                 connector::sGetAllSymbols
         );
@@ -119,8 +119,7 @@ public final class TriangularManager extends BaseManager<TriangularManager.Trian
     private @NotNull Set<String> getSpotTradingSymbols(@NotNull Map<String, Symbol> allSymbols,
                                                        @NotNull Map<String, BookTickDouble> liveTickers,
                                                        @NotNull Map<String, Volume24H> bookTicker24H) {
-        Map<String, List<AssetRate>> conversionGraph;
-        conversionGraph = buildAssetConversionGraph(allSymbols, liveTickers);
+        Map<String, List<AssetRate>> conversionGraph = buildAssetConversionGraph(allSymbols, liveTickers);;
         List<SymbolVolume> candidates = new ArrayList<>();
 
         for (Symbol symbol : allSymbols.values()) {
