@@ -80,6 +80,8 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
         Log.info("Espera del Financiación: %ds", remaining.toSeconds());
         LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
 
+        callEvent(FundingOnTimeManagerListener::onPrepare);
+
         CompletableFuture<Map<String, BinanceConnector.FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
         CompletableFuture<RangeTime> remoteFuture = CompletableFuture.supplyAsync(() -> getDeltaClockRemote(TimeUnit.SECONDS, 20));
         CompletableFuture<Map<String, Symbol>> symbolsFuture = CompletableFuture.supplyAsync(connector::fGetAllSymbols);
@@ -120,9 +122,7 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
         }
 
         // Preparación para mover fondo o cancelar otras ordenes
-        callEvent(FundingOnTimeManagerListener::onPrepare);
         // Esperar que se actualize la cache
-        LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
         Map<String, BigDecimal> balanceAvailable = fGetBalance();
 
         BigDecimal balance = balanceAvailable.get("USDT");
@@ -238,7 +238,7 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
     @SuperBuilder
     public static class FundingMangerConfiguration extends BaseConfig {
         @Builder.Default private BigDecimal maxQuantityQuote = new BigDecimal("6");
-        @Builder.Default private BigDecimal fundingRateMin = BigDecimal.valueOf(0.0015);
+        @Builder.Default private BigDecimal fundingRateMin = BigDecimal.valueOf(0.002);
         @Builder.Default private boolean sendTrade = false;
         @Builder.Default private long windowSize = 1000; // MS
     }
@@ -320,6 +320,7 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
                                             order.symbol()
                                     );
                                     if (status != 200){
+                                        Log.info("Repuesta: %s", jsonNode);
                                         Log.info("Enviando orden de emergencia");
                                         connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true);
                                         connector.checkWebSockets();
@@ -359,6 +360,7 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
                         order.symbol()
                 );
                 if (status != 200){
+                    Log.info("Repuesta: %s", jsonNode);
                     Log.info("Enviando orden de emergencia");
                     connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true);
                     connector.checkWebSockets();

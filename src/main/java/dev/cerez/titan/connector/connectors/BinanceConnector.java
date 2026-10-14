@@ -118,8 +118,10 @@ public final class BinanceConnector extends BaseConnector {
         }
         // Es una repuesta de una solicitud
         JsonNode nodeId = node.get("id");
+        System.out.println(nodeId + " -> " + node);
         if (nodeId != null){
             Consumer<JsonNode> consumer = webSockets.get(wwsURL).getPendingResponse().remove(nodeId.asText());
+            System.out.println("Accept Id: " + nodeId);
             if (consumer != null) consumer.accept(node);
         }
     }

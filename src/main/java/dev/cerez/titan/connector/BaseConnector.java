@@ -276,6 +276,7 @@ public abstract class BaseConnector implements Connector {
 
             sendWebSocket(url, request.toString());
             CompletableFuture<JsonNode> future = new CompletableFuture<>();
+            System.out.println("id: " + id + " Send: " + request);
             webSockets.get(url).getPendingResponse().put(id, future::complete);
             return future;
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {

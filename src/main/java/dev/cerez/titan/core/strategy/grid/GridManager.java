@@ -37,14 +37,17 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
 public final class GridManager extends BaseManager<GridManager.GridManagerConfiguration, PersistenceNope, BinanceConnector, GridManagerListener> implements StatusProfiler {
 
-    @Nullable
-    private BinanceConnector.OrderFuture lastOrderFilled = null;
+    @Nullable private BinanceConnector.OrderFuture lastOrderFilled = null;
+    private volatile Future<?> waitForUpdate = CompletableFuture.runAsync(() -> {});
+
     @NotNull private final String symbol;
     @NotNull private final WaitableSet<String> waitForCancel = new WaitableSet<>();
     @NotNull private final HashSet<String> forOpen = new HashSet<>();
@@ -83,7 +86,7 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
         }, false).addCondicion(c -> c.context().position() != null));
         applyAttributes.add(new MultiplyFirstOrderSize(SideAffected.AGAINST, (orders, c) -> {
             // Cantidad APROXIMADA no puede ser que no sea la cantidad real
-            final int amountOrder = getAmountOrderAprox(c);
+            final int amountOrder = getAmountOrderApprox(c);
             switch(c.config().getSideGrid()) {
                 case LONG -> {
                     return Math.max(amountOrder - Utils.filterBuy(orders).size(), 1);
@@ -99,7 +102,7 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
         }));
         applyAttributes.add(new MultiplyFirstOrderSize(SideAffected.FAVOR, (orders, c) -> {
             // Cantidad APROXIMADA no puede ser que no sea la cantidad real
-            final int amountOrder = getAmountOrderAprox(c);
+            final int amountOrder = getAmountOrderApprox(c);
             switch(c.config().getSideGrid()) {
                 case LONG -> {
                     return Math.max(amountOrder/3 - Utils.filterSell(orders).size(), 1);
@@ -142,24 +145,45 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
         }));
         applyAttributes.add(new CallOnUpdate((order, c) -> {
             BigDecimal stepSize = c.config().getStepSize();
-            OrderPreview sell = order.stream().filter(OrderPreview::isSell).min(Comparator.comparing(OrderPreview::getPrice)).orElse(null);
-            OrderPreview buy = order.stream().filter(OrderPreview::isBuy).max(Comparator.comparing(OrderPreview::getPrice)).orElse(null);
-            if (sell != null){
+            BigDecimal currentPrice = c.currentPrice();
+            priceAlarm.clear();
+            OrderPreview sell = order.stream()
+                    .filter(OrderPreview::isSell)
+                    .min(Comparator.comparing(OrderPreview::getPrice))
+                    .orElse(null);
+
+            OrderPreview buy = order.stream()
+                    .filter(OrderPreview::isBuy)
+                    .max(Comparator.comparing(OrderPreview::getPrice))
+                    .orElse(null);
+
+            if (sell != null) {
                 BigDecimal delta = sell.getPrice().subtract(stepSize);
-                priceAlarm.addAlarm(false, delta, () -> {
-                    Log.info("Sell price: %.2f Alarm: %.2f", c.currentPrice(), delta);
-                    updateGrid();
-                });
+
+                if (currentPrice.compareTo(delta) > 0) {
+                    Log.info("Add Alarm Sell " + c.currentPrice());
+                    priceAlarm.addAlarm(false, delta, () -> {
+                        Log.info("Sell price: %.2f Alarm: %.2f", c.currentPrice(), delta);
+                        updateGrid();
+                    });
+                }
             }
-            if (buy != null){
+
+            if (buy != null) {
                 BigDecimal delta = buy.getPrice().add(stepSize);
-                priceAlarm.addAlarm(true, delta, () -> {
-                    Log.info("Buy price: %.2f Alarm: %2.2f", c.currentPrice(), delta);
-                    updateGrid();
-                });
+                if (currentPrice.compareTo(delta) < 0) {
+                    Log.info("Add Alarm Buy " + c.currentPrice());
+                    priceAlarm.addAlarm(true, delta, () -> {
+                        Log.info("Buy price: %.2f Alarm: %.2f", c.currentPrice(), delta);
+                        updateGrid();
+                    });
+                }
+            }
+
+            if (priceAlarm.isEmpty() && (waitForUpdate.isCancelled() || waitForUpdate.isDone())) {
+                waitForUpdate = executor.schedule(this::updateGrid, 5, TimeUnit.MINUTES);
             }
         }));
-
         Log.info("Balance disponible %.4f %s", fGetBalance().get(getConfig().quoteAsset), getConfig().quoteAsset);
         connector.wuCreateEventOrderTradeUpdate(orderUpdate -> {
             if (!orderUpdate.symbol().equals(symbol)) {
@@ -177,17 +201,18 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
             LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
             updateGrid();
         }, null, true);
+        updateGrid();
         priceAlarm.start();
-        executor.execute(() -> {
-            while (running) {
-                // Para actualizar la gráfica periódicamente para detectar cambios en el precio
-                LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(1));
+//        executor.execute(() -> {
+//            while (running) {
+//                // Para actualizar la gráfica periódicamente para detectar cambios en el precio
+//                LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(1));
 //                updateGrid();
-            }
-        });
+//            }
+//        });
     }
 
-    private int getAmountOrderAprox(@NotNull Context c) {
+    private int getAmountOrderApprox(@NotNull Context c) {
         BigDecimal amountOrderApproximate = c.balanceUsdt()
                 .divide(c.currentPrice(), 12, RoundingMode.HALF_EVEN)
                 .divide(getConfig().getSizePerOrderBaseAsset(), 12, RoundingMode.HALF_EVEN)
@@ -208,6 +233,7 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
 
     public synchronized void updateGrid() {
         if (!running) return;
+        waitForUpdate.cancel(false);
         waitForCancel.clear();
         forOpen.clear();
         callEvent(GridManagerListener::onUpdate);
@@ -216,11 +242,13 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
         CompletableFuture<BigDecimal> currentPriceFuture = CompletableFuture.supplyAsync(() -> connector.fGetPrice(symbol));
         CompletableFuture<List<BinanceConnector.OrderFuture>> ordersFuture = CompletableFuture.supplyAsync(() -> connector.fGetAllOrder(symbol));
         CompletableFuture<BigDecimal> balanceFuture = CompletableFuture.supplyAsync(() -> fGetBalanceTotal().getOrDefault(getConfig().quoteAsset, BigDecimal.ZERO));
+        CompletableFuture<BinanceConnector.BookTick> bookTickerFuture = CompletableFuture.supplyAsync(() -> connector.fGetBookTick(symbol));
 
         BinanceConnector.FuturePosition position = positionFuture.join();
         BigDecimal currentPrice = currentPriceFuture.join();
         List<BinanceConnector.OrderFuture> orders = ordersFuture.join();
         BigDecimal balance = balanceFuture.join();
+        BinanceConnector.BookTick bookTicker = bookTickerFuture.join();
 
         List<BinanceConnector.OrderFuture> ordersActive = Utils.filterNew(orders);
         lastOrderFilled = orders.stream()
@@ -234,7 +262,7 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
                 // En caso de que tenga una posición con PNL negativo se descuenta del margen usable
                 : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO)).multiply(new BigDecimal(getConfig().getLeverage()));
 
-        Context context = new Context(balanceUse, currentPrice, getConfig(), position, orders);
+        Context context = new Context(balanceUse, currentPrice, bookTicker, getConfig(), position, orders);
 
         List<OrderPreview> orderPreviews = gridBuilder.buildGrid(context);
         List<OrderPreview> desiredOrders = applyAttributes.apply(context, orderPreviews);
@@ -311,10 +339,8 @@ public final class GridManager extends BaseManager<GridManager.GridManagerConfig
             );
         }
         // Se vuelve a intentar
-        if (retry) {
-            Log.info("Operación fallida reintentado calculo en 20 segundos...");
-            LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(20));
-            updateGrid();
+        if (retry && (waitForUpdate.isCancelled() || waitForUpdate.isDone())) {
+            waitForUpdate = executor.schedule(this::updateGrid, 5, TimeUnit.SECONDS);
         }
     }
 

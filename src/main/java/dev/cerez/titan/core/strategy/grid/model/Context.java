@@ -11,6 +11,7 @@ import java.util.List;
 
 public record Context(@NotNull BigDecimal balanceUsdt,
                       @NotNull BigDecimal currentPrice,
+                      @NotNull BinanceConnector.BookTick currentBookTicker,
                       @NotNull GridManager.GridManagerConfiguration config,
                       @Nullable BinanceConnector.FuturePosition position,
                       @NotNull List<BinanceConnector.OrderFuture> orders

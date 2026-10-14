@@ -19,8 +19,12 @@ public class PriceAlarm implements Switch {
     private final Set<Alarm> alarms = Collections.synchronizedSet(new HashSet<>());
 
     public void addAlarm(boolean forBuy, @NotNull BigDecimal price, @NotNull Runnable runnable) {
-        synchronized (this.alarms) {
-            alarms.add(new Alarm(forBuy, price, runnable));
+        synchronized (alarms) {
+            boolean exists = alarms.stream().anyMatch(alarm ->
+                    alarm.forBuy() == forBuy && alarm.price().compareTo(price) == 0
+            );
+
+            if (!exists) alarms.add(new Alarm(forBuy, price, runnable));
         }
     }
 
@@ -29,22 +33,22 @@ public class PriceAlarm implements Switch {
         if (running) return;
         running = true;
         connector.wfCreateBookTicker((bookTick -> {
-            synchronized (alarms){
-                LinkedList<Alarm> alarmsForRemove = new LinkedList<>();
-                for (Alarm alarm : List.copyOf(alarms)) {
-                    if (alarm.forBuy){
-                        if (bookTick.bidPrice().compareTo(alarm.price) > 0) {
-                            alarmsForRemove.add(alarm);
-                            alarm.runnable().run();
-                        }
-                    }else {
-                        if (bookTick.askPrice().compareTo(alarm.price) < 0) {
-                            alarmsForRemove.add(alarm);
-                            alarm.runnable().run();
-                        }
+            List<Alarm> triggered = new ArrayList<>(12);
+            synchronized (alarms) {
+                for (Alarm alarm : alarms) {
+                    boolean reached = alarm.forBuy()
+                            ? bookTick.bidPrice().compareTo(alarm.price()) >= 0
+                            : bookTick.askPrice().compareTo(alarm.price()) <= 0;
+
+                    if (reached) {
+                        triggered.add(alarm);
                     }
                 }
-                alarmsForRemove.forEach(alarms::remove);
+
+                triggered.forEach(alarms::remove);
+            }
+            for (Alarm alarm : triggered) {
+                alarm.runnable().run();
             }
         }), null, symbol);
     }
@@ -58,9 +62,16 @@ public class PriceAlarm implements Switch {
     }
 
     public void clear() {
-        alarms.clear();
+        synchronized (alarms) {
+            alarms.clear();
+        }
     }
 
+    public boolean isEmpty() {
+        synchronized (alarms) {
+            return alarms.isEmpty();
+        }
+    }
 
     private record Alarm(boolean forBuy, @NotNull BigDecimal price, @NotNull Runnable runnable) {}
 }
