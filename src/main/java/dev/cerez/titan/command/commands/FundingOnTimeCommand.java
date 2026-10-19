@@ -7,7 +7,7 @@ import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.storage.StorageManagerJsonLocal;
-import dev.cerez.titan.utils.Provider;
+import dev.cerez.titan.storage.StorageManagerMemory;
 import dev.cerez.titan.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 
@@ -20,8 +20,10 @@ public class FundingOnTimeCommand extends BaseCommand {
 
     @Override
     public void execute(@NotNull List<String> args) {
-        StorageManager storage = new StorageManagerJsonLocal(Utils.getRootId());
-        BinanceConnector connector = new BinanceConnector(storage.getConfigProvider(BaseConnector.ConnectorConfig.class, "testnet"));
+        StorageManager storageReal = new StorageManagerJsonLocal(Utils.getRootId());
+        StorageManager storageMemory = new StorageManagerMemory(Utils.getRootId());
+        storageReal.setConfigProfilerName(BaseConnector.ConnectorConfig.class, "testnet");
+        BinanceConnector connector = new BinanceConnector(storageReal);
         connector.start();
         connector.wuCreateEventAccountUpdate((jsonNode -> {
             Log.info(jsonNode.toPrettyString());
@@ -32,7 +34,7 @@ public class FundingOnTimeCommand extends BaseCommand {
         FundingOnTimeManager.FundingMangerConfiguration config = FundingOnTimeManager.FundingMangerConfiguration.builder()
                 .sendTrade(true)
                 .build();
-        FundingOnTimeManager fundingManger = new FundingOnTimeManager(Provider.from(config),connector, new StorageManagerJsonLocal(Utils.getRootId()));
+        FundingOnTimeManager fundingManger = new FundingOnTimeManager(storageMemory.saveIfNotExits(config),connector);
         fundingManger.start();
     }
 }

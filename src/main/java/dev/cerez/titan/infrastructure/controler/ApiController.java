@@ -49,7 +49,7 @@ public class ApiController {
 
     @GetMapping("/strategy")
     public ResponseEntity<List<Strategy>> getStrategy(@AuthenticationPrincipal CustomUserDetails user) {
-        return ResponseEntity.ok(getPort(user).getManagers().stream().map(m -> new Strategy(m.getId(), m.getTypeManager(), m.getName(), m.isRunning())).toList());
+        return ResponseEntity.ok(getPort(user).getStrategy().stream().map(m -> new Strategy(m.getId(), m.getTypeManager(), m.getName(), m.isRunning())).toList());
     }
 
     private @NotNull EnvironmentManager.EnvironmentPort getPort(@NotNull CustomUserDetails user) {

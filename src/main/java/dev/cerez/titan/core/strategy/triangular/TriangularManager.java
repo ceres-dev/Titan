@@ -6,16 +6,15 @@ import dev.cerez.titan.connector.model.AssetRate;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.connector.model.Volume24H;
-import dev.cerez.titan.core.PersistenceNope;
+import dev.cerez.titan.core.PersistentNope;
 import dev.cerez.titan.core.event.events.TriangularManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
 import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularEngineJava;
 import dev.cerez.titan.core.strategy.triangular.utils.TriangularArbitrageOpportunity;
-import dev.cerez.titan.core.BaseManager;
+import dev.cerez.titan.core.ManagerStrategy;
 import dev.cerez.titan.storage.StorageManager;
-import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.telemtry.Telemetry;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -28,7 +27,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 
-public final class TriangularManager extends BaseManager<TriangularManager.TriangularManagerConfiguration, PersistenceNope, Connector, TriangularManagerListener> implements StatusProfiler {
+public final class TriangularManager extends ManagerStrategy<TriangularManager.TriangularManagerConfiguration, PersistentNope, Connector, TriangularManagerListener> implements StatusProfiler {
 
     @Setter @Nullable private SearchTriangularEngine engine;
     @Setter @Nullable private Consumer<SearchTriangularEngine.OnOpportunities> onOpportunities;
@@ -38,8 +37,8 @@ public final class TriangularManager extends BaseManager<TriangularManager.Trian
     @Nullable private Consumer<BookTickDouble> streamListener = null;
 
     @SneakyThrows
-    public TriangularManager(@NotNull Provider<TriangularManagerConfiguration> config, @NotNull Connector connector, StorageManager storageManager) {
-        super(config, PersistenceNope.class, connector, storageManager);
+    public TriangularManager(@NotNull StorageManager storageManager, @NotNull Connector connector) {
+        super(storageManager.createProfilerManager(TriangularManagerConfiguration.class, PersistentNope.class), connector, TypeManager.FUNDING_TRIANGULAR);
         this.engine = getConfig().getEngine().getConstructor(SearchTriangularEngine.EngineConfigurationProvider.class).newInstance(getConfig());
     }
 
@@ -62,13 +61,16 @@ public final class TriangularManager extends BaseManager<TriangularManager.Trian
             }
 
             Map<String, Volume24H> volume24H = connector.sGetVolume24H();
-            Set<String> symbolsToSubscribe = getSpotTradingSymbols(allSymbolsMap, tickersMap, volume24H);
-            Log.info("<green>Request Received: %s Total Symbols.", allSymbolsMap.size());
+            Map<String, Symbol> symbolsToSubscribe = new HashMap<>();
+            for (String symbolName : getSymbolsUse(allSymbolsMap, tickersMap, volume24H)) {
+                symbolsToSubscribe.put(symbolName, allSymbolsMap.get(symbolName));
+            }
+            Log.info("<green>Request Received: %d Total Symbols. Use Symbols: %d", allSymbolsMap.size(), symbolsToSubscribe.size());
             Log.info("Starting engine...");
-            engine.configure(allSymbolsMap, tickersMap);
+            engine.configure(symbolsToSubscribe, tickersMap);
             Log.info("<green>Engine Ready: %s.", engine.getClass().getName());
             Log.info("Starting Api...");
-            connector.wsSubscribeBookTicker(streamListener = this::onBookTickerUpdate, symbolsToSubscribe);
+            connector.wsSubscribeBookTicker(streamListener = this::onBookTickerUpdate, symbolsToSubscribe.keySet());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             Log.exception("Error iniciando stream de arbitraje", e);
@@ -116,9 +118,9 @@ public final class TriangularManager extends BaseManager<TriangularManager.Trian
         }
     }
 
-    private @NotNull Set<String> getSpotTradingSymbols(@NotNull Map<String, Symbol> allSymbols,
-                                                       @NotNull Map<String, BookTickDouble> liveTickers,
-                                                       @NotNull Map<String, Volume24H> bookTicker24H) {
+    private @NotNull Set<String> getSymbolsUse(@NotNull Map<String, Symbol> allSymbols,
+                                               @NotNull Map<String, BookTickDouble> liveTickers,
+                                               @NotNull Map<String, Volume24H> bookTicker24H) {
         Map<String, List<AssetRate>> conversionGraph = buildAssetConversionGraph(allSymbols, liveTickers);;
         List<SymbolVolume> candidates = new ArrayList<>();
 
@@ -148,7 +150,6 @@ public final class TriangularManager extends BaseManager<TriangularManager.Trian
 
             candidates.add(new SymbolVolume(symbol.name(), volumeUsdt));
         }
-
         candidates.sort((a, b) -> Double.compare(b.volumeUsdt(), a.volumeUsdt()));
         return getCandidates(candidates);
 
@@ -162,8 +163,16 @@ public final class TriangularManager extends BaseManager<TriangularManager.Trian
             result.add(candidates.get(i).symbol());
         }
         int maxLowVolumen = getConfig().getMaxSymbolsLowVolumen();
-        for (int i = maxLowVolumen; i >= 0; i--) {
-            result.add(candidates.get(i).symbol());
+
+        int index = maxLowVolumen;
+        for (int i = maxLowVolumen; i >= 0; ) {
+            String symbol = candidates.get(index).symbol();
+            if (!symbol.endsWith("USDT") && !symbol.endsWith("USDC")) {
+                result.add(symbol);
+                i--;
+            }
+            index--;
+            if (index < 0) break;
         }
         return result;
     }
@@ -229,11 +238,6 @@ public final class TriangularManager extends BaseManager<TriangularManager.Trian
     @Override
     public @NotNull StatusProfiler.PresenceProfile getPresenceProfile() {
         return null;
-    }
-
-    @Override
-    public @NotNull TypeManager getTypeManager() {
-        return TypeManager.TRIANGULAR;
     }
 
     protected record SymbolVolume(

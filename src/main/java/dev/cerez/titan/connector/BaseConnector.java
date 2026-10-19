@@ -132,7 +132,7 @@ public abstract class BaseConnector implements Connector {
         executor.execute(() -> {
             while (running) {
                 LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(60));
-                syncTimeServer();
+//                syncTimeServer();
             }
         });
         executor.execute(() -> {

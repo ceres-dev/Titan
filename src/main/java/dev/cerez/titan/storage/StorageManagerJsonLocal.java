@@ -4,10 +4,12 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.cerez.titan.Log;
 import dev.cerez.titan.core.BaseConfig;
-import dev.cerez.titan.utils.Provider;
+import dev.cerez.titan.core.BasePersistent;
+import dev.cerez.titan.utils.Nameable;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
 import java.io.File;
@@ -16,20 +18,17 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Objects;
 import java.util.UUID;
 
-public class StorageManagerJsonLocal implements StorageManager {
+public class StorageManagerJsonLocal extends BaseStorageManager {
 
     private static final String EXTENSION = ".json";
 
-    @Getter
-    private final UUID idUser;
     private final Path path;
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
     public StorageManagerJsonLocal(@NotNull UUID idUser) {
-        this.idUser = idUser;
+        super(idUser);
         this.path = Paths.get("userData", idUser.toString());
         File file = new File(path.toFile().toURI());
         if (!file.exists()) {
@@ -38,49 +37,45 @@ public class StorageManagerJsonLocal implements StorageManager {
     }
 
     @Override
-    public <P> void savePersistence(@NonNull P persistence) {
-        try (FileWriter writer = new FileWriter(path.resolve(persistence.getClass().getSimpleName() + EXTENSION).toFile())) {
-            gson.toJson(persistence, writer);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public @NotNull Storage<BaseConfig> buildConfig(Class<BaseConfig> clazz) {
+        return new StorageJsonLocal<>(clazz);
     }
 
     @Override
-    public <P> Provider<P> getPersistenceProvider(Class<P> p) {
-        return () -> {
-            try (FileReader reader = new FileReader(path.resolve(p.getSimpleName() + EXTENSION).toFile())) {
-                return gson.fromJson(reader, p);
+    public @NotNull Storage<BasePersistent> buildPersistent(Class<BasePersistent> clazz) {
+        return new StorageJsonLocal<>(clazz);
+    }
+
+    @Getter
+    @Setter
+    @RequiredArgsConstructor
+    public class StorageJsonLocal<O extends Nameable> implements Storage<O> {
+        private final UUID idUser = StorageManagerJsonLocal.this.idUser;
+        private final Class<O> clazz;
+        private String profilerName = "default";
+
+        @Override
+        public void save(@NonNull O persistence) {
+            try (FileWriter writer = new FileWriter(path.resolve(persistence.getClass().getSimpleName() + EXTENSION).toFile())) {
+                gson.toJson(persistence, writer);
             } catch (IOException e) {
-                Log.exception(e);
-                return null;
+                throw new RuntimeException(e);
             }
-        };
-    }
-
-    @Override
-    public <C extends BaseConfig> void saveConfig(@NotNull C config) {
-        try (FileWriter writer = new FileWriter(path.resolve(config.getClass().getSimpleName() + "-" + config.getName() + EXTENSION).toFile())) {
-            gson.toJson(config, writer);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
         }
-    }
 
-    @Override
-    public <C extends BaseConfig> Provider<C> getConfigProvider(Class<C> c, @Nullable String nameProfiler) {
-        return () -> {
+        @Override
+        public O load(@NonNull String name) {
             try (FileReader reader = new FileReader(
                     path.resolve(
-                            c.getSimpleName() + "-" + Objects.requireNonNullElse(nameProfiler, "default") + EXTENSION
+                            clazz.getSimpleName() + "-" + name + EXTENSION
                     ).toFile())
             ) {
-                return gson.fromJson(reader, c);
+                return gson.fromJson(reader, clazz);
             } catch (IOException e) {
                 Log.exception(e);
                 return null;
             }
-        };
+        }
     }
 
 }

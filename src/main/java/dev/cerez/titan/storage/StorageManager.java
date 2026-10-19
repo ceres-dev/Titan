@@ -1,9 +1,9 @@
 package dev.cerez.titan.storage;
 
 import dev.cerez.titan.core.BaseConfig;
-import dev.cerez.titan.utils.Provider;
+import dev.cerez.titan.core.BasePersistent;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -11,51 +11,71 @@ public interface StorageManager {
 
     UUID getIdUser();
 
-    <P> void savePersistence(@NotNull P persistence);
+    <C extends BaseConfig> Storage<C> getConfig(@NotNull Class<C> clazz);
 
-    <P> Provider<P> getPersistenceProvider(Class<P> t);
+    <P extends BasePersistent> Storage<P> getPersistent(@NotNull Class<P> clazz);
 
-    <C extends BaseConfig> void saveConfig(C configurationProvider);
+    <C extends BaseConfig, P extends BasePersistent> StorageProfiler<C, P> createProfilerManager(Class<C> config, Class<P> persistent);
 
-    <C extends BaseConfig> Provider<C> getConfigProvider(Class<C> t, @Nullable String nameProfiler);
+    <C extends BaseConfig> void setConfigProfilerName(Class<C> clazz, String profilerName);
 
-    default <P> void savePersistence(@NotNull Provider<P> provider) {
-        savePersistence(provider.get());
+    <P extends BasePersistent> void setPersistentProfilerName(Class<P> clazz, String profilerName);
+
+    default <C extends BaseConfig> C loadConfig(Class<C> clazz) {
+        return getConfig(clazz).load();
+    }
+
+    default <P extends BasePersistent> P loadPersistence(Class<P> clazz) {
+        return getPersistent(clazz).load();
+    }
+
+    @Contract(value = "_ -> this")
+    default <C extends BaseConfig> @NotNull StorageManager saveConfig(@NotNull C config) {
+        getConfig(config.getClass()).saveUnsafe(config);
+        return this;
+    }
+
+    @Contract(value = "_ -> this")
+    default <P extends BasePersistent> @NotNull StorageManager savePersistence(@NotNull P persistent) {
+        getPersistent(persistent.getClass()).saveUnsafe(persistent);
+        return this;
+    }
+
+    @Contract(value = "_ -> this")
+    default <C extends BaseConfig> @NotNull StorageManager saveIfNotExits(@NotNull C config) {
+        if (loadConfig(config.getClass()) == null) {
+            saveConfig(config);
+        }
+        return this;
+    }
+
+    @Contract(value = "_ -> this")
+    default <P extends BasePersistent> @NotNull StorageManager saveIfNotExits(@NotNull P persistent) {
+        if (loadPersistence(persistent.getClass()) == null) {
+            savePersistence(persistent);
+        }
+        return this;
     }
 
     @SuppressWarnings("unchecked")
-    default <P> Provider<P> getProviderOrSavePersistence(@NotNull P p){
-        Provider<P> loaded = (Provider<P>) getPersistenceProvider(p.getClass());
-        if(loaded == null){
-            savePersistence(p);
-            return Provider.from(p);
+    default <C extends BaseConfig> @NotNull C loadOrSaveDefault(@NotNull C config) {
+        C c = (C) loadConfig(config.getClass());
+        if (c == null) {
+            saveConfig(config);
+            return config;
         }else {
-            if (loaded.get() == null) {
-                savePersistence(p);
-                return Provider.from(p);
-            }else {
-                return loaded;
-            }
+            return c;
         }
     }
 
-    default <C extends BaseConfig> void saveConfig(@NotNull Provider<C> provider){
-        saveConfig(provider.get());
-    }
-
     @SuppressWarnings("unchecked")
-    default <C extends BaseConfig> Provider<C> getProviderOrSaveConfig(C c){
-        Provider<C> loaded = (Provider<C>) getConfigProvider(c.getClass(), c.getName());
-        if(loaded == null){
-            saveConfig(c);
-            return Provider.from(c);
+    default <P extends BasePersistent> @NotNull P loadOrSaveDefault(@NotNull P persistent) {
+        P p = (P) loadPersistence(persistent.getClass());
+        if (p == null) {
+            savePersistence(persistent);
+            return persistent;
         }else {
-            if (loaded.get() == null) {
-                saveConfig(c);
-                return Provider.from(c);
-            }else {
-                return loaded;
-            }
+            return p;
         }
     }
 }

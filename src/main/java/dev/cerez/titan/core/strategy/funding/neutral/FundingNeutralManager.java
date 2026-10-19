@@ -5,12 +5,12 @@ import dev.cerez.titan.command.InputUser;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.core.BaseConfig;
-import dev.cerez.titan.core.BaseManager;
+import dev.cerez.titan.core.BasePersistent;
+import dev.cerez.titan.core.ManagerStrategy;
 import dev.cerez.titan.core.event.events.FundingManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.storage.StorageManager;
-import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Status;
 import dev.cerez.titan.utils.Utils;
 import lombok.Data;
@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public final class FundingNeutralManager extends BaseManager<FundingNeutralManager.FundingManagerConfiguration, FundingNeutralManager.FundingManagerPersistan, BinanceConnector, FundingManagerListener> implements StatusProfiler, Status<FundingNeutralManager.Status> {
+public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralManager.FundingManagerConfiguration, FundingNeutralManager.FundingManagerPersistan, BinanceConnector, FundingManagerListener> implements StatusProfiler, Status<FundingNeutralManager.Status> {
 
     @NotNull private final InputUser inputUser = new InputUser();
     @NotNull private final String baseAsset;
@@ -38,8 +38,8 @@ public final class FundingNeutralManager extends BaseManager<FundingNeutralManag
     @NotNull @Getter private final String symbol;
     @NotNull @Getter private Status status = Status.READY;
 
-    public FundingNeutralManager(@NotNull Provider<FundingManagerConfiguration> config, @NotNull BinanceConnector connector, @NotNull StorageManager storageManager) {
-        super(config, FundingManagerPersistan.class, connector, storageManager);
+    public FundingNeutralManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
+        super(storageManager.createProfilerManager(FundingManagerConfiguration.class, FundingManagerPersistan.class), connector, TypeManager.FUNDING_NEUTRAL);
         FundingManagerPersistan persistan = getPersistence();
         this.baseAsset = getConfig().getBaseAsset();
         this.quoteAsset = getConfig().getQuoteAsset();
@@ -109,7 +109,7 @@ public final class FundingNeutralManager extends BaseManager<FundingNeutralManag
         });
         CompletableFuture.allOf(closeOrderMargin, closeOrderFuture).join();
 
-        savePersistence(new FundingManagerPersistan(this));
+        new FundingManagerPersistan(this);
         status = Status.RUNNING;
     }
 
@@ -240,7 +240,7 @@ public final class FundingNeutralManager extends BaseManager<FundingNeutralManag
 
     @Override
     public @NotNull TypeManager getTypeManager() {
-        return TypeManager.FUNDING;
+        return TypeManager.FUNDING_NEUTRAL;
     }
 
     @Data
@@ -254,7 +254,7 @@ public final class FundingNeutralManager extends BaseManager<FundingNeutralManag
         private boolean logsEndPoints;
     }
 
-    public static class FundingManagerPersistan {
+    public static class FundingManagerPersistan extends BasePersistent {
         private final Status status;
         private final boolean isActive;
         private final UUID uuid;

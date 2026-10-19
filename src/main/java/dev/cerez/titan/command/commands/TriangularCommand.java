@@ -11,6 +11,7 @@ import dev.cerez.titan.core.strategy.triangular.ExecutorCycles;
 import dev.cerez.titan.core.strategy.triangular.utils.Loader;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.storage.StorageManagerJsonLocal;
+import dev.cerez.titan.storage.StorageManagerMemory;
 import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.telemtry.Telemetry;
@@ -38,8 +39,8 @@ public class TriangularCommand extends BaseCommand {
                 .stepsAddDelayComputeNanoTime(10)
                 .build();
         TriangularManager.TriangularManagerConfiguration triangularManagerConfig = TriangularManager.TriangularManagerConfiguration.builder()
-                .maxSymbolsHighVolumen(100)
-                .maxSymbolsLowVolumen(800)
+                .maxSymbolsHighVolumen(900)
+                .maxSymbolsLowVolumen(90)
                 .banAssets(Set.of("TRY"))
                 .maxCycleLength(3)
                 .minCycleLength(3)
@@ -50,13 +51,13 @@ public class TriangularCommand extends BaseCommand {
 
         Telemetry telemetry =           new Telemetry(telemetryConfig);
         Loader loader =                 new Loader();
-        StorageManager storageManager = new StorageManagerJsonLocal(Utils.getRootId());
-        Connector connector =           new BinanceConnector(storageManager.getConfigProvider(BaseConnector.ConnectorConfig.class, null));
+        StorageManager storageManager = new StorageManagerMemory(Utils.getRootId());
+        Connector connector =           new BinanceConnector(new StorageManagerJsonLocal(Utils.getRootId()));
         ExecutorCycles executorCycles = new ExecutorCycles(configExecutor, connector);
 
         connector.setTelemetry(telemetry);
         connector.start();
-        TriangularManager manager = new TriangularManager(Provider.from(triangularManagerConfig), connector, storageManager);
+        TriangularManager manager = new TriangularManager(storageManager, connector);
         manager.setTelemetry(telemetry);
         manager.setOnOpportunities(executorCycles::onOpportunities);
         manager.start();

@@ -4,3 +4,4 @@
   <img src="https://img.shields.io/github/languages/top/ceres-dev/Titan">
   <img src="https://img.shields.io/badge/Java%20version-21-yellow?logo=java">
 </p>
+Bot 100% autónomo en trading en Binance

@@ -4,7 +4,6 @@ import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.core.strategy.grid.model.Context;
 import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
-import dev.cerez.titan.utils.Utils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -13,7 +12,6 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * @author Chat GPT
@@ -37,9 +35,9 @@ public class GridBuilder {
     public @NotNull List<OrderPreview> buildGrid(@NotNull Context context) {
         List<OrderPreview> result = new ArrayList<>();
 
-        BigDecimal balanceUsdt = context.balanceUsdt();
+        BigDecimal balanceUsdt = context.getBalanceUsdt();
         BigDecimal positionBaseAsset = context.positionBaseAsset();
-        BigDecimal currentPrice = context.currentPrice();
+        BigDecimal currentPrice = context.getCurrentPrice();
 
         BigDecimal buyBudget  = balanceUsdt.subtract(positionBaseAsset.multiply(currentPrice)).multiply(MARGEN);
         BigDecimal sellBudget = balanceUsdt.add(positionBaseAsset.multiply(currentPrice)).multiply(MARGEN);
@@ -145,9 +143,9 @@ public class GridBuilder {
             @NotNull Context context,
             @NotNull List<OrderPreview> currentOrders
     ) {
-        BigDecimal balanceUsdt = context.balanceUsdt();
+        BigDecimal balanceUsdt = context.getBalanceUsdt();
         BigDecimal positionBaseAsset = context.positionBaseAsset();
-        BigDecimal currentPrice = context.currentPrice();
+        BigDecimal currentPrice = context.getCurrentPrice();
 
         List<OrderPreview> buys = new ArrayList<>();
         List<OrderPreview> sells = new ArrayList<>();

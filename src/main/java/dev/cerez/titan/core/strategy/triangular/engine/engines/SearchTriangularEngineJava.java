@@ -362,8 +362,14 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
                 continue;
             }
 
-            if (visitedAssets.contains(edge.getToAsset())) {
-                continue;
+            if (visitedAssets.size() < 3){
+                if (visitedAssets.getFirst() == edge.getToAsset() || visitedAssets.getLast() == edge.getToAsset()) {
+                    continue;
+                }
+            }else {
+                if (visitedAssets.contains(edge.getToAsset())) {
+                    continue;
+                }
             }
 
             path.addLast(edge);
@@ -395,11 +401,11 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
         NameAsset startAsset = first.getFromAsset();
         NameAsset currentAsset = startAsset;
 
-        List<NameAsset> cycleAssets = new LinkedList<>();
-        cycleAssets.add(startAsset);
+        LinkedList<NameAsset> cycleAssets = new LinkedList<>();
+        cycleAssets.addFirst(startAsset);
 
         LinkedList<NameAsset> distinctAssets = new LinkedList<>();
-        distinctAssets.add(startAsset);
+        distinctAssets.addFirst(startAsset);
 
         int i = 0;
         for (ArbitrageEdge edge : cycleEdges) {

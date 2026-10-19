@@ -39,7 +39,7 @@ public class ApplyAttributes {
 
             List<OrderPreview> use = new ArrayList<>(orders.size());
             List<OrderPreview> unuse = new ArrayList<>(orders.size());
-            SideGrid sideGrid = context.config().getSideGrid();
+            SideGrid sideGrid = context.getConfig().getSideGrid();
             SideAffected sideAffected = attribute.getSideAffected();
 
             if (sideAffected == SideAffected.BOTH || sideGrid == SideGrid.BOTH){

@@ -6,12 +6,11 @@ import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.BaseConfig;
-import dev.cerez.titan.core.BaseManager;
-import dev.cerez.titan.core.PersistenceNope;
+import dev.cerez.titan.core.ManagerStrategy;
+import dev.cerez.titan.core.PersistentNope;
 import dev.cerez.titan.core.event.events.FundingOnTimeManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.StorageManager;
-import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Utils;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -31,12 +30,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
-public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager.FundingMangerConfiguration, PersistenceNope, BinanceConnector, FundingOnTimeManagerListener> {
+public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeManager.FundingMangerConfiguration, PersistentNope, BinanceConnector, FundingOnTimeManagerListener> {
 
     private final ConcurrentMap<String, SymbolTarget> symbolsPending = new ConcurrentHashMap<>();
 
-    public FundingOnTimeManager(@NotNull Provider<FundingMangerConfiguration> config, @NonNull BinanceConnector connector, @NotNull StorageManager storageManager) {
-        super(config, PersistenceNope.class, connector, storageManager);
+    public FundingOnTimeManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
+        super(storageManager.createProfilerManager(FundingMangerConfiguration.class, PersistentNope.class), connector, TypeManager.FUNDING_ON_TIME);
     }
 
     @Override
@@ -61,13 +60,10 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
         });
     }
 
-
-
     @Override
     protected void internalStop() {
         connector.wuDeleteEventAccountUpdate(null);
     }
-
 
     private void searchFunding(){
         var config = getConfig();
@@ -178,8 +174,8 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
 
         symbols.forEach(symbolTarget -> symbolsPending.put(symbolTarget.getTarget().symbol(), symbolTarget));
         symbols.forEach(SymbolTarget::openPosition);
-        // Está entre 225 a 250
-        parkUntil(fundingTimeLocal/* + 249*/); // 40 no funciona, 60 bien
+        // Espera hasta la hora exacta
+        parkUntil(fundingTimeLocal);
     }
 
 
@@ -262,7 +258,7 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
         }
 
         public void finish(){
-            executor.schedule(this::closePosition, config.windowSize + TimeUnit.SECONDS.toMillis(5), TimeUnit.MILLISECONDS);
+            executor.schedule(this::closePosition, TimeUnit.SECONDS.toMillis(5), TimeUnit.MILLISECONDS);
             connector.wfRemoveBookTicker(null, target.symbol());
         }
 
@@ -323,11 +319,12 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
                                         Log.info("Repuesta: %s", jsonNode);
                                         Log.info("Enviando orden de emergencia");
                                         connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true);
-                                        connector.checkWebSockets();
                                     }
                                     order = null;
-                                }catch (NullPointerException e) {
-                                    Log.error("Order: %s", jsonNode.toString());
+                                }catch (Exception e) {
+                                    Log.exception(e);
+                                }finally {
+                                    connector.checkWebSockets();
                                 }
                             }));
             }catch (Exception e){
@@ -354,15 +351,20 @@ public final class FundingOnTimeManager extends BaseManager<FundingOnTimeManager
                     "close-" + Utils.uuidToBase36(UUID.randomUUID()),
                     true
             ).thenAccept((jsonNode -> {
-                int status = jsonNode.get("status").asInt();
-                Log.info("Order status: %d, symbol=%s",
-                        status,
-                        order.symbol()
-                );
-                if (status != 200){
-                    Log.info("Repuesta: %s", jsonNode);
-                    Log.info("Enviando orden de emergencia");
-                    connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true);
+                try {
+                    int status = jsonNode.get("status").asInt();
+                    Log.info("Order status: %d, symbol=%s",
+                            status,
+                            order.symbol()
+                    );
+                    if (status != 200){
+                        Log.info("Repuesta: %s", jsonNode);
+                        Log.info("Enviando orden de emergencia");
+                        connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true);
+                    }
+                } catch (Exception e) {
+                    Log.exception(e);
+                } finally {
                     connector.checkWebSockets();
                 }
             }));

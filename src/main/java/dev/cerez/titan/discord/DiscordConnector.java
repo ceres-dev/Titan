@@ -2,6 +2,7 @@ package dev.cerez.titan.discord;
 
 import dev.cerez.titan.Titan;
 import dev.cerez.titan.core.BaseConfig;
+import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.Configurable;
 import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Switch;
@@ -23,8 +24,8 @@ public class DiscordConnector implements Switch, Configurable<DiscordConnector.D
     private JDA jda;
 
 
-    public DiscordConnector(@NotNull Provider<DiscordConfig> storageManager) {
-        this.config = storageManager.get();
+    public DiscordConnector(@NotNull StorageManager storageManager) {
+        this.config = storageManager.getConfig(DiscordConfig.class).getProvider().get();
     }
 
     @SneakyThrows

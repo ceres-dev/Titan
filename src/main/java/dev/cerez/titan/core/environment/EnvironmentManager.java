@@ -3,17 +3,16 @@ package dev.cerez.titan.core.environment;
 import dev.cerez.titan.Titan;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.core.BaseManager;
+import dev.cerez.titan.core.ManagerStrategy;
 import dev.cerez.titan.core.ConfigNope;
-import dev.cerez.titan.core.PersistenceNope;
+import dev.cerez.titan.core.PersistentNope;
 import dev.cerez.titan.core.exception.ConfigMalformatException;
 import dev.cerez.titan.core.exception.ManagerIsNotFoundException;
 import dev.cerez.titan.core.event.events.EnvironmentManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.storage.StorageManagerJsonLocal;
-import dev.cerez.titan.core.strategy.Manager;
-import dev.cerez.titan.utils.Provider;
+import dev.cerez.titan.core.Manager;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.Contract;
@@ -25,14 +24,14 @@ import java.util.*;
 
 @Setter
 @Getter
-public final class EnvironmentManager extends BaseManager<ConfigNope, PersistenceNope, BinanceConnector, EnvironmentManagerListener> {
+public final class EnvironmentManager extends ManagerStrategy<ConfigNope, PersistentNope, BinanceConnector, EnvironmentManagerListener> {
 
     private UUID idOwner;
-    private final Map<UUID, Manager<?>> manager = new HashMap<>();
+    private final Map<UUID, Manager<?, ?>> manager = new HashMap<>();
     private final EnvironmentPort port = new EnvironmentPort();
 
-    private EnvironmentManager(@NotNull Provider<ConfigNope> config, @NotNull BinanceConnector binanceConnector, @NotNull StorageManager storageManager, @NotNull UUID idOwner) {
-        super(config, PersistenceNope.class, binanceConnector, storageManager);
+    private EnvironmentManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector binanceConnector, @NotNull UUID idOwner) {
+        super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), binanceConnector, TypeManager.ENVIRONMENT);
         this.idOwner = idOwner;
     }
 
@@ -40,7 +39,7 @@ public final class EnvironmentManager extends BaseManager<ConfigNope, Persistenc
     public static @NotNull EnvironmentManager create(@NotNull UUID idUser) {
         StorageManager storageManager = new StorageManagerJsonLocal(idUser);
         BinanceConnector binanceConnector = new BinanceConnector(
-                storageManager.getProviderOrSaveConfig(
+                storageManager.loadOrSaveDefault(
                         BaseConnector.ConnectorConfig.builder()
                                 .isTestNet(Titan.IS_TESTNET)
                                 .maxStreamsPerSubscribe(100)
@@ -48,9 +47,8 @@ public final class EnvironmentManager extends BaseManager<ConfigNope, Persistenc
                 )
         );
         var environment = new EnvironmentManager(
-                Provider.from(new ConfigNope()),
-                binanceConnector,
                 storageManager,
+                binanceConnector,
                 idUser
         );
         environment.start();
@@ -68,7 +66,7 @@ public final class EnvironmentManager extends BaseManager<ConfigNope, Persistenc
 
     @Override
     public @NotNull TypeManager getTypeManager() {
-        return TypeManager.FUNDING;
+        return TypeManager.FUNDING_NEUTRAL;
     }
 
     public class EnvironmentPort {
@@ -92,7 +90,7 @@ public final class EnvironmentManager extends BaseManager<ConfigNope, Persistenc
         public UUID createManager(@NotNull ManagerBuilder managerBuilder) throws ManagerIsNotFoundException  {
             UUID uuid = UUID.randomUUID();
             try {
-                Manager<?> manager = managerBuilder.manager.getConstructor(Object.class, BinanceConnector.class).newInstance(managerBuilder.config, connector);
+                Manager<?, ?> manager = managerBuilder.manager.getConstructor(Object.class, BinanceConnector.class).newInstance(managerBuilder.config, connector);
                 manager.setName(managerBuilder.name);
                 EnvironmentManager.this.manager.put(uuid, manager);
             } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
@@ -102,8 +100,8 @@ public final class EnvironmentManager extends BaseManager<ConfigNope, Persistenc
             return uuid;
         }
 
-        public @NotNull Set<Manager<?>> getManagers() {
-            return new HashSet<>(manager.values());
+        public @NotNull Set<Manager<?, ?>> getStrategy() {
+            return new HashSet<>(manager.values().stream().filter(m -> m instanceof ManagerStrategy<?,?,?,?>).toList());
         }
 
         public long getLocalTimestamp() {
@@ -130,6 +128,6 @@ public final class EnvironmentManager extends BaseManager<ConfigNope, Persistenc
             return connector.fGetPositions();
         }
 
-        public record ManagerBuilder(Class<? extends Manager<?>> manager, Object config, String name) {}
+        public record ManagerBuilder(Class<? extends Manager<?, ?>> manager, Object config, String name) {}
     }
 }

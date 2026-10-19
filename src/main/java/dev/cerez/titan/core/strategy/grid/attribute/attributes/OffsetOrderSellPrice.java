@@ -11,7 +11,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 public class OffsetOrderSellPrice extends BaseAttribute {
 
@@ -27,10 +26,10 @@ public class OffsetOrderSellPrice extends BaseAttribute {
         for (OrderPreview order : context.sells()) {
             order.setPrice(order.getPrice().add(offset));
         }
-        GridManager.GridManagerConfiguration config = context.context().config();
+        GridManager.GridManagerConfiguration config = context.context().getConfig();
         Utils.getMin(context.sells()).ifPresent(order -> {
             BigDecimal stepSize = config.getStepSize();
-            if (order.getPrice().subtract(stepSize).compareTo(context.context().currentPrice()) >= 0) {
+            if (order.getPrice().subtract(stepSize).compareTo(context.context().getCurrentPrice()) >= 0) {
                 context.orderUse().add(new OrderPreview(config.getBaseAsset() + config.getQuoteAsset(),
                         order.getPrice().subtract(stepSize),
                         config.getSizePerOrderBaseAsset(),

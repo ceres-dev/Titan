@@ -8,6 +8,7 @@ import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.model.*;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
+import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.Order;
 import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Utils;
@@ -49,8 +50,8 @@ public final class BinanceConnector extends BaseConnector {
 
     private String listenKey = null;
 
-    public BinanceConnector(Provider<ConnectorConfig> config) {
-        super(config);
+    public BinanceConnector(StorageManager storageManager) {
+        super(storageManager.getConfig(ConnectorConfig.class).getProvider());
     }
 
     public BinanceConnector(ConnectorConfig config) {
@@ -238,7 +239,6 @@ public final class BinanceConnector extends BaseConnector {
                     Double.parseDouble(node.get("volume").asText())
             ));
         }
-
         return result;
     }
 
