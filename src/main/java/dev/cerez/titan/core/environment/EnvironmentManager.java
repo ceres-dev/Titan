@@ -11,7 +11,7 @@ import dev.cerez.titan.core.exception.ManagerIsNotFoundException;
 import dev.cerez.titan.core.event.events.EnvironmentManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.StorageManager;
-import dev.cerez.titan.storage.StorageManagerJsonLocal;
+import dev.cerez.titan.storage.storages.StorageManagerJsonLocal;
 import dev.cerez.titan.core.Manager;
 import lombok.Getter;
 import lombok.Setter;

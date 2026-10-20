@@ -10,9 +10,8 @@ import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularE
 import dev.cerez.titan.core.strategy.triangular.ExecutorCycles;
 import dev.cerez.titan.core.strategy.triangular.utils.Loader;
 import dev.cerez.titan.storage.StorageManager;
-import dev.cerez.titan.storage.StorageManagerJsonLocal;
-import dev.cerez.titan.storage.StorageManagerMemory;
-import dev.cerez.titan.utils.Provider;
+import dev.cerez.titan.storage.storages.StorageManagerJsonLocal;
+import dev.cerez.titan.storage.storages.StorageManagerMemory;
 import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.telemtry.Telemetry;
 import org.jetbrains.annotations.NotNull;
@@ -47,16 +46,17 @@ public class TriangularCommand extends BaseCommand {
                 .engine(SearchTriangularEngineJava.class)
                 .build();
 
-
-
         Telemetry telemetry =           new Telemetry(telemetryConfig);
         Loader loader =                 new Loader();
         StorageManager storageManager = new StorageManagerMemory(Utils.getRootId());
-        Connector connector =           new BinanceConnector(new StorageManagerJsonLocal(Utils.getRootId()));
+        StorageManagerJsonLocal storageManagerJsonLocal = new StorageManagerJsonLocal(Utils.getRootId());
+        storageManagerJsonLocal.setConfigProfilerName(BaseConnector.ConnectorConfig.class, "triangular");
+        Connector connector =           new BinanceConnector(storageManagerJsonLocal);
         ExecutorCycles executorCycles = new ExecutorCycles(configExecutor, connector);
 
         connector.setTelemetry(telemetry);
         connector.start();
+        storageManager.saveIfNotExits(triangularManagerConfig);
         TriangularManager manager = new TriangularManager(storageManager, connector);
         manager.setTelemetry(telemetry);
         manager.setOnOpportunities(executorCycles::onOpportunities);

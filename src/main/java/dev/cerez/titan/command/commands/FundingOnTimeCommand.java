@@ -6,8 +6,8 @@ import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
 import dev.cerez.titan.storage.StorageManager;
-import dev.cerez.titan.storage.StorageManagerJsonLocal;
-import dev.cerez.titan.storage.StorageManagerMemory;
+import dev.cerez.titan.storage.storages.StorageManagerJsonLocal;
+import dev.cerez.titan.storage.storages.StorageManagerMemory;
 import dev.cerez.titan.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 
@@ -31,10 +31,10 @@ public class FundingOnTimeCommand extends BaseCommand {
         connector.wuCreateEventOrderTradeUpdate((a) -> {
             Log.info(a.toString());
         }, null, true);
-        FundingOnTimeManager.FundingMangerConfiguration config = FundingOnTimeManager.FundingMangerConfiguration.builder()
+        FundingOnTimeManager.FundingManagerConfig config = FundingOnTimeManager.FundingManagerConfig.builder()
                 .sendTrade(true)
                 .build();
-        FundingOnTimeManager fundingManger = new FundingOnTimeManager(storageMemory.saveIfNotExits(config),connector);
+        FundingOnTimeManager fundingManger = new FundingOnTimeManager(storageMemory.saveIfNotExits(config), connector);
         fundingManger.start();
     }
 }

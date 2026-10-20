@@ -1,12 +1,12 @@
 package dev.cerez.titan.core.managers;
 
 import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.core.BaseManager;
-import dev.cerez.titan.core.ConfigNope;
-import dev.cerez.titan.core.Manager;
-import dev.cerez.titan.core.PersistentNope;
+import dev.cerez.titan.core.*;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.StorageManager;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
@@ -15,13 +15,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class BalanceMaxRiskManager extends BaseManager<ConfigNope, PersistentNope, BinanceConnector> {
+public class BalanceMaxRiskManager extends BaseManager<BalanceMaxRiskManager.BalanceMaxRiskManagerConfig, PersistentNope, BinanceConnector> {
 
     private final HashMap<String, BigDecimal> balanceRisk = new HashMap<>();
 
-    public BalanceMaxRiskManager(StorageManager storageManager, BinanceConnector connector, Map<String, BigDecimal> balance) {
-        super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), connector, TypeManager.ENVIRONMENT);
-        balanceRisk.putAll(normalize(balance));
+    public BalanceMaxRiskManager(@NotNull StorageManager storageManager, BinanceConnector connector) {
+        super(storageManager.createProfilerManager(BalanceMaxRiskManagerConfig.class, PersistentNope.class), connector, TypeManager.ENVIRONMENT);
+        balanceRisk.putAll(normalize(getConfig().getBalanceDivision()));
     }
 
     public Map<String, BigDecimal> futuroBalance(Manager<?, ?> manager) {
@@ -68,5 +68,12 @@ public class BalanceMaxRiskManager extends BaseManager<ConfigNope, PersistentNop
     @Override
     protected void internalStop() {
 
+    }
+
+    @Data
+    @Builder
+    @EqualsAndHashCode(callSuper = true)
+    public static class BalanceMaxRiskManagerConfig extends BaseConfig {
+        private final Map<String, BigDecimal> balanceDivision;
     }
 }

@@ -30,12 +30,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
-public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeManager.FundingMangerConfiguration, PersistentNope, BinanceConnector, FundingOnTimeManagerListener> {
+public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeManager.FundingManagerConfig, PersistentNope, BinanceConnector, FundingOnTimeManagerListener> {
 
     private final ConcurrentMap<String, SymbolTarget> symbolsPending = new ConcurrentHashMap<>();
 
     public FundingOnTimeManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
-        super(storageManager.createProfilerManager(FundingMangerConfiguration.class, PersistentNope.class), connector, TypeManager.FUNDING_ON_TIME);
+        super(storageManager.createProfilerManager(FundingManagerConfig.class, PersistentNope.class), connector, TypeManager.FUNDING_ON_TIME);
     }
 
     @Override
@@ -232,7 +232,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
     @Data
     @EqualsAndHashCode(callSuper = true)
     @SuperBuilder
-    public static class FundingMangerConfiguration extends BaseConfig {
+    public static class FundingManagerConfig extends BaseConfig {
         @Builder.Default private BigDecimal maxQuantityQuote = new BigDecimal("6");
         @Builder.Default private BigDecimal fundingRateMin = BigDecimal.valueOf(0.002);
         @Builder.Default private boolean sendTrade = false;
@@ -243,7 +243,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
     @RequiredArgsConstructor
     public class SymbolTarget {
 
-        private final FundingMangerConfiguration config;
+        private final FundingManagerConfig config;
         private final Symbol symbol;
         private final BinanceConnector.FundingRate target;
 

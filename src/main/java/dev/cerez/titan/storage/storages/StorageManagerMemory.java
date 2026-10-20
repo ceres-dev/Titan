@@ -1,7 +1,11 @@
-package dev.cerez.titan.storage;
+package dev.cerez.titan.storage.storages;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.BasePersistent;
+import dev.cerez.titan.storage.BaseStorageManager;
+import dev.cerez.titan.storage.Storage;
 import dev.cerez.titan.utils.Nameable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +18,8 @@ import java.util.Map;
 import java.util.UUID;
 
 public class StorageManagerMemory extends BaseStorageManager implements Serializable {
+
+    private final Gson gson = new GsonBuilder().create();
 
     public StorageManagerMemory(UUID uuid) {
         super(uuid);
@@ -35,7 +41,6 @@ public class StorageManagerMemory extends BaseStorageManager implements Serializ
     public class StorageJsonLocal<O extends Nameable> implements Storage<O> {
 
         private final Map<String, O> map = new HashMap<>();
-        private final UUID idUser = StorageManagerMemory.this.idUser;
         private final Class<O> clazz;
         private String profilerName = "default";
 

@@ -9,10 +9,8 @@ import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.core.strategy.grid.GridManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
-import dev.cerez.titan.storage.StorageManager;
-import dev.cerez.titan.storage.StorageManagerJsonLocal;
-import dev.cerez.titan.storage.StorageManagerMemory;
-import dev.cerez.titan.utils.Provider;
+import dev.cerez.titan.storage.storages.StorageManagerJsonLocal;
+import dev.cerez.titan.storage.storages.StorageManagerMemory;
 import dev.cerez.titan.utils.Utils;
 import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
@@ -35,7 +33,11 @@ public class GridCommand extends BaseCommand {
         BinanceConnector binanceConnector = new BinanceConnector(storageManagerJsonLocal.saveIfNotExits(BaseConnector.ConnectorConfig.builder().build()));
         binanceConnector.start();
 
-        BalanceMaxRiskManager balanceMaxRiskManager = new BalanceMaxRiskManager(storageManagerMemory, binanceConnector, Map.of("SPY", BigDecimal.ONE));
+        BalanceMaxRiskManager.BalanceMaxRiskManagerConfig balanceMaxRiskManagerConfig = BalanceMaxRiskManager.BalanceMaxRiskManagerConfig.builder()
+                .balanceDivision(Map.of("SPY", BigDecimal.ONE))
+                .build();
+
+        BalanceMaxRiskManager balanceMaxRiskManager = new BalanceMaxRiskManager(storageManagerMemory.saveConfig(balanceMaxRiskManagerConfig), binanceConnector);
 
         GridManager.GridManagerConfiguration gridConfig = GridManager.GridManagerConfiguration.builder()
                 .baseAsset("SPY")
@@ -54,7 +56,7 @@ public class GridCommand extends BaseCommand {
         gridManager.setName("SPY");
         gridManager.start();
 
-        FundingOnTimeManager.FundingMangerConfiguration fundingConfig = FundingOnTimeManager.FundingMangerConfiguration.builder()
+        FundingOnTimeManager.FundingManagerConfig fundingConfig = FundingOnTimeManager.FundingManagerConfig.builder()
                 .sendTrade(true)
                 .build();
         FundingOnTimeManager fundingOnTimeManager = new FundingOnTimeManager(storageManagerMemory.saveConfig(fundingConfig), binanceConnector);

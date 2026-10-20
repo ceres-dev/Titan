@@ -4,7 +4,6 @@ import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.BasePersistent;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
@@ -18,8 +17,6 @@ public abstract class BaseStorageManager implements StorageManager {
     protected final Map<Class<BasePersistent>, Storage<BasePersistent>> persistence = new HashMap<>();
     @Getter
     protected final UUID idUser;
-    @Getter @Setter
-    protected String defaultProfilerName;
 
     @Override
     @SuppressWarnings("unchecked")

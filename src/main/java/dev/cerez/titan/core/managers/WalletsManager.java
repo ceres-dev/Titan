@@ -12,7 +12,7 @@ import org.jspecify.annotations.NonNull;
 public class WalletsManager extends BaseManager<ConfigNope, PersistentNope, BinanceConnector> {
 
     protected WalletsManager(@NotNull StorageManager storageManager, @NonNull BinanceConnector connector) {
-        super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), connector, TypeManager.BALANCE_MAX_RISK);
+        super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), connector, TypeManager.WALLETS);
     }
 
     @Override

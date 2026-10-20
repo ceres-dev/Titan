@@ -6,11 +6,8 @@ import dev.cerez.titan.utils.ProviderSable;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
-import java.util.UUID;
 
 public interface Storage<O extends Nameable> {
-
-    UUID getIdUser();
 
     void save(@NotNull O object);
 
@@ -59,7 +56,6 @@ public interface Storage<O extends Nameable> {
         save((O) object);
     }
 
-    @SuppressWarnings("unchecked")
     default Provider<O> getProviderOrSave(@NotNull O p){
         Provider<O> loaded = getProvider();
         if(loaded == null){

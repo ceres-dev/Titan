@@ -327,9 +327,6 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
     ) {
 
         ArbitrageEdge[] outgoing = outgoingByFromAsset[currentAsset.hashCode()];
-        if (outgoing == null) {
-            return;
-        }
 
         int nextLength = sizePath.value + 1;
         for (ArbitrageEdge edge : outgoing) {

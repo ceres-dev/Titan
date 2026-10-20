@@ -6,6 +6,7 @@ import dev.cerez.titan.core.Manager;
 import dev.cerez.titan.core.PersistentNope;
 import dev.cerez.titan.core.environment.EnvironmentManager;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
+import dev.cerez.titan.core.managers.WalletsManager;
 import dev.cerez.titan.core.strategy.funding.neutral.FundingNeutralManager;
 import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
 import dev.cerez.titan.core.strategy.grid.GridManager;
@@ -17,11 +18,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum TypeManager {
     GRID(GridManager.class, GridManager.GridManagerConfiguration.class, PersistentNope.class),
-    FUNDING_ON_TIME(FundingOnTimeManager.class, FundingOnTimeManager.FundingMangerConfiguration.class, PersistentNope.class),
+    FUNDING_ON_TIME(FundingOnTimeManager.class, FundingOnTimeManager.FundingManagerConfig.class, PersistentNope.class),
     FUNDING_NEUTRAL(FundingNeutralManager.class, FundingNeutralManager.FundingManagerConfiguration.class, FundingNeutralManager.FundingManagerPersistan.class),
     FUNDING_TRIANGULAR(TriangularManager.class, TriangularManager.TriangularManagerConfiguration.class, PersistentNope.class),
     ENVIRONMENT(EnvironmentManager.class, ConfigNope.class, PersistentNope.class),
-    BALANCE_MAX_RISK(BalanceMaxRiskManager.class, ConfigNope.class, PersistentNope.class),;
+    BALANCE_MAX_RISK(BalanceMaxRiskManager.class, ConfigNope.class, PersistentNope.class),
+    WALLETS(WalletsManager.class, ConfigNope.class, PersistentNope.class),;
 
     private final Class<? extends Manager<?, ?>> clazzManager;
     private final Class<? extends BaseConfig> clazzConfig;
