@@ -93,14 +93,34 @@
         </header>
         <div class="windowContent">
             <h2>Posiciones</h2>
+            <table >
+                <thead>
+                <tr>
+                    <th>Símbolo</th>
+                    <th>quantity</th>
+                    <th>entryPriceAvg</th>
+                    <th>pnlUnrealize</th>
+                </tr>
+                </thead>
+                <tbody id="positions">
+                <tr>
+                    <td><div class="cliLoader"></div></td>
+                    <td><div class="cliLoader"></div></td>
+                    <td><div class="cliLoader"></div></td>
+                    <td><div class="cliLoader"></div></td>
+                </tr>
+                </tbody>
+            </table>
         </div>
     </section>
 </section>
 <div class="rgbEffect"></div>
+<script src="/script/utils.js"></script>
 <script src="/script/requestBalance.js"></script>
 <script src="/script/requestStrategy.js"></script>
 <script src="/script/requestTime.js"></script>
 <script src="/script/requestLogs.js"></script>
+<script src="/script/requestPositions.js"></script>
 
 <script src="/script/window.js"></script>
 <script src="../static/script/window.js"></script>

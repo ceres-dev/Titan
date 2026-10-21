@@ -23,6 +23,7 @@ async function loadTime() {
     } catch (error) {
         console.error("Error obteniendo el tiempo:", error);
     }
+    setInterval(renderTimes, 100);
 }
 
 function renderTimes() {
@@ -41,15 +42,12 @@ function renderTimes() {
 function renderTime(elementId, time, name) {
     const clock = document.getElementById(elementId);
 
-    const pad = (num) => String(num).padStart(2, "0");
-
-    const hours = pad(time.getHours());
-    const minutes = pad(time.getMinutes());
-    const seconds = pad(time.getSeconds());
+    const hours = utils.pad(time.getHours());
+    const minutes = utils.pad(time.getMinutes());
+    const seconds = utils.pad(time.getSeconds());
 
     clock.textContent = `${name} ${hours}:${minutes}:${seconds}`;
 }
 
 // Actualizar los relojes cada segundo
-setInterval(renderTimes, 100);
 loadTime();

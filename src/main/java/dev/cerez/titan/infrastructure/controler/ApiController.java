@@ -1,6 +1,7 @@
 package dev.cerez.titan.infrastructure.controler;
 
 import dev.cerez.titan.Titan;
+import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.infrastructure.model.Balance;
 import dev.cerez.titan.infrastructure.model.LogRecord;
@@ -16,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import javax.swing.text.Position;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -52,6 +54,11 @@ public class ApiController {
     @GetMapping("/logs")
     public ResponseEntity<List<LogRecord>> getLogs(@AuthenticationPrincipal CustomUserDetails user) {
         return ResponseEntity.ok(getPort(user).getLogs().stream().map(i -> new LogRecord(Utils.cleanAnsi(i.getMessage()), i.getThreadName(), i.getLevel().toString(), i.getTimeStamp())).toList());
+    }
+
+    @GetMapping("/positions")
+    public ResponseEntity<List<BinanceConnector.FuturePosition>> getPositions(@AuthenticationPrincipal CustomUserDetails user) {
+        return ResponseEntity.ok(getPort(user).getPositions());
     }
 
     @PostMapping("/command")

@@ -152,6 +152,23 @@ li:last-child{
     margin-bottom: 0.5rem;
 }
 
+/* Tablas */
+table{
+    border-spacing: 0;
+}
+th, td{
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+    border-left: 3px solid var(--main-color);
+}
+th:last-child, td:last-child{
+    padding-right: 0;
+}
+th:first-child, td:first-child {
+    padding-left: 0;
+    border-left: none;
+}
+
 /* Effects */
 .rgbEffect {
     position: fixed;

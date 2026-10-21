@@ -534,8 +534,10 @@ public final class BinanceConnector extends BaseConnector {
         params.put("symbol", symbol.toUpperCase(Locale.US));
         JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v3/positionRisk", params);
         for (JsonNode node : raw) {
-            if (node.get("symbol").asText().equals(symbol.toUpperCase(Locale.US))) {
+            String s = node.get("symbol").asText();
+            if (s.equals(symbol.toUpperCase(Locale.US))) {
                 return new FuturePosition(
+                        s,
                         new BigDecimal(node.get("positionAmt").asText()),
                         new BigDecimal(node.get("entryPrice").asText()),
                         new BigDecimal(node.get("unRealizedProfit").asText())
@@ -550,6 +552,7 @@ public final class BinanceConnector extends BaseConnector {
         JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v3/positionRisk");
         for (JsonNode node : raw) {
             result.add(new FuturePosition(
+                    node.get("symbol").asText(),
                     new BigDecimal(node.get("positionAmt").asText()),
                     new BigDecimal(node.get("entryPrice").asText()),
                     new BigDecimal(node.get("unRealizedProfit").asText())
@@ -1029,7 +1032,7 @@ public final class BinanceConnector extends BaseConnector {
 
     public record Convert(double fromMin, double fromMax, double toMin, double toMax) {}
 
-    public record FuturePosition(@NotNull BigDecimal quantity, @NotNull BigDecimal entryPriceAvg, @NotNull BigDecimal pnlUnrealize) {
+    public record FuturePosition(@NotNull String symbol, @NotNull BigDecimal quantity, @NotNull BigDecimal entryPriceAvg, @NotNull BigDecimal pnlUnrealize) {
         @Contract(pure = true)
         public @NotNull SidePosition sidePosition() {
             if (quantity.signum() == 1) return SidePosition.LONG;

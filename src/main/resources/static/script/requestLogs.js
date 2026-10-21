@@ -21,17 +21,15 @@ function renderLogs(elementId, logs) {
         logs.forEach((log) => {
             const li = document.createElement("li");
             const strong = document.createElement("code");
-            console.log(log)
             li.classList.add("log");
             li.appendChild(strong);
 
-            const pad = (num) => String(num).padStart(2, "0");
             const date = new Date(log.time)
 
-            const hours = pad(date.getHours());
-            const minutes = pad(date.getMinutes());
-            const seconds = pad(date.getSeconds());
-            const milliseconds = pad(String(date.getMilliseconds()).padStart(3, "0"));
+            const hours = utils.pad(date.getHours());
+            const minutes = utils.pad(date.getMinutes());
+            const seconds = utils.pad(date.getSeconds());
+            const milliseconds = utils.padCustom(date.getMilliseconds(), 3);
 
             const levelSpan = document.createElement("span");
 
@@ -54,11 +52,7 @@ function renderLogs(elementId, logs) {
             threadSpan.textContent = log.thread;
             threadSpan.style.color = "#aaf"
 
-            const string1 = `${hours}:${minutes}:${seconds}:${milliseconds} [`;
-            const string2 = `] [`;
-            const string3 = `]: ${log.message}`;
-
-            li.append(string1, threadSpan, string2, levelSpan, string3);
+            li.append(`${hours}:${minutes}:${seconds}:${milliseconds} [`, threadSpan, `] [`, levelSpan, `]: ${log.message}`);
 
             list.appendChild(li);
         });

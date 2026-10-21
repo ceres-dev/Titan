@@ -12,3 +12,7 @@ body{
 #logsWindow{
     grid-column: 1 / 3;
 }
+#positionWindow{
+    grid-column: 2 / 4;
+    grid-row: 2 / 3;
+}
