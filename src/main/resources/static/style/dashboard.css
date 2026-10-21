@@ -6,8 +6,9 @@ body{
 }
 .logs{
     height: 300px;
-    width: 800px;
-
     overflow: scroll;
     white-space: nowrap;
+}
+#logsWindow{
+    grid-column: 1 / 3;
 }

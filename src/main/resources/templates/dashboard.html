@@ -20,7 +20,7 @@
         <p id="timeExchange">Exchange --:--:--</p>
     </nav>
 </header>
-<section class="mainSections" style="display: grid; grid-template-columns: 1fr 1fr;">
+<section class="mainSections" style="display: grid; grid-template-columns: 1fr 1fr 1fr;">
     <section class="window" id="logsWindow">
         <header class="windowHeader">
             <span>titan://root/logs</span>
@@ -28,11 +28,11 @@
         </header>
         <div class="windowContent">
             <h2>Logs</h2>
-            <section class="box logs" >
+            <div class="box logs" >
                 <ul id="logs">
                     <div class="cliLoader"></div>
                 </ul>
-            </section>
+            </div>
         </div>
     </section>
 
@@ -86,6 +86,15 @@
             <h2>Telemetría</h2>
         </div>
     </section>
+    <section class="window" id="positionWindow">
+        <header class="windowHeader">
+            <span>titan://root/positions</span>
+            <button class="windowCloser">X</button>
+        </header>
+        <div class="windowContent">
+            <h2>Posiciones</h2>
+        </div>
+    </section>
 </section>
 <div class="rgbEffect"></div>
 <script src="/script/requestBalance.js"></script>
@@ -100,6 +109,8 @@
     createWindow({id: "balanceWindow",});
     createWindow({id: "strategyWindow",});
     createWindow({id: "telemetryWindow",});
+    createWindow({id: "positionWindow",});
+
 </script>
 
 </body>

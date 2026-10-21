@@ -26,7 +26,7 @@ function renderStrategy(elementId, strategies) {
             strong.textContent = strategy.label;
 
             li.appendChild(strong);
-            li.append(` ${strategy.isRunning}`);
+            li.append(`${strategy.isRunning}`);
             li.append(button);
 
             list.appendChild(li);

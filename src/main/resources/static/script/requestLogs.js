@@ -31,10 +31,34 @@ function renderLogs(elementId, logs) {
             const hours = pad(date.getHours());
             const minutes = pad(date.getMinutes());
             const seconds = pad(date.getSeconds());
-            const milliseconds = pad(date.getMilliseconds());
+            const milliseconds = pad(String(date.getMilliseconds()).padStart(3, "0"));
 
+            const levelSpan = document.createElement("span");
 
-            li.append(` ${hours}:${minutes}:${seconds}:${milliseconds} [${log.thread}] [${log.level}]: ${log.message}`);
+            switch (log.level) {
+                case "INFO":
+                    levelSpan.style.color = "green";
+                    break;
+                case "WARN":
+                    levelSpan.style.color = "yellow";
+                    break;
+                case "ERROR":
+                    levelSpan.style.color = "red";
+                    break;
+                default:
+                    levelSpan.style.color = "gray";
+            }
+            levelSpan.textContent = log.level;
+
+            const threadSpan = document.createElement("span");
+            threadSpan.textContent = log.thread;
+            threadSpan.style.color = "#aaf"
+
+            const string1 = `${hours}:${minutes}:${seconds}:${milliseconds} [`;
+            const string2 = `] [`;
+            const string3 = `]: ${log.message}`;
+
+            li.append(string1, threadSpan, string2, levelSpan, string3);
 
             list.appendChild(li);
         });
