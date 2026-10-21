@@ -9,6 +9,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 
 public class CommandHander implements Switch {
 
@@ -49,6 +51,7 @@ public class CommandHander implements Switch {
         running = true;
         executor.execute(() -> {
             int i = 0;
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(100));
             for (Map.Entry<String, String> entry : aliases.entrySet()) {
                 int index = i++;
                 System.out.printf("\t[%d/%s]: %s%n", index, entry.getKey(), entry.getValue());

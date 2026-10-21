@@ -353,21 +353,25 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
             ).thenAccept((jsonNode -> {
                 try {
                     int status = jsonNode.get("status").asInt();
-                    Log.info("Order status: %d, symbol=%s",
-                            status,
-                            order.symbol()
-                    );
-                    if (status != 200){
-                        Log.info("Repuesta: %s", jsonNode);
-                        Log.info("Enviando orden de emergencia");
-                        connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true);
+                    if (order != null){
+                        Log.info("Order status: %d, symbol=%s",
+                                status,
+                                order.symbol()
+                        );
+                        if (status != 200){
+                            Log.info("Repuesta: %s", jsonNode);
+                            Log.info("Enviando orden de emergencia");
+                            connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true);
+                        }
+                    }else {
+                        Log.info("Posición Cerrada Repuesta: %s", jsonNode);
                     }
                 } catch (Exception e) {
                     Log.exception(e);
                 } finally {
                     connector.checkWebSockets();
                 }
-            }));
+            })).join();
             Log.info("Posición Cerrada");
             // Una pequeña espera para que se actualize la cache
             LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));

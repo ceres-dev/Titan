@@ -53,7 +53,7 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
                 new GridCommand(this),
                 new FundingOnTimeCommand(this)
         );
-        discordConnector = new DiscordConnector(storageManager.saveConfig(DiscordConnector.DiscordConfig.builder().build()));
+        discordConnector = new DiscordConnector(storageManager.saveIfNotExits(DiscordConnector.DiscordConfig.builder().build()));
     }
 
     @Contract(pure = true)

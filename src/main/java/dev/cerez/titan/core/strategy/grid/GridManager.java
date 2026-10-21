@@ -36,10 +36,9 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
-public final class GridManager extends ManagerStrategy<GridManager.GridManagerConfiguration, PersistentNope, BinanceConnector, GridManagerListener> implements StatusProfiler {
+public final class GridManager extends ManagerStrategy<GridManager.GridManagerConfig, PersistentNope, BinanceConnector, GridManagerListener> implements StatusProfiler {
 
     @Nullable private BinanceConnector.OrderFuture lastOrderFilled = null;
     private volatile Future<?> waitForUpdate = CompletableFuture.runAsync(() -> {});
@@ -52,7 +51,7 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
     @NotNull private final ApplyAttributes applyAttributes;
 
     public GridManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
-        super(storageManager.createProfilerManager(GridManagerConfiguration.class, PersistentNope.class), connector, TypeManager.GRID);
+        super(storageManager.createProfilerManager(GridManagerConfig.class, PersistentNope.class), connector, TypeManager.GRID);
         this.symbol = getConfig().baseAsset + getConfig().quoteAsset;
         this.priceAlarm = new PriceAlarm(connector, symbol);
         this.gridBuilder = new GridBuilder(getConfig());
@@ -182,8 +181,8 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
 //        }));
         applyAttributes.add(new CallOnUpdate((order, c) -> {
             long amount = order.stream().filter(o -> !o.isReduceOnly()).count();
-            GridManagerConfiguration config = c.getConfig();
-            if (amount > 5) {
+            GridManagerConfig config = c.getConfig();
+            if (amount > config.getMinOrderSafe()) {
                 if (config.getStepSizePriority() != null) {
                     config.setStepSizePriority(null);
                     Log.info("Disminuyendo StepSize=%.4f", config.getStepSize());
@@ -256,6 +255,8 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         CompletableFuture<BigDecimal> balanceFuture = CompletableFuture.supplyAsync(() -> fGetBalanceTotal().getOrDefault(getConfig().quoteAsset, BigDecimal.ZERO));
         CompletableFuture<BinanceConnector.BookTick> bookTickerFuture = CompletableFuture.supplyAsync(() -> connector.fGetBookTick(symbol));
 
+        GridManagerConfig config = getConfig();
+
         BinanceConnector.FuturePosition position = positionFuture.join();
 //        BigDecimal currentPrice = currentPriceFuture.join();
         List<BinanceConnector.OrderFuture> orders = ordersFuture.join();
@@ -272,9 +273,9 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         BigDecimal balanceUse = position == null
                 ? balance
                 // En caso de que tenga una posición con PNL negativo se descuenta del margen usable
-                : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO)).multiply(new BigDecimal(getConfig().getLeverage()));
+                : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO)).multiply(new BigDecimal(config.getLeverage()));
 
-        Context context = new Context(balanceUse, currentPrice, bookTicker, getConfig(), position, orders);
+        Context context = new Context(balanceUse, currentPrice, bookTicker, config, position, orders);
 
         List<OrderPreview> orderPreviews = gridBuilder.buildGrid(context);
         List<OrderPreview> desiredOrders = applyAttributes.apply(context, orderPreviews);
@@ -371,7 +372,7 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
     @Data
     @SuperBuilder
     @EqualsAndHashCode(callSuper = true)
-    public static class GridManagerConfiguration extends BaseConfig {
+    public static class GridManagerConfig extends BaseConfig {
         @NotNull private final String baseAsset;
         @NotNull private final String quoteAsset;
         @Getter(AccessLevel.NONE) @NotNull private final BigDecimal stepSizeHighActivity;
@@ -379,20 +380,23 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         @Getter(AccessLevel.NONE) @NotNull private final BigDecimal stepSizeLowActivity;
         @NotNull private BigDecimal sizePerOrderBaseAsset;
         @NotNull private SideGrid sideGrid;
+        private int minOrderSafe;
         private int leverage;
         private boolean logsEndPoints;
         private int amountPriceOffset;
 
-        @Getter(AccessLevel.NONE)
-        private transient final AtomicReference<MarketSessionState> lastMarketSession = new AtomicReference<>();
-        @Getter(AccessLevel.NONE)
-        private transient final TemporalRefence<MarketSessionState> lastMarketSessionTemporal =new TemporalRefence<>(TimeUnit.MINUTES, 2);
-        @Nullable
-        private transient BigDecimal stepSizePriority;
+        // No Agregar final, ya que el constructor no es llamado y gson ignorara estos campos por el transient
+        @Getter(AccessLevel.NONE) @Builder.Default
+        private transient TemporalRefence<MarketSessionState> lastMarketSessionTemporal = null;
+        @Getter(AccessLevel.NONE) @Builder.Default
+        private transient volatile MarketSessionState lastMarketSession = null;
+        @Nullable @Builder.Default
+        private transient BigDecimal stepSizePriority = null;
 
 
         @Contract
-        public BigDecimal getStepSize() {
+        public synchronized BigDecimal getStepSize() {
+            if (lastMarketSessionTemporal == null) lastMarketSessionTemporal = new TemporalRefence<>(TimeUnit.MINUTES, 2);
             if (stepSizePriority != null){
                 return stepSizePriority;
             }
@@ -402,10 +406,10 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
                 case CLOSED, OVERNIGHT -> stepSizeLowActivity;
                 case REGULAR -> stepSizeHighActivity;
             };
-            boolean noEquals = !marketSessionStatus.equals(lastMarketSession.get());
+            boolean noEquals = !marketSessionStatus.equals(lastMarketSession);
             if (noEquals) {
-                Log.info("Cambio de horario %s -> %s StepSize=%.4f", lastMarketSession.get(), marketSessionStatus, stepSize);
-                lastMarketSession.set(marketSessionStatus);
+                Log.info("Cambio de horario %s -> %s StepSize=%.4f", lastMarketSession, marketSessionStatus, stepSize);
+                lastMarketSession = marketSessionStatus;
             }
             return stepSize;
         }

@@ -29,13 +29,14 @@ public class GridCommand extends BaseCommand {
         BinanceConnector binanceConnector = environmentManager.getConnector();
         DiscordConnector discordConnector = environmentManager.getDiscordConnector();
 
-        GridManager.GridManagerConfiguration gridConfigDefault = GridManager.GridManagerConfiguration.builder()
+        GridManager.GridManagerConfig gridConfigDefault = GridManager.GridManagerConfig.builder()
                 .baseAsset("SPY")
                 .quoteAsset("USDT")
                 .stepSizeHighActivity(new BigDecimal("0.7"))
                 .stepSizeMediumActivity(new BigDecimal("0.5"))
                 .stepSizeLowActivity(new BigDecimal("0.4"))
                 .sizePerOrderBaseAsset(new BigDecimal("0.01"))
+                .minOrderSafe(6)
                 .leverage(5)
                 .logsEndPoints(false)
                 .sideGrid(SideGrid.LONG)
@@ -51,7 +52,6 @@ public class GridCommand extends BaseCommand {
                 .build();
 
         BalanceMaxRiskManager balanceMaxRiskManager = new BalanceMaxRiskManager(storageManager.saveConfig(balanceMaxRiskManagerConfigDefault), binanceConnector);
-
         GridManager gridManager = new GridManager(storageManager.saveConfig(gridConfigDefault), binanceConnector);
         gridManager.setBalanceMaxRiskManager(balanceMaxRiskManager);
         gridManager.setName("SPY");

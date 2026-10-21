@@ -80,7 +80,8 @@ public final class Titan implements Switch {
                        \\__\\/     \\__\\/         \\__\\/    \\  \\:\\        \\  \\:\\   \s
                                                          \\__\\/         \\__\\/   \s
                 """);
-        titanApplication.start();
+//        titanApplication.start();
+        getEnvironmentManager(Utils.getRootId());
     }
 
     @Override

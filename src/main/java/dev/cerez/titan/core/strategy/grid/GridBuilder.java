@@ -21,11 +21,11 @@ public class GridBuilder {
 
     private static final BigDecimal MARGEN = new BigDecimal("0.9");
 
-    private final GridManager.GridManagerConfiguration config;
+    private final GridManager.GridManagerConfig config;
     private final SideGrid grid;
     private final BigDecimal amountPerOrderBaseAsset;
 
-    public GridBuilder(GridManager.@NotNull GridManagerConfiguration config) {
+    public GridBuilder(GridManager.@NotNull GridManagerConfig config) {
         this.config = config;
         this.grid = config.getSideGrid();
         this.amountPerOrderBaseAsset = config.getSizePerOrderBaseAsset();

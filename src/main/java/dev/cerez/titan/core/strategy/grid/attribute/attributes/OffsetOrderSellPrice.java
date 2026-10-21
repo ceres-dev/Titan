@@ -26,7 +26,7 @@ public class OffsetOrderSellPrice extends BaseAttribute {
         for (OrderPreview order : context.sells()) {
             order.setPrice(order.getPrice().add(offset));
         }
-        GridManager.GridManagerConfiguration config = context.context().getConfig();
+        GridManager.GridManagerConfig config = context.context().getConfig();
         Utils.getMin(context.sells()).ifPresent(order -> {
             BigDecimal stepSize = config.getStepSize();
             if (order.getPrice().subtract(stepSize).compareTo(context.context().getCurrentPrice()) >= 0) {

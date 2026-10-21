@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.*;
 
 @RequiredArgsConstructor
-public class TemporalRefence<R>  {
+public final class TemporalRefence<R>  {
 
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(Utils.getThreadFactory(this));
     private final TimeUnit unit;
@@ -28,7 +28,7 @@ public class TemporalRefence<R>  {
         return reference;
     }
 
-    public @Nullable R get(){
+    public synchronized @Nullable R get(){
         if (isUseble && reference != null) {
             return reference;
         }else {
@@ -36,18 +36,18 @@ public class TemporalRefence<R>  {
         }
     }
 
-    public @NotNull R getOrDefault(@NotNull R r){
+    public synchronized @NotNull R getOrDefault(@NotNull R r){
         return get() == null ? r : this.reference;
     }
 
-    public @NotNull R getOrCompute(){
+    public synchronized @NotNull R getOrCompute(){
         if (get() == null) {
             return set(provider.get());
         }
         return this.reference;
     }
 
-    public @NotNull R getOrCompute(Provider<R> provider){
+    public synchronized @NotNull R getOrCompute(Provider<R> provider){
         if (get() == null) {
             return set(provider.get());
         }

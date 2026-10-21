@@ -768,7 +768,7 @@ public final class BinanceConnector extends BaseConnector {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toLowerCase(Locale.US));
         params.put("side", sideOrder);
-        params.put("quantity", amountBase);
+        params.put("quantity", fGetAllSymbols().get(symbol).roundBaseQuantity(amountBase));
         params.put("reduceOnly", reduceOnly);
         params.put("type", "MARKET");
         if (nameOrder != null) params.put("nameOrder", nameOrder);

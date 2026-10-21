@@ -17,7 +17,7 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum TypeManager {
-    GRID(GridManager.class, GridManager.GridManagerConfiguration.class, PersistentNope.class),
+    GRID(GridManager.class, GridManager.GridManagerConfig.class, PersistentNope.class),
     FUNDING_ON_TIME(FundingOnTimeManager.class, FundingOnTimeManager.FundingManagerConfig.class, PersistentNope.class),
     FUNDING_NEUTRAL(FundingNeutralManager.class, FundingNeutralManager.FundingManagerConfiguration.class, FundingNeutralManager.FundingManagerPersistan.class),
     FUNDING_TRIANGULAR(TriangularManager.class, TriangularManager.TriangularManagerConfiguration.class, PersistentNope.class),

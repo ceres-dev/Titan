@@ -36,15 +36,23 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
         this.typeManager = typeManager;
     }
 
-    @Nullable private C cacheConfig = null;
-    @Nullable private P cachePersistence = null;
+    @Nullable private volatile C cacheConfig = null;
+    @Nullable private volatile P cachePersistence = null;
 
     public @NotNull C getConfig() {
-        return Objects.requireNonNullElse(cacheConfig, cacheConfig = this.configStorage.load());
+        if (cacheConfig == null) {
+            return cacheConfig = this.configStorage.load();
+        }else {
+            return Objects.requireNonNull(cacheConfig);
+        }
     }
 
     public P getPersistence() {
-        return Objects.requireNonNullElse(cachePersistence, cachePersistence = this.persistenceStorage.load());
+        if (cachePersistence == null) {
+            return cachePersistence = this.persistenceStorage.load();
+        }else {
+            return Objects.requireNonNull(cachePersistence);
+        }
     }
 
     @Override

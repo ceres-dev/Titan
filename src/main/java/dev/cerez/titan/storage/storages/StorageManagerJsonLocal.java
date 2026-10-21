@@ -8,6 +8,7 @@ import dev.cerez.titan.core.BasePersistent;
 import dev.cerez.titan.storage.BaseStorageManager;
 import dev.cerez.titan.storage.Storage;
 import dev.cerez.titan.utils.Nameable;
+import dev.cerez.titan.utils.Utils;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -59,7 +60,7 @@ public class StorageManagerJsonLocal extends BaseStorageManager {
 
         @Override
         public void save(@NonNull O persistence) {
-            try (FileWriter writer = new FileWriter(path.resolve(persistence.getClass().getSimpleName() + EXTENSION).toFile())) {
+            try (FileWriter writer = new FileWriter(path.resolve(persistence.getClass().getSimpleName() + "-" + persistence.getName() + EXTENSION).toFile())) {
                 gson.toJson(persistence, writer);
             } catch (IOException e) {
                 throw new RuntimeException(e);

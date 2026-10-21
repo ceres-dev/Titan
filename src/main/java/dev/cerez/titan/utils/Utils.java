@@ -7,6 +7,7 @@ import dev.cerez.titan.core.Manager;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
+import dev.cerez.titan.log.Log;
 import lombok.Getter;
 import lombok.experimental.UtilityClass;
 import org.jetbrains.annotations.Contract;
@@ -170,5 +171,14 @@ public class Utils {
 
     public static String cleanAnsi(String input) {
         return input.replaceAll("\u001B\\[[;\\d]*m", "");
+    }
+
+    public void printTraceStack(){
+        StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
+        StringBuilder sb = new StringBuilder();
+        for (StackTraceElement stackTraceElement : stackTraceElements){
+            sb.append("\t").append(stackTraceElement.toString()).append("\n");
+        }
+        Log.info(sb.toString());
     }
 }
