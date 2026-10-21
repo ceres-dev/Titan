@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import dev.cerez.titan.Log;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.exception.ApiException;
 import dev.cerez.titan.connector.exception.DefaultApiException;
 import dev.cerez.titan.connector.exception.NotSetApiKeysException;

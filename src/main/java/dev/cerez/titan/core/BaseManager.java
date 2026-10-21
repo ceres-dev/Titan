@@ -1,6 +1,6 @@
 package dev.cerez.titan.core;
 
-import dev.cerez.titan.Log;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.Storage;

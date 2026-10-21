@@ -7,6 +7,7 @@ import dev.cerez.titan.storage.StorageManager;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.experimental.SuperBuilder;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
@@ -71,7 +72,7 @@ public class BalanceMaxRiskManager extends BaseManager<BalanceMaxRiskManager.Bal
     }
 
     @Data
-    @Builder
+    @SuperBuilder
     @EqualsAndHashCode(callSuper = true)
     public static class BalanceMaxRiskManagerConfig extends BaseConfig {
         private final Map<String, BigDecimal> balanceDivision;

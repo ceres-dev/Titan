@@ -1,12 +1,16 @@
 package dev.cerez.titan;
 
-import dev.cerez.titan.command.CommandHander;
-import dev.cerez.titan.command.commands.*;
-import dev.cerez.titan.core.environment.EnvironmentManager;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.infrastructure.TitanApplication;
+import dev.cerez.titan.log.HistoryAppender;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.Utils;
 import lombok.Getter;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.UUID;
@@ -22,25 +26,12 @@ public final class Titan implements Switch {
 
     @Getter
     private static final Titan instance = new Titan();
-    private static final CommandHander commandHandler = new CommandHander();
     public static final boolean IS_TESTNET = false;
 
     @Getter
     private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(16, Utils.getThreadFactory(this));
     @Getter private final TitanApplication titanApplication = new TitanApplication();
     private final Map<UUID, EnvironmentManager> environmentManagers = new ConcurrentHashMap<>();
-
-    static {
-        commandHandler.registerCommand(
-                new SpringBootCommand(),
-                new ExitCommand(),
-                new TriangularCommand(),
-                new FundingCommand(),
-                new CheckFundingCommand(),
-                new GridCommand(),
-                new FundingOnTimeCommand()
-        );
-    }
 
     public static void main(String[] args) {
 //        StorageManager storageManager = new StorageManagerJsonLocal(Utils.getRootId());
@@ -61,8 +52,10 @@ public final class Titan implements Switch {
 //        System.out.println(targetLimited.stream().map(f ->f.symbol() + "@" + f.nextFundingRate()).toList());
 //        System.out.println(targetFiltered.stream().map(f ->f.symbol() + "@" + f.nextFundingRate()).toList());
 //        System.out.println(targetLimited.getLast());
+        Titan.getInstance().start();
+        Log.configure();
         try {
-            commandHandler.init();
+
         } catch (Exception e) {
             Log.exception(e);
         }

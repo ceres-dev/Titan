@@ -1,6 +1,7 @@
 package dev.cerez.titan.command.commands;
 
 import dev.cerez.titan.command.BaseCommand;
+import dev.cerez.titan.core.managers.EnvironmentManager;
 import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
@@ -8,8 +9,8 @@ import java.util.List;
 
 @ToString
 public class FundingCommand extends BaseCommand {
-    public FundingCommand() {
-        super("funding", "f");
+    public FundingCommand(EnvironmentManager environmentManager) {
+        super("funding", "f", environmentManager);
     }
 
 //

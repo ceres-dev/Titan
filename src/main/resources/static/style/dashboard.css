@@ -1,3 +1,13 @@
 body{
     padding-top: 1rem;
 }
+.log{
+    margin: 0;
+}
+.logs{
+    height: 300px;
+    width: 800px;
+
+    overflow: scroll;
+    white-space: nowrap;
+}

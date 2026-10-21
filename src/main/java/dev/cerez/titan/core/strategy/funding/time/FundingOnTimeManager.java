@@ -1,7 +1,7 @@
 package dev.cerez.titan.core.strategy.funding.time;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import dev.cerez.titan.Log;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.Symbol;

@@ -1,6 +1,6 @@
 package dev.cerez.titan.core.strategy.grid;
 
-import dev.cerez.titan.Log;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.exception.exchange.MarginNotSufficienException;
 import dev.cerez.titan.connector.exception.exchange.PostOnlyRejectException;

@@ -4,7 +4,7 @@ import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.ConfigNope;
 import dev.cerez.titan.core.Manager;
 import dev.cerez.titan.core.PersistentNope;
-import dev.cerez.titan.core.environment.EnvironmentManager;
+import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
 import dev.cerez.titan.core.managers.WalletsManager;
 import dev.cerez.titan.core.strategy.funding.neutral.FundingNeutralManager;

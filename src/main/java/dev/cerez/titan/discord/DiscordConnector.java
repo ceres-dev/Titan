@@ -4,7 +4,6 @@ import dev.cerez.titan.Titan;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.Configurable;
-import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Switch;
 import lombok.*;
 import lombok.experimental.SuperBuilder;

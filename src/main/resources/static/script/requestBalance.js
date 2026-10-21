@@ -9,10 +9,6 @@ async function loadBalance() {
 
         renderBalance("futureBalance", balance.future);
         renderBalance("spotBalance", balance.spot);
-        //renderBalance("fondoBalance", balance.spot);
-        //renderBalance("totalBalance", balance.spot);
-
-
     } catch (error) {
         console.error("Error obteniendo el balance:", error);
     }
@@ -41,6 +37,5 @@ function renderBalance(elementId, balances) {
         li.appendChild(strong);
         list.appendChild(li);
     }
-
 }
 loadBalance();

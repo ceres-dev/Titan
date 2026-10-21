@@ -28,6 +28,11 @@
         </header>
         <div class="windowContent">
             <h2>Logs</h2>
+            <section class="box logs" >
+                <ul id="logs">
+                    <div class="cliLoader"></div>
+                </ul>
+            </section>
         </div>
     </section>
 
@@ -55,22 +60,6 @@
                         </li>
                     </ul>
                 </li>
-                <li>
-                    <h3>Fondos</h3>
-                    <ul class="listSmall" id="fondoBalance">
-                        <li>
-                            <div class="cliLoader"></div>
-                        </li>
-                    </ul>
-                </li>
-                <li>
-                    <h3>Total</h3>
-                    <ul class="listSmall" id="totalBalance">
-                        <li>
-                            <div class="cliLoader"></div>
-                        </li>
-                    </ul>
-                </li>
             </ul>
         </div>
     </section>
@@ -86,14 +75,6 @@
                     <div class="cliLoader"></div>
                 </li>
             </ul>
-            <footer>
-                <button>
-                    StopAll
-                </button>
-                <button>
-                    New
-                </button>
-            </footer>
         </div>
     </section>
     <section class="window" id="telemetryWindow">
@@ -109,6 +90,8 @@
 <div class="rgbEffect"></div>
 <script src="/script/requestBalance.js"></script>
 <script src="/script/requestStrategy.js"></script>
+<script src="/script/requestTime.js"></script>
+<script src="/script/requestLogs.js"></script>
 
 <script src="/script/window.js"></script>
 <script src="../static/script/window.js"></script>

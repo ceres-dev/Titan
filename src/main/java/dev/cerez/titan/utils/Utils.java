@@ -3,21 +3,23 @@ package dev.cerez.titan.utils;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
+import dev.cerez.titan.core.Manager;
+import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
 import lombok.Getter;
-import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
+import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.BiFunction;
-import java.util.function.Function;
+import java.util.function.Consumer;
 
 @UtilityClass
 public class Utils {
@@ -139,4 +141,34 @@ public class Utils {
 
     @Getter
     private static final UUID rootId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+    
+    public static boolean isValidUUID(String input) {
+        if (input == null) return false;
+        try {
+            UUID.fromString(input);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    public static ResponseEntity<Void> findManager(EnvironmentManager.EnvironmentPort port, String id, Consumer<Manager<?, ?>> consumer) {
+        if (!Utils.isValidUUID(id)){
+            return ResponseEntity.badRequest().build();
+        }
+        Set<Manager<?, ?>> managers = port.getStrategy();
+        Map<UUID, Manager<?, ?>> managersMap = new HashMap<>();
+        managers.forEach(m -> managersMap.put(m.getId(), m));
+        Manager<?, ?> manager = managersMap.get(UUID.fromString(id));
+        if (manager != null) {
+            consumer.accept(manager);
+            return ResponseEntity.ok().build();
+        }else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    public static String cleanAnsi(String input) {
+        return input.replaceAll("\u001B\\[[;\\d]*m", "");
+    }
 }

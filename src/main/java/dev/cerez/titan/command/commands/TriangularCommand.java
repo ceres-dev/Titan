@@ -1,10 +1,11 @@
 package dev.cerez.titan.command.commands;
 
-import dev.cerez.titan.Log;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.core.strategy.triangular.TriangularManager;
 import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularEngineJava;
 import dev.cerez.titan.core.strategy.triangular.ExecutorCycles;
@@ -20,8 +21,8 @@ import java.util.List;
 import java.util.Set;
 
 public class TriangularCommand extends BaseCommand {
-    public TriangularCommand() {
-        super("triangular", "t");
+    public TriangularCommand(EnvironmentManager environmentManager) {
+        super("triangular", "t", environmentManager);
     }
 
     @Override

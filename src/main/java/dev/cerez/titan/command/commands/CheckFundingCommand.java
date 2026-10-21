@@ -1,7 +1,8 @@
 package dev.cerez.titan.command.commands;
 
-import dev.cerez.titan.Log;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.command.BaseCommand;
+import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.core.strategy.funding.neutral.FundingNeutralManager;
 import org.jetbrains.annotations.NotNull;
 
@@ -10,8 +11,8 @@ import java.util.List;
 
 public class CheckFundingCommand extends BaseCommand {
 
-    public CheckFundingCommand() {
-        super("check", "c");
+    public CheckFundingCommand(EnvironmentManager environmentManager) {
+        super("check", "c", environmentManager);
     }
 
     @Override

@@ -3,18 +3,6 @@ let highestZIndex = 1;
 function createWindow({id}) {
 
     const windowElement = document.getElementById(id);
-    /*
-    windowElement.innerHTML = `
-        <div class="window-header">
-            <span class="window-title">${title}</span>
-        </div>
-
-        <div class="window-content">
-            ${content}
-        </div>
-    `;*/
-
-    //document.getElementById("desktop").appendChild(windowElement);
 
     const header = windowElement.querySelector(".windowHeader");
     const closer = windowElement.querySelector(".windowCloser");

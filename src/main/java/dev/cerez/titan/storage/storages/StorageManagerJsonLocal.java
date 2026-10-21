@@ -2,7 +2,7 @@ package dev.cerez.titan.storage.storages;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import dev.cerez.titan.Log;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.BasePersistent;
 import dev.cerez.titan.storage.BaseStorageManager;

@@ -1,6 +1,6 @@
 package dev.cerez.titan.core.strategy.triangular;
 
-import dev.cerez.titan.Log;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.exception.ApiException;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.model.OrderResult;

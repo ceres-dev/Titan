@@ -135,9 +135,6 @@ button:active {
 }
 
 /* Listas */
-ul, ol{
-    margin: 0;
-}
 li{
     margin-top: 1rem;
     margin-left: 0.8rem;
@@ -176,7 +173,7 @@ li:last-child{
     content: "/";
     animation: cli-loader 0.8s steps(1) infinite;
 }
-.Gradientloader {
+.gradientLoader {
     --color-1: rgba(38, 50, 56, 0);
     --color-2: #051d38;
 
