@@ -775,10 +775,10 @@ public final class BinanceConnector extends BaseConnector {
         return sendSignedWebSocketRequest(fGetWWS(), "order.place", Utils.uuidToBase36(UUID.randomUUID()), params);
     }
 
-    public void wuCreateEventOrderTradeUpdate(Consumer<OrderUpdate> consumer, @Nullable String id, boolean muliThreading){
+    public void wuCreateEventOrderTradeUpdate(Consumer<OrderUpdate> consumer, @Nullable Object id){
         String defaultName = Utils.getClassNameCallPrevious();
         String type = "ORDER_TRADE_UPDATE";
-        addConsumerStreams(uGetWWS(), Objects.requireNonNullElse(id, defaultName) + "-" + type, (payload) -> {
+        addConsumerStreams(uGetWWS(), Objects.requireNonNullElse(createId(id), defaultName) + "-" + type, (payload) -> {
             if (payload.get("e").asText().equals(type)) {
                 JsonNode node = payload.get("o");
                 StatusOrder statusOrder = StatusOrder.parse(node.get("x").asText());
@@ -788,29 +788,29 @@ public final class BinanceConnector extends BaseConnector {
 
                 consumer.accept(new OrderUpdate(nameOrder, symbol, sideOrder, statusOrder));
             }
-        }, muliThreading);
+        }, true);
     }
 
-    public void wuDeleteEventOrderTradeUpdate(@Nullable String id) {
+    public void wuDeleteEventOrderTradeUpdate(@Nullable Object id) {
         String defaultName = Utils.getClassNameCallPrevious();
         String type = "ORDER_TRADE_UPDATE";
-        removeConsumerStreams(uGetWWS(), Objects.requireNonNullElse(id, defaultName) + "-" + type);
+        removeConsumerStreams(uGetWWS(), Objects.requireNonNullElse(createId(id), defaultName) + "-" + type);
     }
 
-    public void wuCreateEventAccountUpdate(Consumer<JsonNode> consumer, @Nullable String id, boolean muliThreading){
+    public void wuCreateEventAccountUpdate(Consumer<JsonNode> consumer, @Nullable Object id){
         String defaultName = Utils.getClassNameCallPrevious();
-        String type = "ACCOUNT_UPDATE";
-        addConsumerStreams(uGetWWS(), Objects.requireNonNullElse(id, defaultName) + "-" + type, (payload) -> {
+        String type = "ACCOUNT_UPDATE"; //TODO: cambiar el ide
+        addConsumerStreams(uGetWWS(), Objects.requireNonNullElse(createId(id), defaultName) + "-" + type, (payload) -> {
             if (payload.get("e").asText().equals(type)) {
                 consumer.accept(payload);
             }
-        }, muliThreading);
+        }, true);
     }
 
-    public void wuDeleteEventAccountUpdate(@Nullable String id) {
+    public void wuDeleteEventAccountUpdate(@Nullable Object id) {
         String defaultName = Utils.getClassNameCallPrevious();
         String type = "ACCOUNT_UPDATE";
-        removeConsumerStreams(uGetWWS(), Objects.requireNonNullElse(id, defaultName) + "-" + type);
+        removeConsumerStreams(uGetWWS(), Objects.requireNonNullElse(createId(id), defaultName) + "-" + type);
     }
 
     public boolean cPossibleConvert(@NotNull String fromAsset, @NotNull String toAsset) {

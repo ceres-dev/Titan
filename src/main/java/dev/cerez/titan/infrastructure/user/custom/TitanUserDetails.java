@@ -12,14 +12,14 @@ import java.util.List;
 import java.util.UUID;
 
 @Getter
-public class CustomUserDetails implements UserDetails {
+public class TitanUserDetails implements UserDetails {
 
     private final UUID id;
     private final String username;
     private final String password;
     private final boolean enabled;
 
-    public CustomUserDetails(@NotNull User user) {
+    public TitanUserDetails(@NotNull User user) {
         this.id = user.getId();
         this.username = user.getUsername();
         this.password = user.getPassword();

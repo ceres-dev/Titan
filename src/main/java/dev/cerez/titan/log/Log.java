@@ -34,6 +34,7 @@ public class Log {
 
         titanLogger.addAppender(HISTORY_APPENDER);
         titanLogger.addAppender(CONSUMER_APPENDER);
+        Log.info("Registrando Logs");
     }
 
     public static synchronized void info(String message, Object... o) {

@@ -7,8 +7,7 @@ import dev.cerez.titan.infrastructure.model.Balance;
 import dev.cerez.titan.infrastructure.model.LogRecord;
 import dev.cerez.titan.infrastructure.model.Strategy;
 import dev.cerez.titan.infrastructure.model.Time;
-import dev.cerez.titan.infrastructure.user.custom.CustomUserDetails;
-import dev.cerez.titan.log.Log;
+import dev.cerez.titan.infrastructure.user.custom.TitanUserDetails;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.TemporalRefence;
 import dev.cerez.titan.utils.Utils;
@@ -17,7 +16,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import javax.swing.text.Position;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -30,62 +28,55 @@ public class ApiController {
     public TemporalRefence<Balance> balance = new TemporalRefence<>(TimeUnit.SECONDS, 30);
 
     @GetMapping("/balance")
-    public ResponseEntity<Balance> getBalance(@AuthenticationPrincipal CustomUserDetails user) {
-        var port = getPort(user);
-        return ResponseEntity.ok(balance.getOrCompute(() ->
-                new Balance(
-                        Utils.removeIf(port.getSpotBalance(), (k, v) -> v.signum() == 0),
-                        Utils.removeIf(port.getFutureBalance(), (k, v) -> v.signum() == 0)
-                )
-        ));
+    public ResponseEntity<Balance> getBalance(@AuthenticationPrincipal TitanUserDetails user) {
+        return ResponseEntity.ok(getPort(user).getBalance());
     }
 
     @GetMapping("/time")
-    public ResponseEntity<Time> getTime(@AuthenticationPrincipal CustomUserDetails user) {
-        var port = getPort(user);
-        return ResponseEntity.ok(new Time(port.getLocalTimestamp(), port.getRemoteTimestamp()));
+    public ResponseEntity<Time> getTime(@AuthenticationPrincipal TitanUserDetails user) {
+        return ResponseEntity.ok(getPort(user).getTime());
     }
 
     @GetMapping("/strategy")
-    public ResponseEntity<List<Strategy>> getStrategy(@AuthenticationPrincipal CustomUserDetails user) {
-        return ResponseEntity.ok(getPort(user).getStrategy().stream().map(m -> new Strategy(m.getId(), m.getTypeManager(), m.getName(), m.isRunning())).toList());
+    public ResponseEntity<List<Strategy>> getStrategy(@AuthenticationPrincipal TitanUserDetails user) {
+        return ResponseEntity.ok(getPort(user).getStrategy());
     }
 
     @GetMapping("/logs")
-    public ResponseEntity<List<LogRecord>> getLogs(@AuthenticationPrincipal CustomUserDetails user) {
-        return ResponseEntity.ok(getPort(user).getLogs().stream().map(i -> new LogRecord(Utils.cleanAnsi(i.getMessage()), i.getThreadName(), i.getLevel().toString(), i.getTimeStamp())).toList());
+    public ResponseEntity<List<LogRecord>> getLogs(@AuthenticationPrincipal TitanUserDetails user) {
+        return ResponseEntity.ok(getPort(user).getLogs());
     }
 
     @GetMapping("/positions")
-    public ResponseEntity<List<BinanceConnector.FuturePosition>> getPositions(@AuthenticationPrincipal CustomUserDetails user) {
+    public ResponseEntity<List<BinanceConnector.FuturePosition>> getPositions(@AuthenticationPrincipal TitanUserDetails user) {
         return ResponseEntity.ok(getPort(user).getPositions());
     }
 
     @PostMapping("/command")
-    public ResponseEntity<Void> executeCommand(@AuthenticationPrincipal CustomUserDetails user,
+    public ResponseEntity<Void> executeCommand(@AuthenticationPrincipal TitanUserDetails user,
                                                   @RequestParam(value = "command") String command
     ) {
         getPort(user).executeCommand(command);
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/stopAllSrategy")
-    public ResponseEntity<Void> stopAll(@AuthenticationPrincipal CustomUserDetails user) {
-        getPort(user).getStrategy().forEach(Switch::stop);
-        return ResponseEntity.ok().build();
-    }
+//    @PostMapping("/stopAllSrategy")
+//    public ResponseEntity<Void> stopAll(@AuthenticationPrincipal TitanUserDetails user) {
+//        getPort(user).getStrategy().forEach(Switch::stop);
+//        return ResponseEntity.ok().build();
+//    }
+//
+//    @PostMapping("/stopSrategy")
+//    public ResponseEntity<Void> stop(@AuthenticationPrincipal TitanUserDetails user, @RequestParam("id") String id) {
+//        return Utils.findManager(getPort(user), id, Switch::stop);
+//    }
+//
+//    @PostMapping("/startStrategy")
+//    public ResponseEntity<Void> start(@AuthenticationPrincipal TitanUserDetails user, @RequestParam("id") String id) {
+//        return Utils.findManager(getPort(user), id, Switch::start);
+//    }
 
-    @PostMapping("/stopSrategy")
-    public ResponseEntity<Void> stop(@AuthenticationPrincipal CustomUserDetails user, @RequestParam("id") String id) {
-        return Utils.findManager(getPort(user), id, Switch::stop);
-    }
-
-    @PostMapping("/startStrategy")
-    public ResponseEntity<Void> start(@AuthenticationPrincipal CustomUserDetails user, @RequestParam("id") String id) {
-        return Utils.findManager(getPort(user), id, Switch::start);
-    }
-
-    private @NotNull EnvironmentManager.EnvironmentPort getPort(@NotNull CustomUserDetails user) {
+    private @NotNull EnvironmentManager.EnvironmentPort getPort(@NotNull TitanUserDetails user) {
         return titan.getEnvironmentManager(user.getId()).getPort();
     }
 }

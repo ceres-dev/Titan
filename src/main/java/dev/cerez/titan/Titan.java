@@ -52,8 +52,8 @@ public final class Titan implements Switch {
 //        System.out.println(targetLimited.stream().map(f ->f.symbol() + "@" + f.nextFundingRate()).toList());
 //        System.out.println(targetFiltered.stream().map(f ->f.symbol() + "@" + f.nextFundingRate()).toList());
 //        System.out.println(targetLimited.getLast());
+
         Titan.getInstance().start();
-        Log.configure();
         try {
 
         } catch (Exception e) {
@@ -80,7 +80,8 @@ public final class Titan implements Switch {
                        \\__\\/     \\__\\/         \\__\\/    \\  \\:\\        \\  \\:\\   \s
                                                          \\__\\/         \\__\\/   \s
                 """);
-//        titanApplication.start();
+        titanApplication.start();
+        Log.configure();
         getEnvironmentManager(Utils.getRootId());
     }
 

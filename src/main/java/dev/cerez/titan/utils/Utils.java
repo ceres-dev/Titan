@@ -7,13 +7,17 @@ import dev.cerez.titan.core.Manager;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
+import dev.cerez.titan.infrastructure.user.custom.TitanUserDetails;
 import dev.cerez.titan.log.Log;
 import lombok.Getter;
 import lombok.experimental.UtilityClass;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.socket.WebSocketSession;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -153,22 +157,6 @@ public class Utils {
         }
     }
 
-    public static ResponseEntity<Void> findManager(EnvironmentManager.EnvironmentPort port, String id, Consumer<Manager<?, ?>> consumer) {
-        if (!Utils.isValidUUID(id)){
-            return ResponseEntity.badRequest().build();
-        }
-        Set<Manager<?, ?>> managers = port.getStrategy();
-        Map<UUID, Manager<?, ?>> managersMap = new HashMap<>();
-        managers.forEach(m -> managersMap.put(m.getId(), m));
-        Manager<?, ?> manager = managersMap.get(UUID.fromString(id));
-        if (manager != null) {
-            consumer.accept(manager);
-            return ResponseEntity.ok().build();
-        }else {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
     public static String cleanAnsi(String input) {
         return input.replaceAll("\u001B\\[[;\\d]*m", "");
     }
@@ -180,5 +168,16 @@ public class Utils {
             sb.append("\t").append(stackTraceElement.toString()).append("\n");
         }
         Log.info(sb.toString());
+    }
+
+    public @Nullable TitanUserDetails toTitanUser(@NotNull WebSocketSession webSocketSession){
+        if (webSocketSession.getPrincipal() instanceof Authentication authentication) {
+            Object user = authentication.getPrincipal();
+
+            if (user instanceof TitanUserDetails customUser) {
+                return customUser;
+            }
+        }
+        return null;
     }
 }

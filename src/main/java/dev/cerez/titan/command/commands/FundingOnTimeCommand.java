@@ -28,10 +28,10 @@ public class FundingOnTimeCommand extends BaseCommand {
         connector.start();
         connector.wuCreateEventAccountUpdate((jsonNode -> {
             Log.info(jsonNode.toPrettyString());
-        }), null, false);
+        }), null);
         connector.wuCreateEventOrderTradeUpdate((a) -> {
             Log.info(a.toString());
-        }, null, true);
+        }, null);
         FundingOnTimeManager.FundingManagerConfig config = FundingOnTimeManager.FundingManagerConfig.builder()
                 .sendTrade(true)
                 .build();

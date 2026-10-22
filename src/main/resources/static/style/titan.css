@@ -36,9 +36,9 @@ body{
     flex-direction: row;
     max-width: 80rem;
     margin-bottom: 1rem;
+    backdrop-filter: blur(5px);
 }
 .mainSections{
-
     max-width: 80rem;
     width: 100%;
     grid-gap: 1rem;
@@ -175,7 +175,7 @@ th:first-child, td:first-child {
     pointer-events: none;
     inset: 0;
     z-index: -1;
-    opacity: 5%;
+    opacity: 7%;
     background-image: repeating-linear-gradient( to right, #f00 0px, #f00 1px, #0f0 1px, #0f0 2px, #00f 2px, #00f 3px );
 }
 .linesEffect {

@@ -11,6 +11,7 @@ import dev.cerez.titan.connector.exception.NotSetApiKeysException;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.BaseConfig;
+import dev.cerez.titan.utils.Nameable;
 import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.TemporalRefence;
 import dev.cerez.titan.utils.Utils;
@@ -565,5 +566,15 @@ public abstract class BaseConnector implements Connector {
         @Builder.Default private boolean logsRequest = false;
         @Builder.Default private String key = "";
         @Builder.Default private String secret = "";
+    }
+
+    protected String createId(Object o){
+        if (o instanceof String s){
+            return s;
+        }
+        if (o instanceof Nameable){
+            return o.getClass().getSimpleName() + ":" + ((Nameable)o).getName();
+        }
+        return o.toString();
     }
 }

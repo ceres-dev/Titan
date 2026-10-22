@@ -2,7 +2,6 @@ package dev.cerez.titan.storage;
 
 import dev.cerez.titan.utils.Nameable;
 import dev.cerez.titan.utils.Provider;
-import dev.cerez.titan.utils.ProviderSable;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
@@ -21,22 +20,12 @@ public interface Storage<O extends Nameable> {
         return this.load(getProfilerName());
     }
 
-    default ProviderSable<O> getProvider(){
+    default Provider<O> getProvider(){
         return getProvider(getProfilerName());
     }
 
-    default ProviderSable<O> getProvider(String name) {
-        Storage<O> storage = this;
-        return new ProviderSable<>() {
-            @Override
-            public O get() {
-                return load(name);
-            }
-            @Override
-            public void save(@NotNull O o) {
-                storage.save(o);
-            }
-        };
+    default Provider<O> getProvider(String name) {
+        return () -> load(name);
     }
 
     default Optional<O> getOptional() {

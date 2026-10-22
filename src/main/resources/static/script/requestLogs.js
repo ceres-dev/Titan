@@ -6,17 +6,17 @@ async function loadBalance() {
         }
 
         const logs = await response.json();
+        document.getElementById("logs").innerHTML = "";
 
-        renderLogs("logs", logs);
+        addRenderLogs("logs", logs);
+
     } catch (error) {
         console.error("Error obteniendo el balance:", error);
     }
 }
 
-function renderLogs(elementId, logs) {
+function addRenderLogs(elementId, logs) {
     const list = document.getElementById(elementId);
-
-    list.innerHTML = "";
     if (logs.length > 0) {
         logs.forEach((log) => {
             const li = document.createElement("li");

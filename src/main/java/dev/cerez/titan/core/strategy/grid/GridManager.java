@@ -211,7 +211,7 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
             // Es para que actualize la caché de binance al momentó de obtener los datos
             LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
             updateGrid();
-        }, null, true);
+        }, null);
         updateGrid();
         priceAlarm.start();
         executor.execute(() -> {

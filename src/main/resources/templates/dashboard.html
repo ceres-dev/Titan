@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/style/dashboard.css">
 </head>
 <body>
+<div class="rgbEffect"></div>
 <header class="mainSections">
     <nav class="navBar box">
         <h1>Titan</h1>
@@ -114,13 +115,15 @@
         </div>
     </section>
 </section>
-<div class="rgbEffect"></div>
+
+<pre id="output"></pre>
 <script src="/script/utils.js"></script>
 <script src="/script/requestBalance.js"></script>
 <script src="/script/requestStrategy.js"></script>
 <script src="/script/requestTime.js"></script>
 <script src="/script/requestLogs.js"></script>
 <script src="/script/requestPositions.js"></script>
+<script src="/script/websocket.js"></script>
 
 <script src="/script/window.js"></script>
 <script src="../static/script/window.js"></script>
@@ -130,7 +133,6 @@
     createWindow({id: "strategyWindow",});
     createWindow({id: "telemetryWindow",});
     createWindow({id: "positionWindow",});
-
 </script>
 
 </body>

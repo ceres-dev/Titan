@@ -7,7 +7,7 @@ public interface Provider<R> {
     @Contract(pure = true)
     R get();
 
-    static <T> ProviderSable<T> from(T object){
+    static <T> Provider<T> from(T object){
         return () -> object;
     }
 

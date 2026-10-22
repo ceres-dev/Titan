@@ -50,7 +50,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
                     if (symbolTarget != null) symbolTarget.closePosition();
                 }
             }
-        }), null, true);
+        }), null);
         executor.execute(() -> {
             while (running) {
                 Log.info("Starting FundingManger");

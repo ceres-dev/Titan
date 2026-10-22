@@ -25,6 +25,6 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() ->
                         new UsernameNotFoundException("Usuario no encontrado"));
 
-        return new CustomUserDetails(user);
+        return new TitanUserDetails(user);
     }
 }
