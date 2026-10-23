@@ -1,6 +1,6 @@
 package dev.cerez.titan.utils;
 
-public interface Messageable {
+public interface WebSocketServer {
 
     void sendMessage(Object message);
 }

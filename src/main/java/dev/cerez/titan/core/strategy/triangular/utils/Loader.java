@@ -1,6 +1,6 @@
 package dev.cerez.titan.core.strategy.triangular.utils;
 
-import dev.cerez.titan.utils.telemtry.Telemetry;
+import dev.cerez.titan.utils.telemtry.TelemetryCollector;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -14,12 +14,12 @@ public class Loader{
     private final String labelRaw = " %.0fu/s Computo: %.2fms Ping: %.2fms ";
 
     @SuppressWarnings("DuplicateBranchesInSwitch")
-    public void printLoader(Telemetry telemetry){
+    public void printLoader(TelemetryCollector telemetry){
         int counterLoader = 0;
         while(!Thread.interrupted()){
 
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(250));
-            Telemetry.TelemetrySnapshot snapshot = telemetry.getSnapshot();
+            TelemetryCollector.TelemetrySnapshot snapshot = telemetry.getSnapshot();
             String label = labelRaw.formatted(
                     snapshot.getUpdateInOneSecond()*4d,
                     snapshot.getDeltaDelayComputeNanoTime() / 1_000_000d,

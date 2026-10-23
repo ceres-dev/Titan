@@ -13,8 +13,18 @@ socket.addEventListener("open", () => {
     console.log("websocket open");
 });
 
+const requestTime = new Map();
+
+
 socket.addEventListener("message", event => {
     const payload = JSON.parse(event.data);
+
+    let lastTime = requestTime.get(payload.type)
+    if (lastTime > payload.timeStamp) {
+        return;
+    }
+    requestTime.set(payload.type, payload.timeStamp)
+
     switch (payload.type) {
         case "LogRecord": {
             addRenderLogs("logs", payload.data);
@@ -28,6 +38,10 @@ socket.addEventListener("message", event => {
         case "Strategy": {
             renderStrategy("strategy", payload.data);
             break;
+        }
+        case "Telemetry": {
+            renderTelemetryConnector(payload.data.connector);
+            break
         }
         default: {
             console.error("Unknow Response: " + payload.data);

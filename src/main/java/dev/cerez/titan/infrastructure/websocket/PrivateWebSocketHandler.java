@@ -6,7 +6,7 @@ import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.infrastructure.model.WebSocketContainer;
 import dev.cerez.titan.infrastructure.user.custom.TitanUserDetails;
 import dev.cerez.titan.log.Log;
-import dev.cerez.titan.utils.Messageable;
+import dev.cerez.titan.utils.WebSocketServer;
 import dev.cerez.titan.utils.Utils;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -19,6 +19,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import java.io.IOException;
 import java.security.Principal;
 import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
 
 @Component
 public class PrivateWebSocketHandler extends TextWebSocketHandler {
@@ -29,7 +30,7 @@ public class PrivateWebSocketHandler extends TextWebSocketHandler {
         TitanUserDetails user = Utils.toTitanUser(session);
         if (user != null){
             EnvironmentManager manager = titan.getEnvironmentManager(user.getId());
-            manager.setMessageable(new WebSocketMessenger(session));
+            manager.setWebSocketServer(new WebSocketMessenger(session));
             Log.info("Conectado como: " + user.getUsername());
         }else {
             Log.info("Connection desconocida");
@@ -51,13 +52,13 @@ public class PrivateWebSocketHandler extends TextWebSocketHandler {
     }
 
     @RequiredArgsConstructor
-    private static class WebSocketMessenger implements Messageable {
+    private static class WebSocketMessenger implements WebSocketServer {
 
         private final Gson gson = new Gson();
         private final WebSocketSession session;
 
         @Override
-        public void sendMessage(Object message) {
+        public synchronized void sendMessage(Object message) {
             String type;
             if (message instanceof Collection<?> collection) {
                 if (collection.isEmpty()) {
@@ -67,13 +68,15 @@ public class PrivateWebSocketHandler extends TextWebSocketHandler {
             }else {
                 type = message.getClass().getSimpleName();
             }
-            WebSocketContainer webSocketContainer = new WebSocketContainer(type, message);
+            WebSocketContainer webSocketContainer = new WebSocketContainer(type, message, System.currentTimeMillis());
             String payload = gson.toJson(webSocketContainer);
-            try {
-                session.sendMessage(new TextMessage(payload));
-            } catch (IOException e) {
-                Log.exception(e);
-            }
+            CompletableFuture.runAsync(() -> {
+                try {
+                    session.sendMessage(new TextMessage(payload));
+                } catch (IOException e) {
+                    Log.exception(e);
+                }
+            });
         }
     }
 }

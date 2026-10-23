@@ -14,7 +14,7 @@ import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.storage.storages.StorageManagerJsonLocal;
 import dev.cerez.titan.storage.storages.StorageManagerMemory;
 import dev.cerez.titan.utils.Utils;
-import dev.cerez.titan.utils.telemtry.Telemetry;
+import dev.cerez.titan.utils.telemtry.TelemetryCollector;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -34,7 +34,7 @@ public class TriangularCommand extends BaseCommand {
                 .minProfit(0.1d)
                 .isTest(true)
                 .build();
-        Telemetry.TelemetryConfig telemetryConfig = Telemetry.TelemetryConfig.builder()
+        TelemetryCollector.TelemetryConfig telemetryConfig = TelemetryCollector.TelemetryConfig.builder()
                 .maxDelaysDeltaComputeNanoTime(500)
                 .stepsAddDelayComputeNanoTime(10)
                 .build();
@@ -47,7 +47,7 @@ public class TriangularCommand extends BaseCommand {
                 .engine(SearchTriangularEngineJava.class)
                 .build();
 
-        Telemetry telemetry =           new Telemetry(telemetryConfig);
+        TelemetryCollector telemetry =           new TelemetryCollector(telemetryConfig);
         Loader loader =                 new Loader();
         StorageManager storageManager = new StorageManagerMemory(Utils.getRootId());
         StorageManagerJsonLocal storageManagerJsonLocal = new StorageManagerJsonLocal(Utils.getRootId());

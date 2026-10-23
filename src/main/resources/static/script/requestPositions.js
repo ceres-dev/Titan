@@ -21,10 +21,10 @@ function renderPosition(elementId, positions) {
             const tr = document.createElement("tr");
 
             const tdSymbol = document.createElement("td");
-            tdSymbol.textContent = position.symbol
+            tdSymbol.textContent = position.baseAsset + position.quoteAsset
 
             const tdQuantity = document.createElement("td");
-            tdQuantity.textContent = utils.trunc(position.quantity, 2)
+            tdQuantity.textContent = `${utils.trunc(position.quantity, 2)} ${position.baseAsset}`
 
             const tdEntryPriceAvg = document.createElement("td");
             tdEntryPriceAvg.textContent = utils.trunc(position.entryPriceAvg, 2)
@@ -42,7 +42,7 @@ function renderPosition(elementId, positions) {
             }else {
                 span.style.color = "gray"
             }
-            span.textContent = utils.trunc(position.pnlUnrealize, 3)
+            span.textContent = `${utils.trunc(position.pnlUnrealize, 3)} ${position.quoteAsset}`
             tdPnlUnrealize.appendChild(span);
             tr.appendChild(tdPnlUnrealize);
             table.appendChild(tr);

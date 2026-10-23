@@ -3,10 +3,7 @@ package dev.cerez.titan.infrastructure.controler;
 import dev.cerez.titan.Titan;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.managers.EnvironmentManager;
-import dev.cerez.titan.infrastructure.model.Balance;
-import dev.cerez.titan.infrastructure.model.LogRecord;
-import dev.cerez.titan.infrastructure.model.Strategy;
-import dev.cerez.titan.infrastructure.model.Time;
+import dev.cerez.titan.infrastructure.model.*;
 import dev.cerez.titan.infrastructure.user.custom.TitanUserDetails;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.TemporalRefence;
@@ -48,8 +45,13 @@ public class ApiController {
     }
 
     @GetMapping("/positions")
-    public ResponseEntity<List<BinanceConnector.FuturePosition>> getPositions(@AuthenticationPrincipal TitanUserDetails user) {
+    public ResponseEntity<List<Position>> getPositions(@AuthenticationPrincipal TitanUserDetails user) {
         return ResponseEntity.ok(getPort(user).getPositions());
+    }
+
+    @GetMapping("/telemetry")
+    private ResponseEntity<Telemetry> getTelemetry(@AuthenticationPrincipal TitanUserDetails user) {
+        return ResponseEntity.ok(getPort(user).getTelemetry());
     }
 
     @PostMapping("/command")

@@ -16,7 +16,7 @@ import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularE
 import dev.cerez.titan.core.strategy.triangular.utils.TriangularArbitrageOpportunity;
 import dev.cerez.titan.core.ManagerStrategy;
 import dev.cerez.titan.storage.StorageManager;
-import dev.cerez.titan.utils.telemtry.Telemetry;
+import dev.cerez.titan.utils.telemtry.TelemetryCollector;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.jetbrains.annotations.NotNull;
@@ -32,7 +32,7 @@ public final class TriangularManager extends ManagerStrategy<TriangularManager.T
 
     @Setter @Nullable private SearchTriangularEngine engine;
     @Setter @Nullable private Consumer<SearchTriangularEngine.OnOpportunities> onOpportunities;
-    @Setter @Nullable private Telemetry telemetry;
+    @Setter @Nullable private TelemetryCollector telemetry;
 
     @Nullable private Map<String, Symbol> allSymbolsMap = null;
     @Nullable private Consumer<BookTickDouble> streamListener = null;

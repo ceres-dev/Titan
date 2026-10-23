@@ -19,7 +19,7 @@ import java.util.concurrent.locks.LockSupport;
 @Data
 @Getter(AccessLevel.NONE)
 @Setter(AccessLevel.NONE)
-public class Telemetry implements TelemetryConnector, Configurable<Telemetry.TelemetryConfig> {
+public class TelemetryCollector implements TelemetryConnector, Configurable<TelemetryCollector.TelemetryConfig> {
 
     @Getter
     private final TelemetryConfig config;
@@ -33,7 +33,7 @@ public class Telemetry implements TelemetryConnector, Configurable<Telemetry.Tel
     private int updateCounterPrev = 0;
     private int updateCounterCurrentInFrameTime = 0;
 
-    public Telemetry(TelemetryConfig telemetryConfig) {
+    public TelemetryCollector(TelemetryConfig telemetryConfig) {
         this.config = telemetryConfig;
         executor.execute(() -> {
             while (!Thread.currentThread().isInterrupted()) {
@@ -53,12 +53,13 @@ public class Telemetry implements TelemetryConnector, Configurable<Telemetry.Tel
                 getCounterInTimeFrame(),
                 totalUpdateCounter,
                 getDelayDeltaPingPongMs(),
-                requestConnectors
+                requestConnectors,
+                getRequestLastHour()
         );
         inSnapshot = false;
         return snapshot;
     }
-
+    
     private int stepAddDeltaDelayComputeNanoTime = 0;
 
     public synchronized void addDeltaDelayComputeNanoTime(long deltaNanoTime) {
@@ -105,7 +106,7 @@ public class Telemetry implements TelemetryConnector, Configurable<Telemetry.Tel
         if (inSnapshot) {
             return;
         }
-        requestConnectors.add(new TelemetryRequestConnector(method, request));
+        requestConnectors.add(new TelemetryRequestConnector(System.currentTimeMillis(), method, request));
     }
 
     //////////////////
@@ -128,6 +129,15 @@ public class Telemetry implements TelemetryConnector, Configurable<Telemetry.Tel
     private float getDelayDeltaPingPongMs() {
         return currentDeltaDelayPingPongNanoTime / 1_000_000f;
     }
+    
+    @Contract(pure = true)
+    private int getRequestLastHour() {
+        long current = System.currentTimeMillis();
+        List<TelemetryRequestConnector> requestsFilter = requestConnectors.stream()
+                .filter(telemetry -> current - (1000 * 60 * 60) < telemetry.date()).toList();
+        return requestsFilter.size();
+    }
+
 
     @Data
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -137,6 +147,7 @@ public class Telemetry implements TelemetryConnector, Configurable<Telemetry.Tel
         private final long totalCountUpdates;
         private final float delayPingPongMs;
         private final List<TelemetryRequestConnector> requestConnector;
+        private final int requestLastHour;
     }
 
     @Data
@@ -148,7 +159,7 @@ public class Telemetry implements TelemetryConnector, Configurable<Telemetry.Tel
         @Builder.Default private Mode mode = Mode.FULL;
     }
 
-    public record TelemetryRequestConnector(BaseConnector.Method method, String request) {}
+    public record TelemetryRequestConnector(long date, BaseConnector.Method method, String request) {}
 
     public enum Mode{
         FULL,

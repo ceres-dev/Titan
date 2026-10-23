@@ -74,6 +74,24 @@
         </header>
         <div class="windowContent">
             <h2>Telemetría</h2>
+            <div>
+                <h3>Connector</h3>
+                <ul id="telemetryConnector">
+                    <li>
+                        <strong>Request/h: </strong>
+                        <span id="TelemetryRequestForHour">321r/h</span>
+                    </li>
+                </ul>
+            </div>
+            <div>
+                <h3>Sistema</h3>
+                <ul id="telemetrySystem">
+                    <li>
+                        <strong>RAM</strong>
+                        <span id="TelemetryRequestForHour">321r/h</span>
+                    </li>
+                </ul>
+            </div>
         </div>
     </section>
     <section class="window" id="positionWindow">
@@ -126,6 +144,7 @@
 <script src="/script/requestTime.js"></script>
 <script src="/script/requestLogs.js"></script>
 <script src="/script/requestPositions.js"></script>
+<script src="/script/requestTelemetry.js"></script>
 <script src="/script/websocket.js"></script>
 
 <script src="/script/window.js"></script>

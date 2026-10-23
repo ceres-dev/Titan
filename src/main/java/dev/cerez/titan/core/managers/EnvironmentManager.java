@@ -5,6 +5,7 @@ import dev.cerez.titan.command.CommandHander;
 import dev.cerez.titan.command.commands.*;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.ConfigNope;
 import dev.cerez.titan.core.Manager;
 import dev.cerez.titan.core.ManagerStrategy;
@@ -15,17 +16,15 @@ import dev.cerez.titan.core.exception.ConfigMalformatException;
 import dev.cerez.titan.core.exception.ManagerIsNotFoundException;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.DiscordConnector;
-import dev.cerez.titan.infrastructure.model.Balance;
-import dev.cerez.titan.infrastructure.model.LogRecord;
-import dev.cerez.titan.infrastructure.model.Strategy;
-import dev.cerez.titan.infrastructure.model.Time;
+import dev.cerez.titan.infrastructure.model.*;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.storage.storages.StorageManagerJsonLocal;
-import dev.cerez.titan.utils.Messageable;
+import dev.cerez.titan.utils.WebSocketServer;
 import dev.cerez.titan.utils.NoAutoRegister;
 import dev.cerez.titan.utils.Ownership;
 import dev.cerez.titan.utils.Utils;
+import dev.cerez.titan.utils.telemtry.TelemetryCollector;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -36,6 +35,7 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -49,13 +49,20 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
     private final StorageManager storageManager;
     private final DiscordConnector discordConnector;
     private final CommandHander commandHandler;
-    private Messageable messageable = message -> {};
+    private final TelemetryCollector telemetry;
+    private WebSocketServer webSocketServer = message -> {};
 
     private EnvironmentManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector binanceConnector, @NotNull UUID idOwner) {
         super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), binanceConnector, TypeManager.ENVIRONMENT);
         this.storageManager = storageManager;
         this.idOwner = idOwner;
         this.commandHandler = new CommandHander(this);
+        TelemetryCollector.TelemetryConfig config = TelemetryCollector.TelemetryConfig.builder()
+                .maxDelaysDeltaComputeNanoTime(100)
+                .stepsAddDelayComputeNanoTime(5)
+                .build();
+        this.telemetry = new TelemetryCollector(config);
+        connector.setTelemetry(telemetry);
         commandHandler.registerCommand(
                 new ExitCommand(this),
                 new TriangularCommand(this),
@@ -66,13 +73,14 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
         );
         discordConnector = new DiscordConnector(storageManager.saveIfNotExits(DiscordConnector.DiscordConfig.builder().build()));
         connector.wuCreateEventAccountUpdate((update) -> {
-            messageable.sendMessage(getPort().getBalance());
-            messageable.sendMessage(getPort().getPositions());
+            webSocketServer.sendMessage(getPort().getBalance());
+            webSocketServer.sendMessage(getPort().getPositions());
         }, this);
         Log.CONSUMER_APPENDER.addConsumer((log) ->
-        {
-            messageable.sendMessage(List.of(new LogRecord(Utils.cleanAnsi(log.getMessage()), log.getThreadName(), log.getLevel().toString(), log.getTimeStamp())));
-        }        );
+                webSocketServer.sendMessage(List.of(new LogRecord(Utils.cleanAnsi(log.getMessage()), log.getThreadName(), log.getLevel().toString(), log.getTimeStamp()))));
+        executor.scheduleAtFixedRate(() -> {
+            webSocketServer.sendMessage(getPort().getTelemetry());
+        }, 5, 5, TimeUnit.SECONDS);
     }
 
     @Contract(pure = true)
@@ -122,7 +130,7 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
                 executor.execute(() -> strategy.registerListener(new Listener() {
                     @Override
                     public void changeStatus() {
-                        messageable.sendMessage(getPort().getStrategy());
+                        webSocketServer.sendMessage(getPort().getStrategy());
                     }
                 }));
             }
@@ -177,7 +185,6 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
         }
 
         public @NotNull List<Strategy> getStrategy() {
-            Log.info(managerMap.values().toString());
             return managerMap.values().stream().filter(m -> m instanceof ManagerStrategy<?,?,?,?>).map(m -> (ManagerStrategy<?,?,?,?>) m).map(m -> new Strategy(m.getId(), m.getTypeManager(), m.getName(), m.getClass().getSimpleName(), m.getStatus())).toList();
         }
 
@@ -189,8 +196,21 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
             return connector.fPing();
         }
 
-        public List<BinanceConnector.FuturePosition> getPositions() {
-            return connector.fGetPositions();
+        public List<Position> getPositions() {
+            Map<String, Symbol> symbolMap = connector.fGetAllSymbols();
+            Map<String, BinanceConnector.FundingRate> nextFundingMap = connector.fGetFundingRate();;
+            return connector.fGetPositions().stream().map((futurePosition -> {
+                Symbol symbol = symbolMap.get(futurePosition.symbol());
+                BigDecimal nextFunding = nextFundingMap.get(futurePosition.symbol()).nextFundingRate();
+                return new Position(
+                        symbol.getBaseAsset(),
+                        symbol.getQuoteAsset(),
+                        futurePosition.quantity(),
+                        futurePosition.entryPriceAvg(),
+                        futurePosition.pnlUnrealize(),
+                        nextFunding
+                );
+            })).toList();
         }
 
         public Balance getBalance() {
@@ -204,6 +224,23 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
 
         public List<LogRecord> getLogs(){
             return Log.HISTORY_APPENDER.getHistory().stream().map(i -> new LogRecord(Utils.cleanAnsi(i.getMessage()), i.getThreadName(), i.getLevel().toString(), i.getTimeStamp())).toList();
+        }
+
+        public Telemetry getTelemetry() {
+            TelemetryCollector.TelemetrySnapshot snapshot = telemetry.getSnapshot();
+            Runtime runtime = Runtime.getRuntime();
+            long totalMemory = runtime.totalMemory();
+            long freeMemory = runtime.freeMemory();
+            long usedMemory = totalMemory - freeMemory;
+            return new Telemetry(
+                    new Telemetry.Connector(
+                            snapshot.getRequestLastHour()
+                    ),
+                    new Telemetry.System(
+                            totalMemory,
+                            usedMemory
+                    )
+            );
         }
 
         public record ManagerBuilder(Class<? extends Manager<?, ?>> manager, Object config, String name) {}
