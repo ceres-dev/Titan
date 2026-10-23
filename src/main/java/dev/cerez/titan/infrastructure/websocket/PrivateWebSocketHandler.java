@@ -39,7 +39,6 @@ public class PrivateWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(@NotNull WebSocketSession session, @NotNull TextMessage message) throws Exception {
-
         Principal user = session.getPrincipal();
 
         if (user == null) {
@@ -48,8 +47,6 @@ public class PrivateWebSocketHandler extends TextWebSocketHandler {
         }
 
         String received = message.getPayload();
-
-        // Ejemplo: responder únicamente al cliente que envió el mensaje.
         Log.info(received);
     }
 

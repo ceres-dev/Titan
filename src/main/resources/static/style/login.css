@@ -53,6 +53,9 @@ input:hover, input:focus {
 input:focus {
     outline: none;
 }
+input::placeholder {
+    color: var(--main-login-color);
+}
 button {
     background: transparent;
     color: var(--main-login-color);

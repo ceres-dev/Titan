@@ -1,5 +1,6 @@
 package dev.cerez.titan.core.strategy.funding.neutral;
 
+import dev.cerez.titan.core.StatusManager;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.command.InputUser;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
@@ -7,11 +8,10 @@ import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.BasePersistent;
 import dev.cerez.titan.core.ManagerStrategy;
-import dev.cerez.titan.core.event.events.FundingManagerListener;
+import dev.cerez.titan.core.event.events.FundingNeutralManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.storage.StorageManager;
-import dev.cerez.titan.utils.Status;
 import dev.cerez.titan.utils.Utils;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -29,14 +29,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralManager.FundingManagerConfiguration, FundingNeutralManager.FundingManagerPersistan, BinanceConnector, FundingManagerListener> implements StatusProfiler, Status<FundingNeutralManager.Status> {
+public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralManager.FundingManagerConfiguration, FundingNeutralManager.FundingManagerPersistan, BinanceConnector, FundingNeutralManagerListener> implements StatusProfiler {
 
     @NotNull private final InputUser inputUser = new InputUser();
     @NotNull private final String baseAsset;
     @NotNull private final String quoteAsset;
     @NotNull private final UUID uuid;
     @NotNull @Getter private final String symbol;
-    @NotNull @Getter private Status status = Status.READY;
 
     public FundingNeutralManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
         super(storageManager.createProfilerManager(FundingManagerConfiguration.class, FundingManagerPersistan.class), connector, TypeManager.FUNDING_NEUTRAL);
@@ -47,7 +46,7 @@ public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralM
         if (persistan.isActive) {
             Log.warning("El programa no termino el proceso de cierre adecuadamente. La estrategia esta corriendo");
             this.uuid = persistan.uuid;
-            this.status = persistan.status;
+            setStatus(persistan.status);
         }else {
             this.uuid = UUID.randomUUID();
         }
@@ -56,7 +55,7 @@ public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralM
     @Override
     protected void internalStart() {
         connector.getConfig().setLogsRequest(getConfig().logsEndPoints);
-        status = Status.CHECK;
+        setStatus(StatusManager.PREPARING);
         // Activar el margen Aislado
         Log.info("¿Esta Habilitado el margen aislado?...");
         if (!connector.mIsEnableInsolated(symbol)){
@@ -66,7 +65,6 @@ public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralM
         Log.info("<green>Habilitado margen aislado");
         if (checkPreStart()) {
             Log.info("Checks <red>Fail");
-            status = Status.READY;
             return;
         }
         Log.info("Checks <green>Ok");
@@ -75,7 +73,6 @@ public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralM
             connector.getConfig().setLogsRequest(true);
         }
         Log.info("Iniciando...");
-        status = Status.STARTING;
         BalancePreview preview = new BalancePreview(getConfig().getSizePosition(), getConfig().getBooking());
         // Transferir fondos
         Log.info("Transfiriendo fondos...");
@@ -110,7 +107,7 @@ public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralM
         CompletableFuture.allOf(closeOrderMargin, closeOrderFuture).join();
 
         new FundingManagerPersistan(this);
-        status = Status.RUNNING;
+        setStatus(StatusManager.WORKING);
     }
 
     @Override
@@ -125,7 +122,6 @@ public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralM
             Log.error("La posición short no exite");
             return;
         }
-        status = Status.STOPING;
         BigDecimal borrowed = connector.mGetBorrowed(symbol);
         Log.info("Deuda: %s", borrowed);
         CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
@@ -171,7 +167,7 @@ public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralM
         Log.info("<green>Long cerrado", borrowed);
         Log.info("<green>Short Cerrado", baseAsset, quoteAsset);
         Log.info("Fin del programa", baseAsset, quoteAsset);
-        status = Status.STOPPED;
+        setStatus(StatusManager.STOPPED);
     }
 
     public boolean checkPreStart(){
@@ -216,19 +212,19 @@ public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralM
 
     @Override
     public @NotNull StatusProfiler.PresenceProfile getPresenceProfile() {
-        switch (status) {
+        switch (getStatus()) {
             case STOPPED -> {
                 return new PresenceProfile(OnlineStatus.DO_NOT_DISTURB, Activity.of(Activity.ActivityType.WATCHING, "Detenido"));
             }
             case READY -> {
                 return new PresenceProfile(OnlineStatus.IDLE, Activity.of(Activity.ActivityType.PLAYING, "En espera de iniciar"));
             }
-            case CHECK, STARTING -> {
+            case STARTING -> {
                 return new PresenceProfile(OnlineStatus.ONLINE, Activity.of(Activity.ActivityType.PLAYING, "Iniciando..."));
             }
-            case RUNNING -> {
-                return new PresenceProfile(OnlineStatus.ONLINE, Activity.of(Activity.ActivityType.WATCHING, "%s @ %.4f%%".formatted(baseAsset + quoteAsset, connector.fGetFundingRate().get(baseAsset + quoteAsset).nextFundingRate().multiply(new BigDecimal("100")))));
-            }
+//            case RUNNING -> {
+//                return new PresenceProfile(OnlineStatus.ONLINE, Activity.of(Activity.ActivityType.WATCHING, "%s @ %.4f%%".formatted(baseAsset + quoteAsset, connector.fGetFundingRate().get(baseAsset + quoteAsset).nextFundingRate().multiply(new BigDecimal("100")))));
+//            }
             case STOPING -> {
                 return new PresenceProfile(OnlineStatus.DO_NOT_DISTURB, Activity.of(Activity.ActivityType.PLAYING, "Deteniendo..."));
             }
@@ -255,24 +251,15 @@ public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralM
     }
 
     public static class FundingManagerPersistan extends BasePersistent {
-        private final Status status;
+        private final StatusManager status;
         private final boolean isActive;
         private final UUID uuid;
 
         @Contract(pure = true)
         public FundingManagerPersistan(@NotNull FundingNeutralManager manager) {
-            this.status = manager.status;
+            this.status = manager.getStatus();
             this.isActive = manager.running;
             this.uuid = manager.uuid;
         }
-    }
-
-    public enum Status{
-        READY,
-        CHECK,
-        STARTING,
-        RUNNING,
-        STOPING,
-        STOPPED,
     }
 }

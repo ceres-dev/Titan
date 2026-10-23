@@ -2,6 +2,7 @@ package dev.cerez.titan.core;
 
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.core.event.BaseListener;
 import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
 import dev.cerez.titan.core.strategy.TypeManager;
@@ -15,9 +16,10 @@ import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.Consumer;
 
-public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersistent, O extends Connector, L extends Listener> extends BaseManager<C, P, O> {
+public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersistent, O extends Connector, L extends BaseListener> extends BaseManager<C, P, O> {
 
-    @Getter @NotNull protected final Set<L> listeners = new HashSet<>();
+    @Getter @NotNull protected final Set<Listener> listeners = new HashSet<>();
+    @Getter @NotNull private StatusManager status = StatusManager.STOPING;
 
     @Getter @Setter @Nullable protected BalanceMaxRiskManager balanceMaxRiskManager;
 
@@ -28,7 +30,7 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
         super(storageManager, connector, typeManager);
     }
 
-    public void registerListener(L listener){
+    public void registerListener(Listener listener){
         listeners.add(listener);
     }
 
@@ -64,7 +66,34 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
         }
     }
 
+    @Override
+    public void start(){
+        setStatus(StatusManager.STARTING);
+        super.start();
+        if (this.status == StatusManager.STARTING) {
+            setStatus(StatusManager.READY);
+        }
+        callEvent(BaseListener::started);
+    }
+
+    @Override
+    public void stop(){
+        setStatus(StatusManager.STOPING);
+        super.stop();
+        setStatus(StatusManager.STOPPED);
+        callEvent(BaseListener::stopped);
+    }
+
+    protected void setStatus(StatusManager status){
+        this.status = status;
+        callEvent(BaseListener::changeStatus);
+    }
+
+
+    @SuppressWarnings("unchecked")
     protected void callEvent(Consumer<L> consumer){
-        listeners.forEach(consumer);
+        for (BaseListener listener : listeners) {
+            consumer.accept((L) listener);
+        }
     }
 }

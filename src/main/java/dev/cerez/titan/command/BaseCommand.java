@@ -1,10 +1,14 @@
 package dev.cerez.titan.command;
 
 import dev.cerez.titan.core.managers.EnvironmentManager;
+import dev.cerez.titan.utils.Utils;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 @Getter
 public abstract class BaseCommand {
@@ -19,5 +23,5 @@ public abstract class BaseCommand {
         this.environmentManager = environmentManager;
     }
 
-    public abstract void execute(@NotNull List<String> args);
+    protected abstract void execute(@NotNull List<String> args);
 }

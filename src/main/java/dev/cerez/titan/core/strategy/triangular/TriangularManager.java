@@ -1,5 +1,6 @@
 package dev.cerez.titan.core.strategy.triangular;
 
+import dev.cerez.titan.core.StatusManager;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.model.AssetRate;
@@ -71,6 +72,7 @@ public final class TriangularManager extends ManagerStrategy<TriangularManager.T
             Log.info("<green>Engine Ready: %s.", engine.getClass().getName());
             Log.info("Starting Api...");
             connector.wsSubscribeBookTicker(streamListener = this::onBookTickerUpdate, symbolsToSubscribe.keySet());
+            setStatus(StatusManager.WORKING);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             Log.exception("Error iniciando stream de arbitraje", e);

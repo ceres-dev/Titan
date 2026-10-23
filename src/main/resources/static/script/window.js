@@ -19,6 +19,7 @@ function createWindow({id}) {
 }
 
 function makeDraggable(windowElement, header, closer) {
+    const resetButton = document.getElementById("resetWindows");
 
     let dragging = false;
 
@@ -54,5 +55,11 @@ function makeDraggable(windowElement, header, closer) {
     closer.addEventListener("click", (event) => {
         windowElement.style.visibility = "hidden";
         windowElement.style.pointerEvents = "none";
+    })
+
+    resetButton.addEventListener("click", (event) => {
+        windowElement.style.visibility = "visible";
+        windowElement.style.pointerEvents = "all";
+        windowElement.style.transform = `translate(0px, 0px)`;
     })
 }

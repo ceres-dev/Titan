@@ -6,7 +6,7 @@ const protocol =
 // El navegador envía automáticamente las cookies del
 // mismo origen que correspondan a esta petición.
 const socket = new WebSocket(
-    `${protocol}//${location.host}/ws/private`
+    `${protocol}//${location.host}/ws`
 );
 
 socket.addEventListener("open", () => {
@@ -25,8 +25,12 @@ socket.addEventListener("message", event => {
             addRenderLogs("spotBalance", payload.data.spot);
             break;
         }
+        case "Strategy": {
+            renderStrategy("strategy", payload.data);
+            break;
+        }
         default: {
-            console.error("Unknow Response: " + payload);
+            console.error("Unknow Response: " + payload.data);
         }
     }
 });

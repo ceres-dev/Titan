@@ -4,10 +4,27 @@ body{
 .log{
     margin: 0;
 }
-.logs{
+#logs{
     height: 300px;
     overflow: scroll;
     white-space: nowrap;
+}
+
+.barLeft, .barRight, .navBar{
+    display: flex;
+    flex-direction: row;
+    max-width: 80rem;
+    align-items: center;
+    flex-grow: 1;
+    gap: 1rem;
+}
+.barRight{
+    flex-direction: row-reverse;
+}
+.strategyElement{
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 #logsWindow{
     grid-column: 1 / 3;
@@ -15,4 +32,28 @@ body{
 #positionWindow{
     grid-column: 2 / 4;
     grid-row: 2 / 3;
+}
+#strategyWindow{
+    grid-column: 2 / 4;
+}
+#telemetryWindow{
+    grid-row: 2 / 4;
+}
+
+/*Effects Type */
+.statusWAITING{
+    animation: statusWaiting 2s infinite linear;
+}
+.statusWORKING{
+    animation: statusWorking 2s infinite linear;
+}
+@keyframes statusWaiting{
+    0% { color: #5e5eff}
+    50% { color: #2b2bff}
+    100% { color: #5e5eff }
+}
+@keyframes statusWorking{
+    0% { color: #a6ff8f}
+    50% { color: #60ff2b}
+    100% { color: #a6ff8f }
 }

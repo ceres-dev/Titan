@@ -1,10 +1,13 @@
 package dev.cerez.titan.core;
 
+import dev.cerez.titan.Titan;
+import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.Storage;
 import dev.cerez.titan.storage.StorageProfiler;
+import dev.cerez.titan.utils.NoAutoRegister;
 import dev.cerez.titan.utils.Utils;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -28,12 +31,14 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
     @Getter @Setter @NotNull protected String name = id.toString();
     @Getter @Setter(value = AccessLevel.NONE) protected boolean running = false;
     @Getter protected final TypeManager typeManager;
+    @Getter @Setter protected EnvironmentManager environmentManager;
 
     protected BaseManager(@NotNull StorageProfiler<C, P> storageProfiler, @NotNull O connector, @NotNull TypeManager typeManager) {
         this.configStorage = storageProfiler.config();
         this.persistenceStorage = storageProfiler.persistent();
         this.connector = connector;
         this.typeManager = typeManager;
+        autoRegister();
     }
 
     @Nullable private volatile C cacheConfig = null;
@@ -56,7 +61,7 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
     }
 
     @Override
-    public final void start() {
+    public void start() {
         if (running)return;
         running = true;
         long currentTime = System.currentTimeMillis();
@@ -66,13 +71,40 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
     }
 
     @Override
-    public final void stop() {
+    public void stop() {
         if (!running)return;
         running = false;
         long currentTime = System.currentTimeMillis();
         Log.info("<cian>Deteniendo: %s:%s", this.getClass().getSimpleName(), getName());
         CompletableFuture.runAsync(this::internalStop, executor).join();
         Log.info("<green>Detenido: %s:%s %.2fs", this.getClass().getSimpleName(), getName(), (System.currentTimeMillis() - currentTime) / 1000d);
+    }
+
+    @Override
+    public void registerEnvironment(@NotNull EnvironmentManager environment) {
+        this.environmentManager = environment;
+        environment.registerManager(this);
+    }
+
+    private void autoRegister(){
+        if (this instanceof NoAutoRegister) {
+            return;
+        }
+
+        Thread current = Thread.currentThread();
+        String[] split = current.getName().split("-");
+        if (split.length > 1) {
+            String uuidBase64 = split[1];
+
+
+            try {
+                UUID uuid = Utils.base64ToUuid(uuidBase64);
+                EnvironmentManager environment = Titan.getInstance().getEnvironmentManager(uuid);
+                if (environment != null) environment.registerManager(this);
+            }catch (Exception ignored){
+                ignored.printStackTrace();
+            }
+        }
     }
 
     protected abstract void internalStart();

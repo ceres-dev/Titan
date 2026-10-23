@@ -277,7 +277,7 @@ public abstract class BaseConnector implements Connector {
 
             sendWebSocket(url, request.toString());
             CompletableFuture<JsonNode> future = new CompletableFuture<>();
-            System.out.println("id: " + id + " Send: " + request);
+//            System.out.println("id: " + id + " Send: " + request);
             webSockets.get(url).getPendingResponse().put(id, future::complete);
             return future;
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
@@ -568,12 +568,20 @@ public abstract class BaseConnector implements Connector {
         @Builder.Default private String secret = "";
     }
 
+    @Contract(value = "null -> null; !null -> !null")
     protected String createId(Object o){
-        if (o instanceof String s){
-            return s;
-        }
-        if (o instanceof Nameable){
-            return o.getClass().getSimpleName() + ":" + ((Nameable)o).getName();
+        switch (o) {
+            case null -> {
+                return null;
+            }
+            case String s -> {
+                return s;
+            }
+            case Nameable n -> {
+                return o.getClass().getSimpleName() + ":" + n.getName();
+            }
+            default -> {
+            }
         }
         return o.toString();
     }

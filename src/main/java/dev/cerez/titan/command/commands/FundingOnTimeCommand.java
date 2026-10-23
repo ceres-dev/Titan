@@ -21,11 +21,11 @@ public class FundingOnTimeCommand extends BaseCommand {
 
     @Override
     public void execute(@NotNull List<String> args) {
+        BinanceConnector connector = this.getEnvironmentManager().getConnector();
         StorageManager storageReal = new StorageManagerJsonLocal(Utils.getRootId());
         StorageManager storageMemory = new StorageManagerMemory(Utils.getRootId());
         storageReal.setConfigProfilerName(BaseConnector.ConnectorConfig.class, "testnet");
-        BinanceConnector connector = new BinanceConnector(storageReal);
-        connector.start();
+
         connector.wuCreateEventAccountUpdate((jsonNode -> {
             Log.info(jsonNode.toPrettyString());
         }), null);

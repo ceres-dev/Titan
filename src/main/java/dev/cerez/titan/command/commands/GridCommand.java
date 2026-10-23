@@ -2,7 +2,7 @@ package dev.cerez.titan.command.commands;
 
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.core.event.events.FundingOnTimeManagerListener;
+import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
@@ -63,7 +63,7 @@ public class GridCommand extends BaseCommand {
 
         discordConnector.setStatusProfiler(gridManager);
 
-        fundingOnTimeManager.registerListener(new FundingOnTimeManagerListener() {
+        fundingOnTimeManager.registerListener(new Listener() {
             @Override
             public void onPrepare() {
                 gridManager.stop();

@@ -1,6 +1,7 @@
 package dev.cerez.titan.core.strategy.funding.time;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import dev.cerez.titan.core.StatusManager;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
@@ -74,8 +75,9 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
         Duration remaining = Duration.between(now, nextHour);
 
         Log.info("Espera del Financiación: %ds", remaining.toSeconds());
+        setStatus(StatusManager.WAITING);
         LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
-
+        setStatus(StatusManager.PREPARING);
         callEvent(FundingOnTimeManagerListener::onPrepare);
 
         CompletableFuture<Map<String, BinanceConnector.FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
@@ -136,7 +138,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
                 .toList()
                 .getLast()
         );
-
+        setStatus(StatusManager.STARTING);
         try {
             Log.info("Delta temporal: Avg: %dms, Max: %dms, Min: %dms", remote.avg(), remote.max(), remote.min());
             symbolsPending.clear();
@@ -154,7 +156,6 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
 
         long fundingTimeLocal = symbols.getFirst().target.nextFundingTime() - remote.avg();
         var config = getConfig();
-
 
         long waitFinal = fundingTimeLocal - config.windowSize;
         long currentTimeFinal = System.currentTimeMillis();

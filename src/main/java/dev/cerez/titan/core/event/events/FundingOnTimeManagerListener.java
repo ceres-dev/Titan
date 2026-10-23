@@ -1,8 +1,9 @@
 package dev.cerez.titan.core.event.events;
 
-import dev.cerez.titan.core.event.Listener;
+import dev.cerez.titan.core.event.BaseListener;
+import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
 
-public interface FundingOnTimeManagerListener extends Listener {
+public interface FundingOnTimeManagerListener extends BaseListener {
 
     default void onPrepare() {}
 

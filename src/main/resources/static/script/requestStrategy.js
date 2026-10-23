@@ -21,20 +21,22 @@ function renderStrategy(elementId, strategies) {
     if (strategies.length > 0) {
         strategies.forEach((strategy) => {
             const li = document.createElement("li");
-            const strong = document.createElement("strong");
-            const button = document.createElement("button");
-            strong.textContent = strategy.label;
+            const h3 = document.createElement("h3");
+            const div = document.createElement("div");
+            const small = document.createElement("small");
+            const span = document.createElement("span");
+            span.textContent = strategy.status
+            span.classList.add("status" + strategy.status);
+            h3.textContent = strategy.label;
+            div.classList.add("strategyElement");
+            div.appendChild(h3);
+            div.appendChild(span);
+            small.textContent = strategy.name;
 
-            li.appendChild(strong);
-            li.append(`${strategy.isRunning}`);
-            li.append(button);
+            li.appendChild(div);
+            li.appendChild(small);
 
             list.appendChild(li);
-            if (strategy.isRunning){
-                button.textContent = "Stop"
-            }else {
-                button.textContent = "Start"
-            }
         })
     }else {
         const li = document.createElement("li");

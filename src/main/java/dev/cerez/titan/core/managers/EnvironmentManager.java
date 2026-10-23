@@ -9,6 +9,7 @@ import dev.cerez.titan.core.ConfigNope;
 import dev.cerez.titan.core.Manager;
 import dev.cerez.titan.core.ManagerStrategy;
 import dev.cerez.titan.core.PersistentNope;
+import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.event.events.EnvironmentManagerListener;
 import dev.cerez.titan.core.exception.ConfigMalformatException;
 import dev.cerez.titan.core.exception.ManagerIsNotFoundException;
@@ -22,36 +23,39 @@ import dev.cerez.titan.log.Log;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.storage.storages.StorageManagerJsonLocal;
 import dev.cerez.titan.utils.Messageable;
+import dev.cerez.titan.utils.NoAutoRegister;
 import dev.cerez.titan.utils.Ownership;
 import dev.cerez.titan.utils.Utils;
+import lombok.AccessLevel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public final class EnvironmentManager extends ManagerStrategy<ConfigNope, PersistentNope, BinanceConnector, EnvironmentManagerListener> implements Ownership {
+public final class EnvironmentManager extends ManagerStrategy<ConfigNope, PersistentNope, BinanceConnector, EnvironmentManagerListener> implements Ownership, NoAutoRegister {
 
+    @NotNull
     private final UUID idOwner;
+    @Getter(AccessLevel.NONE)
     private final Map<UUID, Manager<?, ?>> managerMap = new HashMap<>();
-    private final CommandHander commandHandler = new CommandHander();
     private final EnvironmentPort port = new EnvironmentPort();
     private final StorageManager storageManager;
     private final DiscordConnector discordConnector;
+    private final CommandHander commandHandler;
     private Messageable messageable = message -> {};
 
     private EnvironmentManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector binanceConnector, @NotNull UUID idOwner) {
         super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), binanceConnector, TypeManager.ENVIRONMENT);
         this.storageManager = storageManager;
         this.idOwner = idOwner;
+        this.commandHandler = new CommandHander(this);
         commandHandler.registerCommand(
                 new ExitCommand(this),
                 new TriangularCommand(this),
@@ -106,6 +110,35 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
     }
 
     @Override
+    public void registerEnvironment(@NotNull EnvironmentManager manager){
+        throw new IllegalStateException();
+    }
+
+    public void registerManager(@NotNull Manager<?, ?> @NotNull... manager) {
+        for (Manager<?, ?> m : manager) {
+            if (!this.equals(m.getEnvironmentManager())) m.setEnvironmentManager(this);
+            managerMap.put(m.getId(), m);
+            if (m instanceof ManagerStrategy<?, ?, ?, ?> strategy){
+                executor.execute(() -> strategy.registerListener(new Listener() {
+                    @Override
+                    public void changeStatus() {
+                        messageable.sendMessage(getPort().getStrategy());
+                    }
+                }));
+            }
+        }
+    }
+
+    public void unregisterManager(@NotNull UUID @NotNull... id) {
+        for (UUID i : id) managerMap.remove(i);
+    }
+
+    @Contract(pure = true)
+    public Manager<?, ?> getManager(@NotNull UUID id) {
+        return managerMap.get(id);
+    }
+
+    @Override
     public @NotNull TypeManager getTypeManager() {
         return TypeManager.FUNDING_NEUTRAL;
     }
@@ -144,7 +177,8 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
         }
 
         public @NotNull List<Strategy> getStrategy() {
-            return managerMap.values().stream().filter(m -> m instanceof ManagerStrategy<?,?,?,?>).map(m -> new Strategy(m.getId(), m.getTypeManager(), m.getName(), m.isRunning())).toList();
+            Log.info(managerMap.values().toString());
+            return managerMap.values().stream().filter(m -> m instanceof ManagerStrategy<?,?,?,?>).map(m -> (ManagerStrategy<?,?,?,?>) m).map(m -> new Strategy(m.getId(), m.getTypeManager(), m.getName(), m.getClass().getSimpleName(), m.getStatus())).toList();
         }
 
         public Time getTime(){

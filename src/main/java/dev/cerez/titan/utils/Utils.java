@@ -15,12 +15,15 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
+import org.jspecify.annotations.NonNull;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.BiFunction;
@@ -35,9 +38,62 @@ public class Utils {
         return value.toString(36);
     }
 
-    public @NotNull String uuidToBase64(UUID uuid) {
-        BigInteger value = uuidToBigInteger(uuid);
-        return value.toString(64);
+    private static final String ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz/+";
+    private static final BigInteger BASE = BigInteger.valueOf(64);
+
+    public @NotNull String uuidToBase64(@NotNull UUID uuid) {
+        ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
+        bb.putLong(uuid.getMostSignificantBits());
+        bb.putLong(uuid.getLeastSignificantBits());
+        BigInteger number = new BigInteger(1, bb.array());
+
+        StringBuilder sb = new StringBuilder();
+        while (number.compareTo(BigInteger.ZERO) > 0) {
+            BigInteger[] divideAndRemainder = number.divideAndRemainder(BASE);
+            int remainder = divideAndRemainder[1].intValue();
+            sb.append(ALPHABET.charAt(remainder));
+            number = divideAndRemainder[0];
+        }
+        return sb.reverse().toString();
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull UUID base64ToUuid(@NotNull String base64Str) {
+        byte[] bytes = getBytes(base64Str);
+        byte[] uuidBytes = new byte[16];
+
+        // Ajustar el array de bytes si es más corto o más largo debido al signo
+        if (bytes.length <= 16) {
+            System.arraycopy(bytes, 0, uuidBytes, 16 - bytes.length, bytes.length);
+        } else {
+            // Si trae un byte extra de signo (0x00) al inicio, lo ignoramos
+            System.arraycopy(bytes, bytes.length - 16, uuidBytes, 0, 16);
+        }
+
+        // Reconstruir los longs para el UUID
+        ByteBuffer byteBuffer = ByteBuffer.wrap(uuidBytes);
+        long mostSigBits = byteBuffer.getLong();
+        long leastSigBits = byteBuffer.getLong();
+
+        return new UUID(mostSigBits, leastSigBits);
+    }
+
+    private static byte @NonNull [] getBytes(String base64Str) {
+        BigInteger number = BigInteger.ZERO;
+
+        // Reconstruir el BigInteger multiplicando por la base (64)
+        for (int i = 0; i < base64Str.length(); i++) {
+            char c = base64Str.charAt(i);
+            int digit = ALPHABET.indexOf(c);
+            if (digit == -1) {
+                throw new IllegalArgumentException("Carácter inválido en la cadena: " + c);
+            }
+            number = number.multiply(BASE).add(BigInteger.valueOf(digit));
+        }
+
+        // Convertir el BigInteger de vuelta a un array de 16 bytes
+        byte[] bytes = number.toByteArray();
+        return bytes;
     }
 
     private @NotNull BigInteger uuidToBigInteger(@NotNull UUID uuid) {
@@ -96,11 +152,21 @@ public class Utils {
         throw new IllegalArgumentException();
     }
 
+    public @NotNull ThreadFactory getThreadFactory(@NotNull Object o, @Nullable EnvironmentManager environment) {
+        String id = Utils.uuidToBase64(UUID.randomUUID());
+        if (environment != null){
+            return Thread.ofVirtual()
+                    .name(id + "-" + Utils.uuidToBase64(environment.getIdOwner()) + "-" + o.getClass().getSimpleName() + "-", 0)
+                    .factory();
+        }else {
+            return Thread.ofVirtual()
+                    .name(id + "-" + o.getClass().getSimpleName() + "-", 0)
+                    .factory();
+        }
+    }
+
     public @NotNull ThreadFactory getThreadFactory(@NotNull Object o) {
-        String id = Utils.uuidToBase36(UUID.randomUUID());
-        return Thread.ofVirtual()
-                .name(id + "-" + o.getClass().getSimpleName() + "-", 0)
-                .factory();
+        return getThreadFactory(o, null);
     }
 
     public String getClassNameCallPrevious(){

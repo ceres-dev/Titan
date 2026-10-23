@@ -16,13 +16,13 @@ async function loadBalance() {
 }
 
 function addRenderLogs(elementId, logs) {
-    const list = document.getElementById(elementId);
+    const container = document.getElementById(elementId);
     if (logs.length > 0) {
         logs.forEach((log) => {
-            const li = document.createElement("li");
-            const strong = document.createElement("code");
+            const li = document.createElement("pre");
+            const code = document.createElement("code");
             li.classList.add("log");
-            li.appendChild(strong);
+            li.appendChild(code);
 
             const date = new Date(log.time)
 
@@ -52,9 +52,10 @@ function addRenderLogs(elementId, logs) {
             threadSpan.textContent = log.thread;
             threadSpan.style.color = "#aaf"
 
-            li.append(`${hours}:${minutes}:${seconds}:${milliseconds} [`, threadSpan, `] [`, levelSpan, `]: ${log.message}`);
+            code.append(`${hours}:${minutes}:${seconds}:${milliseconds} [`, threadSpan, `] [`, levelSpan, `]: ${log.message}`);
 
-            list.appendChild(li);
+            container.appendChild(li);
+            container.scrollTop = container.scrollHeight;
         });
     }
 }

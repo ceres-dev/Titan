@@ -1,5 +1,6 @@
 package dev.cerez.titan.command;
 
+import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.Utils;
@@ -7,9 +8,7 @@ import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.LockSupport;
 
 public class CommandHander implements Switch {
@@ -18,7 +17,11 @@ public class CommandHander implements Switch {
     private final HashMap<String, String> aliases = new HashMap<>();
     private final HashMap<Integer, String> indexCommands = new HashMap<>();
     private final InputUser input = new InputUser();
-    private final Executor executor = Executors.newScheduledThreadPool(4, Utils.getThreadFactory(this));
+    private final ScheduledExecutorService executor;
+
+    public CommandHander(@NotNull EnvironmentManager environmentManager) {
+        this.executor = Executors.newScheduledThreadPool(4, Utils.getThreadFactory(this, environmentManager));
+    }
 
     public void dispatch(@NotNull String cmd){
         dispatch(cmd.split(" "));
@@ -36,9 +39,9 @@ public class CommandHander implements Switch {
             return;
         }
         if (args.length > 1) {
-            command.execute(Arrays.stream(Arrays.copyOfRange(args, 1, args.length)).toList());
+            CompletableFuture.runAsync(() -> command.execute(Arrays.stream(Arrays.copyOfRange(args, 1, args.length)).toList()), executor);
         }else {
-            command.execute(List.of());
+            CompletableFuture.runAsync(() -> command.execute(List.of()), executor);
         }
     }
 
