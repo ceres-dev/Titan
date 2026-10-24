@@ -22,7 +22,7 @@ function renderTelemetryConnector(telemetry) {
         const strong = document.createElement("strong");
         strong.textContent = "Requests: ";
         const span = document.createElement("span");
-        span.textContent = `${telemetry.requestLastHour}r/h`;
+        span.textContent = `${utils.trunc(telemetry.requestLastHour/60, 2)}r/m`;
         itemConnector.appendChild(strong)
         itemConnector.appendChild(span)
     }
@@ -41,6 +41,30 @@ function renderTelemetrySystem(telemetry) {
         itemRam.appendChild(strong);
         itemRam.appendChild(span);
     }
+    const itemUptime = document.createElement("li");
+    {
+        const strong = document.createElement("strong");
+        strong.textContent = "Uptime: ";
+        lastUptime = telemetry.uptime;
+        lastUpdateTelemetry = Date.now();
+        const span = document.createElement("span");
+        span.textContent = `${utils.formatMiliSeconds(telemetry.uptime)}`;
+        span.id = "uptime";
+        itemUptime.appendChild(strong);
+        itemUptime.appendChild(span);
+    }
     listSystem.appendChild(itemRam)
+    listSystem.appendChild(itemUptime)
+}
+
+let lastUptime = null;
+let lastUpdateTelemetry = Date.now();
+function updateUpdateTime(){
+    let element = document.getElementById("uptime");
+    let current = Date.now();
+    if (element != null) {
+        element.textContent = `${utils.formatMiliSeconds(lastUptime + (current - lastUpdateTelemetry))}`;
+    }
 }
 loadTelemetry();
+setInterval(updateUpdateTime, 1000);

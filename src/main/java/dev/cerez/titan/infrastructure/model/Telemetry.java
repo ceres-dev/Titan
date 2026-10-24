@@ -9,6 +9,7 @@ public record Telemetry(
     public record Connector(int requestLastHour){}
     public record System(
             long totalMemory,
-            long usedMemory
+            long usedMemory,
+            long uptime
     ){}
 }

@@ -8,4 +8,5 @@ public enum StatusManager {
     PREPARING,
     STARTING,
     READY,
+    INOPERATIVE
 }

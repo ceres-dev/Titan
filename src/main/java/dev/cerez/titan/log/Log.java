@@ -2,8 +2,7 @@ package dev.cerez.titan.log;
 
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
-import dev.cerez.titan.Titan;
+import dev.cerez.titan.TitanApplication;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.UtilityClass;
@@ -11,13 +10,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Locale;
-import java.util.function.Consumer;
 
 @SuppressWarnings("LoggerInitializedWithForeignClass")
 @UtilityClass
 public class Log {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(Titan.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(TitanApplication.class);
     public static final HistoryAppender<ILoggingEvent> HISTORY_APPENDER = new HistoryAppender<>();
     public static final ConsumerAppender<ILoggingEvent> CONSUMER_APPENDER = new ConsumerAppender<>();
 
@@ -30,7 +28,7 @@ public class Log {
         HISTORY_APPENDER.start();
         CONSUMER_APPENDER.start();
 
-        ch.qos.logback.classic.Logger titanLogger = context.getLogger(Titan.class);
+        ch.qos.logback.classic.Logger titanLogger = context.getLogger(TitanApplication.class);
 
         titanLogger.addAppender(HISTORY_APPENDER);
         titanLogger.addAppender(CONSUMER_APPENDER);

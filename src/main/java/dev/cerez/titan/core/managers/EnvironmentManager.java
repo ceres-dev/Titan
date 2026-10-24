@@ -1,6 +1,5 @@
 package dev.cerez.titan.core.managers;
 
-import dev.cerez.titan.Titan;
 import dev.cerez.titan.command.CommandHander;
 import dev.cerez.titan.command.commands.*;
 import dev.cerez.titan.connector.BaseConnector;
@@ -51,6 +50,7 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
     private final CommandHander commandHandler;
     private final TelemetryCollector telemetry;
     private WebSocketServer webSocketServer = message -> {};
+    private final long uptime = System.currentTimeMillis();
 
     private EnvironmentManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector binanceConnector, @NotNull UUID idOwner) {
         super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), binanceConnector, TypeManager.ENVIRONMENT);
@@ -78,9 +78,10 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
         }, this);
         Log.CONSUMER_APPENDER.addConsumer((log) ->
                 webSocketServer.sendMessage(List.of(new LogRecord(Utils.cleanAnsi(log.getMessage()), log.getThreadName(), log.getLevel().toString(), log.getTimeStamp()))));
-        executor.scheduleAtFixedRate(() -> {
-            webSocketServer.sendMessage(getPort().getTelemetry());
-        }, 5, 5, TimeUnit.SECONDS);
+        executor.scheduleAtFixedRate(() -> webSocketServer.sendMessage(getPort().getTelemetry()), 5, 5, TimeUnit.SECONDS);
+        executor.scheduleAtFixedRate(() -> webSocketServer.sendMessage(getPort().getPositions()), 15, 15, TimeUnit.SECONDS);
+        executor.scheduleAtFixedRate(() -> webSocketServer.sendMessage(getPort().getBalance()), 5, 5, TimeUnit.MINUTES);
+
     }
 
     @Contract(pure = true)
@@ -89,7 +90,6 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
         BinanceConnector binanceConnector = new BinanceConnector(
                 storageManager.loadOrSaveDefault(
                         BaseConnector.ConnectorConfig.builder()
-                                .isTestNet(Titan.IS_TESTNET)
                                 .maxStreamsPerSubscribe(100)
                                 .build()
                 )
@@ -268,7 +268,8 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
                     ),
                     new Telemetry.System(
                             totalMemory,
-                            usedMemory
+                            usedMemory,
+                            System.currentTimeMillis() - uptime
                     )
             );
         }

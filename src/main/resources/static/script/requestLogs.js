@@ -52,11 +52,54 @@ function addRenderLogs(elementId, logs) {
             threadSpan.textContent = log.thread;
             threadSpan.style.color = "#aaf"
 
-            code.append(`${hours}:${minutes}:${seconds}:${milliseconds} [`, threadSpan, `] [`, levelSpan, `]: ${log.message}`);
+            code.append(`${hours}:${minutes}:${seconds}:${milliseconds} [`, threadSpan, `] [`, levelSpan, `]: `);
+            code.insertAdjacentHTML("beforeend", formatLog(log.message))
 
             container.appendChild(li);
             container.scrollTop = container.scrollHeight;
         });
     }
+}
+function formatLog(text) {
+    const regex = /\b(?:true|false|SELL|BUY)\b|\b-?\d+(?:[.,]\d+)?\b/g;
+
+    let result = "";
+    let lastIndex = 0;
+
+    for (const match of text.matchAll(regex)) {
+        // Escapar el texto normal antes de la coincidencia
+        result += escapeHtml(text.slice(lastIndex, match.index));
+
+        const value = match[0];
+        let cssClass;
+
+        if (value === "true" || value === "false") {
+            cssClass = "variable";
+        }else if (value.toUpperCase() === "BUY"){
+            cssClass = "variableBuy";
+        }else if (value.toUpperCase() === "SELL"){
+            cssClass = "variableSell";
+        }else {
+            // Números
+            //cssClass = "variable";
+        }
+
+        result += `<span class="${cssClass}">${value}</span>`;
+        lastIndex = match.index + value.length;
+    }
+
+    result += escapeHtml(text.slice(lastIndex));
+
+    return result;
+}
+
+function escapeHtml(text) {
+    return text.replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[char]);
 }
 loadBalance();

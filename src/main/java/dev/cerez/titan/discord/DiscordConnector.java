@@ -1,10 +1,10 @@
 package dev.cerez.titan.discord;
 
-import dev.cerez.titan.Titan;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.Configurable;
 import dev.cerez.titan.utils.Switch;
+import dev.cerez.titan.utils.Utils;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import net.dv8tion.jda.api.JDA;
@@ -12,6 +12,8 @@ import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.User;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
@@ -20,6 +22,7 @@ public class DiscordConnector implements Switch, Configurable<DiscordConnector.D
     @Getter @NotNull private final DiscordConfig config;
     @Getter private boolean running = false;
     @Getter @Setter private StatusProfiler statusProfiler = null;
+    private final ExecutorService executorService = Executors.newScheduledThreadPool(2, Utils.getThreadFactory(this));
     private JDA jda;
 
 
@@ -34,8 +37,8 @@ public class DiscordConnector implements Switch, Configurable<DiscordConnector.D
         running = true;
         jda = JDABuilder.createDefault(config.token).build();
         jda.awaitReady();
-        Titan.getInstance().getExecutor().execute(() -> {
-            while (running) { // TODO: Bug: Cuando tarda en asignar el StatusProfiler se bloquea el bucle
+        executorService.execute(() -> {
+            while (running) {
                 LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(4));
                 if (statusProfiler == null) continue;
                 StatusProfiler.PresenceProfile presenceProfiler = statusProfiler.getPresenceProfile();

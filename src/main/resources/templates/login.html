@@ -23,7 +23,7 @@
                 <button class="windowCloser">X</button>
             </header>
             <div class="windowContent">
-                <form method="post" th:action="@{/login}">
+                <form method="post" th:action="@{/auth/login}" novalidate>
                     <label>
                         <input class="loginInput" type="text" name="username" placeholder="Username" required>
                     </label>

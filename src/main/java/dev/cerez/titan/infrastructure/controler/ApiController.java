@@ -1,13 +1,11 @@
 package dev.cerez.titan.infrastructure.controler;
 
-import dev.cerez.titan.Titan;
-import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.TitanApplication;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.infrastructure.model.*;
 import dev.cerez.titan.infrastructure.user.custom.TitanUserDetails;
-import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.TemporalRefence;
-import dev.cerez.titan.utils.Utils;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,9 +16,10 @@ import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class ApiController {
 
-    public final Titan titan = Titan.getInstance();
+    public final TitanApplication titan;
 
     public TemporalRefence<Balance> balance = new TemporalRefence<>(TimeUnit.SECONDS, 30);
 

@@ -1,7 +1,7 @@
 package dev.cerez.titan.infrastructure.websocket;
 
 import com.google.gson.Gson;
-import dev.cerez.titan.Titan;
+import dev.cerez.titan.TitanApplication;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.infrastructure.model.WebSocketContainer;
 import dev.cerez.titan.infrastructure.user.custom.TitanUserDetails;
@@ -19,14 +19,20 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import java.io.IOException;
 import java.security.Principal;
 import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Component
+@RequiredArgsConstructor
 public class PrivateWebSocketHandler extends TextWebSocketHandler {
+
+    private final TitanApplication titan;
 
     @Override
     public void afterConnectionEstablished(@NotNull WebSocketSession session) throws Exception {
-        final Titan titan = Titan.getInstance();
         TitanUserDetails user = Utils.toTitanUser(session);
         if (user != null){
             EnvironmentManager manager = titan.getEnvironmentManager(user.getId());
@@ -56,6 +62,8 @@ public class PrivateWebSocketHandler extends TextWebSocketHandler {
 
         private final Gson gson = new Gson();
         private final WebSocketSession session;
+        private final Map<String, AtomicLong> sequences = new ConcurrentHashMap<>();
+        private final Executor executor = Executors.newSingleThreadExecutor(Utils.getThreadFactory(this));
 
         @Override
         public synchronized void sendMessage(Object message) {
@@ -68,9 +76,13 @@ public class PrivateWebSocketHandler extends TextWebSocketHandler {
             }else {
                 type = message.getClass().getSimpleName();
             }
-            WebSocketContainer webSocketContainer = new WebSocketContainer(type, message, System.currentTimeMillis());
+            long sequence = sequences
+                    .computeIfAbsent(type, key -> new AtomicLong())
+                    .incrementAndGet();
+
+            WebSocketContainer webSocketContainer = new WebSocketContainer(type, message, sequence);
             String payload = gson.toJson(webSocketContainer);
-            CompletableFuture.runAsync(() -> {
+            executor.execute(() -> {
                 try {
                     session.sendMessage(new TextMessage(payload));
                 } catch (IOException e) {

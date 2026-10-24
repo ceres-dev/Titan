@@ -17,7 +17,7 @@
 body{
     background: black;
     color: white;
-    font-family: 'Courier New', serif;
+    font-family: 'CascadiaCode', 'Courier New', serif;
     align-content: center;
     display: flex;
     flex-direction: column;
@@ -127,13 +127,33 @@ button:active {
     filter: brightness(0.7);
 }
 
+input {
+    border: var(--main-color);
+    margin: 0;
+    background: transparent;
+    color: var(--main-color);
+    filter: brightness(120%);
+    font-family: var(--font-family-monospace), serif;
+    transition: filter 0.3s ease;
+    font-size: 15px;
+}
+input:hover, input:focus {
+    filter: brightness(170%);
+}
+input:focus {
+    outline: none;
+}
+input::placeholder {
+    color: var(--main-color);
+}
+
 /* Listas */
 li{
-    margin-top: 1rem;
+    margin-top: 0.5rem;
     margin-left: 0.8rem;
 }
 li:last-child{
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
 }
 .listSmall{
     padding-left: 1rem;

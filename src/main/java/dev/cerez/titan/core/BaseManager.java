@@ -1,6 +1,6 @@
 package dev.cerez.titan.core;
 
-import dev.cerez.titan.Titan;
+import dev.cerez.titan.TitanApplication;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.Connector;
@@ -96,10 +96,9 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
         if (split.length > 1) {
             String uuidBase64 = split[1];
 
-
             try {
                 UUID uuid = Utils.base64ToUuid(uuidBase64);
-                EnvironmentManager environment = Titan.getInstance().getEnvironmentManager(uuid);
+                EnvironmentManager environment = TitanApplication.getInstance().getEnvironmentManager(uuid);
                 if (environment != null) environment.registerManager(this);
             }catch (Exception ignored){
                 ignored.printStackTrace();

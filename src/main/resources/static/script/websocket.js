@@ -13,17 +13,17 @@ socket.addEventListener("open", () => {
     console.log("websocket open");
 });
 
-const requestTime = new Map();
+const requestCount = new Map();
 
 
 socket.addEventListener("message", event => {
     const payload = JSON.parse(event.data);
 
-    let lastTime = requestTime.get(payload.type)
-    if (lastTime > payload.timeStamp) {
+    let lastCount = requestCount.get(payload.type)
+    if (lastCount > payload.count) {
         return;
     }
-    requestTime.set(payload.type, payload.timeStamp)
+    requestCount.set(payload.type, payload.count)
 
     switch (payload.type) {
         case "LogRecord": {
@@ -41,6 +41,7 @@ socket.addEventListener("message", event => {
         }
         case "Telemetry": {
             renderTelemetryConnector(payload.data.connector);
+            renderTelemetrySystem(payload.data.system);
             break
         }
         default: {

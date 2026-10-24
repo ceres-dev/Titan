@@ -1,6 +1,6 @@
 package dev.cerez.titan.command.commands;
 
-import dev.cerez.titan.Titan;
+import dev.cerez.titan.TitanApplication;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import org.jetbrains.annotations.NotNull;
@@ -15,6 +15,6 @@ public class ExitCommand extends BaseCommand {
 
     @Override
     public void execute(@NotNull List<String> args) {
-        Titan.getInstance().stop();
+        TitanApplication.getInstance().stop();
     }
 }

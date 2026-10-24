@@ -1,7 +1,6 @@
 package dev.cerez.titan.connector.connectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import dev.cerez.titan.Titan;
 import dev.cerez.titan.connector.exception.*;
 import dev.cerez.titan.connector.exception.exchange.*;
 import dev.cerez.titan.connector.model.SideOrder;
@@ -61,7 +60,6 @@ public final class BinanceConnector extends BaseConnector {
     public BinanceConnector() {
         super(Provider.from(
                 BaseConnector.ConnectorConfig.builder()
-                        .isTestNet(Titan.IS_TESTNET)
                         .maxStreamsPerSubscribe(100)
                         .build()
         ));
@@ -610,7 +608,7 @@ public final class BinanceConnector extends BaseConnector {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
         JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v1/allOrders", params);
-        List<OrderFuture> orders = new ArrayList<>();
+        List<OrderFuture> orders = new LinkedList<>();
         for (JsonNode node : raw) {
             orders.add(new OrderFuture(
                     node.get("symbol").asText(),
@@ -620,7 +618,7 @@ public final class BinanceConnector extends BaseConnector {
                     SideOrder.valueOf(node.get("side").asText()),
                     node.get("reduceOnly").asBoolean(),
                     StatusOrder.parse(node.get("status").asText()),
-                    node.get("date").asLong(),
+                    node.get("time").asLong(),
                     node.get("updateTime").asLong()
             ));
         }

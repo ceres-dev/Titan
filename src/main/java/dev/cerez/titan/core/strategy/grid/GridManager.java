@@ -1,5 +1,7 @@
 package dev.cerez.titan.core.strategy.grid;
 
+import dev.cerez.titan.core.StatusManager;
+import dev.cerez.titan.infrastructure.model.Telemetry;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.exception.exchange.MarginNotSufficienException;
@@ -194,6 +196,18 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
                     config.setStepSizePriority(stepSize);
                 }
             }
+            if (order.stream().allMatch(Order::isReduceOnly)){
+                setStatus(StatusManager.INOPERATIVE);
+            }else {
+                setStatus(StatusManager.WORKING);
+
+                if (order.stream().noneMatch(Order::isReduceOnly)) {
+                    setStatus(StatusManager.WAITING);
+                }else {
+                    setStatus(StatusManager.WORKING);
+                }
+            }
+
         }));
         Log.info("Balance disponible %.4f %s", fGetBalance().get(getConfig().quoteAsset), getConfig().quoteAsset);
         connector.wuCreateEventOrderTradeUpdate(orderUpdate -> {

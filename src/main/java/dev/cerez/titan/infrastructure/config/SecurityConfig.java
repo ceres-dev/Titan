@@ -17,7 +17,7 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/style/**", "/script/**", "/assets/**").permitAll()
-                        .requestMatchers("/login", "/about", "/robots.txt").permitAll()
+                        .requestMatchers("/login", "/auth/**", "/about", "/robots.txt").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .requestMatchers("/dashboard/**").authenticated()
                         .requestMatchers("/ws/**").authenticated()
@@ -25,10 +25,15 @@ public class SecurityConfig {
                 )
                 .formLogin(form -> form
                         .loginPage("/login")
+                        .loginProcessingUrl("/auth/login")
                         .defaultSuccessUrl("/dashboard", true)
                         .permitAll()
                 )
                 .logout(logout -> logout
+                        .logoutUrl("/auth/logout")
+                        .invalidateHttpSession(true)
+                        .clearAuthentication(true)
+                        .deleteCookies("JSESSIONID")
                         .logoutSuccessUrl("/login")
                 );
 

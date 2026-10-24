@@ -39,7 +39,9 @@ body{
 #telemetryWindow{
     grid-row: 2 / 4;
 }
-
+h2{
+    margin-bottom: 0.5rem;
+}
 .profit{
     animation: profitAnimation 2s infinite linear;
 }
@@ -63,11 +65,33 @@ body{
     }
 }
 /*Effects Type */
+.statusSTOPING{
+    animation: statusSTOPING 2s infinite linear;
+}
+.statusSTOPPED{
+    color: #bbbbbb;
+}
 .statusWAITING{
     animation: statusWaiting 2s infinite linear;
 }
 .statusWORKING{
     animation: statusWorking 2s infinite linear;
+}
+.statusPREPARING{
+    animation: statusPreparing 2s infinite linear;
+}
+.statusSTARTING{
+    animation: statusStarting 2s infinite linear;
+}
+.statusREADY{
+    color: #a6ff8f;
+}
+.statusINOPERATIVE{
+    animation: statusInoperative 1.5s infinite ease-in-out;
+}
+@keyframes statusSTOPING{
+    0%, 100% { color: #bbbbbb; }
+    50% { color: #ff6161; }
 }
 @keyframes statusWaiting{
     0%, 100% { color: #5e5eff}
@@ -76,4 +100,25 @@ body{
 @keyframes statusWorking{
     0%, 100% { color: #a6ff8f}
     50% { color: #60ff2b}
+}
+@keyframes statusPreparing{
+    0%, 100% { color: #21ffbd; }
+    50% { color: #a6ff8f; }
+}
+@keyframes statusStarting{
+    0%, 100% { color: #bbbbbb; }
+    50% { color: #a6ff8f; }
+}
+@keyframes statusInoperative{
+    0%, 100% { color: #ff0000; }
+    50% { color: #590000; }
+}
+.variable{
+    color: #00ffbb;
+}
+.variableBuy{
+    color: #2be356;
+}
+.variableSell{
+    color: #e32b56;
 }

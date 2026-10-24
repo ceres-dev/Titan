@@ -22,7 +22,11 @@
             <p id="timeExchange">Exchange --:--:--</p>
         </nav>
         <div class="barRight">
-            <button>LogOut</button>
+            <form style="display: flex" method="post" th:action="@{/auth/logout}" novalidate>
+                <button type="submit">
+                    Logout
+                </button>
+            </form>
             <button id="resetWindows">Reset</button>
         </div>
     </div>
@@ -48,7 +52,7 @@
         <div class="windowContent">
             <h2>Balance</h2>
             <div>
-                <h3>Futuros</h3>
+                <h3>Futuros USDⓈ-M</h3>
                 <ul>
                     <li>
                         <strong>Disponible</strong>

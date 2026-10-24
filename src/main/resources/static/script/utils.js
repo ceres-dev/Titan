@@ -30,9 +30,30 @@ function colorForProfit(element, number) {
     }
 }
 
+function formatMiliSeconds(ms) {
+    const MS_POR_SEGUNDO = 1000;
+    const MS_POR_MINUTO = MS_POR_SEGUNDO * 60;
+    const MS_POR_HORA = MS_POR_MINUTO * 60;
+    const MS_POR_DIA = MS_POR_HORA * 24;
+
+    const dias = Math.floor(ms / MS_POR_DIA);
+    const horas = Math.floor((ms % MS_POR_DIA) / MS_POR_HORA);
+    const minutos = Math.floor((ms % MS_POR_HORA) / MS_POR_MINUTO);
+    const segundos = Math.floor((ms % MS_POR_MINUTO) / MS_POR_SEGUNDO);
+
+    let resultado = [];
+    if (dias > 0) resultado.push(`${dias}d`);
+    if (horas > 0) resultado.push(`${horas}h`);
+    if (minutos > 0) resultado.push(`${minutos}m`);
+    if (segundos > 0 || resultado.length === 0) resultado.push(`${segundos}s`);
+
+    return resultado.join(' ');
+}
+
 window.utils = {
     trunc: trunc,
     padCustom: padCustom,
     pad: pad,
     formatBytes: formatBytes,
+    formatMiliSeconds: formatMiliSeconds,
 }

@@ -85,8 +85,10 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
     }
 
     protected void setStatus(StatusManager status){
-        this.status = status;
-        callEvent(BaseListener::changeStatus);
+        if (this.status != status) {
+            this.status = status;
+            callEvent(BaseListener::changeStatus);
+        }
     }
 
 
