@@ -20,7 +20,7 @@ function renderTelemetryConnector(telemetry) {
     const itemConnector = document.createElement("li");
     {
         const strong = document.createElement("strong");
-        strong.textContent = "Request/H: ";
+        strong.textContent = "Requests: ";
         const span = document.createElement("span");
         span.textContent = `${telemetry.requestLastHour}r/h`;
         itemConnector.appendChild(strong)

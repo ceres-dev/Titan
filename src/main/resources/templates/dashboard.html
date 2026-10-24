@@ -47,25 +47,37 @@
         </header>
         <div class="windowContent">
             <h2>Balance</h2>
-            <ul>
-                <li>
-                    <h3>Futuros</h3>
-                    <ul class="listSmall" id="futureBalance">
-                        <li>
-                            <div class="cliLoader"></div>
-                        </li>
-                    </ul>
-                </li>
-                <li>
-                    <h3>Spot</h3>
-                    <ul class="listSmall" id="spotBalance">
-                        <li>
-                            <div class="cliLoader"></div>
-                        </li>
-                    </ul>
-                </li>
-            </ul>
+            <div>
+                <h3>Futuros</h3>
+                <ul>
+                    <li>
+                        <strong>Disponible</strong>
+                        <ul class="listSmall" id="futureBalance">
+                            <li>
+                                <span class="cliLoader"></span>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>Valorado</strong>
+                        <ul class="listSmall" id="futureValued">
+                            <li>
+                                <span class="cliLoader"></span>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            <div>
+                <h3>Spot</h3>
+                <ul class="listSmall" id="spotBalance">
+                    <li>
+                        <div class="cliLoader"></div>
+                    </li>
+                </ul>
+            </div>
         </div>
+        <footer id="roi"><div class="cliLoader"></div></footer>
     </section>
     <section class="window" id="telemetryWindow">
         <header class="windowHeader">
@@ -78,8 +90,8 @@
                 <h3>Connector</h3>
                 <ul id="telemetryConnector">
                     <li>
-                        <strong>Request/h: </strong>
-                        <span id="TelemetryRequestForHour">321r/h</span>
+                        <strong>Requests: </strong>
+                        <span class="cliLoader"></span>
                     </li>
                 </ul>
             </div>
@@ -87,8 +99,8 @@
                 <h3>Sistema</h3>
                 <ul id="telemetrySystem">
                     <li>
-                        <strong>RAM</strong>
-                        <span id="TelemetryRequestForHour">321r/h</span>
+                        <strong>RAM: </strong>
+                        <span class="cliLoader"></span>
                     </li>
                 </ul>
             </div>

@@ -160,7 +160,7 @@ public final class BinanceConnector extends BaseConnector {
     @Contract(value = " -> new", pure = true)
     @Override
     protected @NotNull @Unmodifiable Set<String> getBlackListEndpointLog() {
-        return Set.of("/api/v3/time");
+        return Set.of("/api/v3/date");
     }
 
     @SuppressWarnings("DuplicatedCode")
@@ -620,7 +620,7 @@ public final class BinanceConnector extends BaseConnector {
                     SideOrder.valueOf(node.get("side").asText()),
                     node.get("reduceOnly").asBoolean(),
                     StatusOrder.parse(node.get("status").asText()),
-                    node.get("time").asLong(),
+                    node.get("date").asLong(),
                     node.get("updateTime").asLong()
             ));
         }
@@ -699,6 +699,25 @@ public final class BinanceConnector extends BaseConnector {
             );
         }
         return result1;
+    }
+
+    public @NotNull List<Transaction> fGetTransaction(long start, long end){
+        Map<String, Object> params = new HashMap<>();
+        params.put("startTime", start);
+        params.put("endTime", end);
+        params.put("limit", 500);
+        JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v1/income", params);;
+        List<Transaction> transactions = new LinkedList<>();
+        for (JsonNode node : raw) {
+            transactions.add(new Transaction(
+                    node.get("symbol").asText(),
+                    IncomeType.valueOf(node.get("incomeType").asText()),
+                    new BigDecimal(node.get("income").asText()),
+                    node.get("asset").asText(),
+                    node.get("time").longValue()
+            ));
+        }
+        return transactions;
     }
 
     public @NotNull Map<String, BigDecimal> fGetAllFundingRateHistory(){
@@ -1079,6 +1098,34 @@ public final class BinanceConnector extends BaseConnector {
     private record FundingConfig(double min, double max, int interval) {}
 
     public record SpotOrder(@NotNull BigDecimal baseAmount, @NotNull BigDecimal quoteAmount) {}
+
+    public record Transaction(@NotNull String symbol, @NotNull IncomeType incomeType, BigDecimal amount, String asset, long date) {}
+
+    public enum IncomeType{
+        TRANSFER,
+        WELCOME_BONUS,
+        REALIZED_PNL,
+        FUNDING_FEE,
+        COMMISSION,
+        INSURANCE_CLEAR,
+        REFERRAL_KICKBACK,
+        COMMISSION_REBATE,
+        API_REBATE,
+        CONTEST_REWARD,
+        CROSS_COLLATERAL_TRANSFER,
+        OPTIONS_PREMIUM_FEE,
+        OPTIONS_SETTLE_PROFIT,
+        INTERNAL_TRANSFER,
+        AUTO_EXCHANGE,
+        DELIVERED_SETTELMENT,
+        COIN_SWAP_DEPOSIT,
+        COIN_SWAP_WITHDRAW,
+        POSITION_LIMIT_INCREASE_FEE,
+        STRATEGY_UMFUTURES_TRANSFER,
+        FEE_RETURN,
+        BFUSD_REWARD,
+        SPECIAL_FUNDING_FEE
+    }
 
     @EqualsAndHashCode(callSuper = true)
     @Data

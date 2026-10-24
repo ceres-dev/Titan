@@ -213,12 +213,42 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
             })).toList();
         }
 
+        private static final Set<BinanceConnector.IncomeType> TYPES_COMPUTE = Set.of(
+                BinanceConnector.IncomeType.REALIZED_PNL,
+                BinanceConnector.IncomeType.FUNDING_FEE,
+                BinanceConnector.IncomeType.SPECIAL_FUNDING_FEE,
+                BinanceConnector.IncomeType.COMMISSION,
+                BinanceConnector.IncomeType.OPTIONS_PREMIUM_FEE,
+                BinanceConnector.IncomeType.INSURANCE_CLEAR,
+                BinanceConnector.IncomeType.POSITION_LIMIT_INCREASE_FEE,
+                BinanceConnector.IncomeType.DELIVERED_SETTELMENT,
+                BinanceConnector.IncomeType.OPTIONS_SETTLE_PROFIT
+        );
+
         public Balance getBalance() {
             Map<String, BigDecimal> BalanceSpot = connector.sGetBalance();
             Map<String, BigDecimal> BalanceFuture = connector.fGetBalance();
+            Map<String, BigDecimal> balanceFutureTotal = connector.fGetBalanceTotal();
+            long currentTime = System.currentTimeMillis();
+            double total = balanceFutureTotal.values().stream().mapToDouble(BigDecimal::doubleValue).sum();
+            List<BinanceConnector.Transaction> transactions = connector.fGetTransaction(currentTime - TimeUnit.DAYS.toMillis(7), currentTime);
+            double roiAbsolute7D = transactions.stream().filter(transaction -> TYPES_COMPUTE.contains(transaction.incomeType())).mapToDouble(transaction -> transaction.amount().doubleValue()).sum();
+            long ago1D = currentTime - TimeUnit.DAYS.toMillis(1);
+            double roiAbsolute1D = transactions.stream().filter(transaction -> transaction.date() > ago1D).filter(transaction -> TYPES_COMPUTE.contains(transaction.incomeType())).mapToDouble(transaction -> transaction.amount().doubleValue()).sum();
+
+            double roiPercent7D = roiAbsolute7D / total;
+            double roiPercent1D = roiAbsolute1D / total;
+
             return new Balance(
                     Utils.removeIf(BalanceSpot, (k, v) -> v.signum() == 0),
-                    Utils.removeIf(BalanceFuture, (k, v) -> v.signum() == 0)
+                    Utils.removeIf(BalanceFuture, (k, v) -> v.signum() == 0),
+                    Utils.removeIf(balanceFutureTotal, (k, v) -> v.signum() == 0),
+                    new Balance.Roi(
+                            roiPercent7D,
+                            roiPercent1D,
+                            roiAbsolute7D,
+                            roiAbsolute1D
+                    )
             );
         }
 

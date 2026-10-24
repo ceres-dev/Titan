@@ -37,3 +37,8 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+# Credenciales locales
+.env
+.env.*
+!.env.example

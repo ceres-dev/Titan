@@ -20,7 +20,15 @@ function formatBytes(bytes, decimales = 2) {
 
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
-
+function colorForProfit(element, number) {
+    if (number > 0.01){
+        element.classList.add('profit');
+    }else if (number < -0.01) {
+        element.classList.add('loses');
+    }else {
+        element.style.color = "gray"
+    }
+}
 
 window.utils = {
     trunc: trunc,

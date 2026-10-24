@@ -35,13 +35,7 @@ function renderPosition(elementId, positions) {
             tr.appendChild(tdQuantity);
             tr.appendChild(tdEntryPriceAvg);
             const span = document.createElement("span");
-            if (position.pnlUnrealize > 0.01){
-                span.style.color = "green"
-            }else if (position.pnlUnrealize < -0.01) {
-                span.style.color = "red"
-            }else {
-                span.style.color = "gray"
-            }
+            colorForProfit(span, position.pnlUnrealize);
             span.textContent = `${utils.trunc(position.pnlUnrealize, 3)} ${position.quoteAsset}`
             tdPnlUnrealize.appendChild(span);
             tr.appendChild(tdPnlUnrealize);

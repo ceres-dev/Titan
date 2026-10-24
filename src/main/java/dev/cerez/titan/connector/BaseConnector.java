@@ -42,22 +42,20 @@ import java.util.function.Consumer;
 
 public abstract class BaseConnector implements Connector {
 
-    protected static final int MAX_STREAMS_PER_SUBSCRIBE = 100;
-//    protected static final int TIMEOUT = 30;
     protected static final int COOLDOWN_MS = 5_000;
 
-    @NotNull  protected final ObjectMapper mapper = new ObjectMapper();
-    @NotNull  protected final HttpClient clientHttp = HttpClient.newHttpClient();
-    @NotNull  protected final TemporalRefence<Map<String, Symbol>> cachedSymbols = new TemporalRefence<>(TimeUnit.MINUTES, 5);
-    @NotNull  protected final ExecutorService executor = Executors.newFixedThreadPool(8, Utils.getThreadFactory(this));
-    @NotNull  protected final Map<String, WebSocketContainer> webSockets = new HashMap<>();
+    @NotNull protected final ObjectMapper mapper = new ObjectMapper();
+    @NotNull protected final HttpClient clientHttp = HttpClient.newHttpClient();
+    @NotNull protected final TemporalRefence<Map<String, Symbol>> cachedSymbols = new TemporalRefence<>(TimeUnit.MINUTES, 5);
+    @NotNull protected final ExecutorService executor = Executors.newFixedThreadPool(8, Utils.getThreadFactory(this));
+    @NotNull protected final Map<String, WebSocketContainer> webSockets = new HashMap<>();
     @Getter
-    @NotNull  protected final ConnectorConfig config;
-    @Setter   protected       TelemetryConnector telemetry;
+    @NotNull protected final ConnectorConfig config;
+    @Setter  protected       TelemetryConnector telemetry;
 
-    @NotNull  private final Object streamIncomingLock = new Object();
-    @NotNull  private final StringBuilder streamIncomingMessage = new StringBuilder();
-    @NotNull  protected final Map<String, Map<String, Consumer<JsonNode>>> consumerStreamsMap = new ConcurrentHashMap<>();
+    @NotNull private   final Object streamIncomingLock = new Object();
+    @NotNull private   final StringBuilder streamIncomingMessage = new StringBuilder();
+    @NotNull protected final Map<String, Map<String, Consumer<JsonNode>>> consumerStreamsMap = new ConcurrentHashMap<>();
 
     protected volatile boolean waitingForPong = false;
     protected volatile long delayPingPongNanoTime = -1;

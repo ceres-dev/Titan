@@ -40,6 +40,28 @@ body{
     grid-row: 2 / 4;
 }
 
+.profit{
+    animation: profitAnimation 2s infinite linear;
+}
+.loses{
+    animation: losesAnimation 2s infinite linear;
+}
+@keyframes losesAnimation{
+    0%, 100% {
+        color: #fd2020;
+    }
+    50% {
+        color: #ff6161;
+    }
+}
+@keyframes profitAnimation{
+    0%, 100% {
+        color: #2ffd20;
+    }
+    50% {
+        color: #96ff61;
+    }
+}
 /*Effects Type */
 .statusWAITING{
     animation: statusWaiting 2s infinite linear;
@@ -48,12 +70,10 @@ body{
     animation: statusWorking 2s infinite linear;
 }
 @keyframes statusWaiting{
-    0% { color: #5e5eff}
+    0%, 100% { color: #5e5eff}
     50% { color: #2b2bff}
-    100% { color: #5e5eff }
 }
 @keyframes statusWorking{
-    0% { color: #a6ff8f}
+    0%, 100% { color: #a6ff8f}
     50% { color: #60ff2b}
-    100% { color: #a6ff8f }
 }
