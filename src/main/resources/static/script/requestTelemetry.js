@@ -17,16 +17,36 @@ function renderTelemetryConnector(telemetry) {
     const listConnector = document.getElementById("telemetryConnector");
 
     listConnector.innerHTML = "";
-    const itemConnector = document.createElement("li");
+    const requestsConnector = document.createElement("li");
     {
         const strong = document.createElement("strong");
         strong.textContent = "Requests: ";
         const span = document.createElement("span");
         span.textContent = `${utils.trunc(telemetry.requestLastHour/60, 2)}r/m`;
-        itemConnector.appendChild(strong)
-        itemConnector.appendChild(span)
+        requestsConnector.appendChild(strong)
+        requestsConnector.appendChild(span)
     }
-    listConnector.appendChild(itemConnector);
+    const rateLimitConnector = document.createElement("li");
+    {
+        const strong = document.createElement("strong");
+        strong.textContent = "RateLimit: ";
+        const span = document.createElement("span");
+        span.textContent = `${telemetry.useWeight}/${telemetry.maxWeight}`;
+        rateLimitConnector.appendChild(strong)
+        rateLimitConnector.appendChild(span)
+    }
+    const pingConnector = document.createElement("li");
+    {
+        const strong = document.createElement("strong");
+        strong.textContent = "Ping: ";
+        const span = document.createElement("span");
+        span.textContent = `${telemetry.sPing}ms`;
+        pingConnector.appendChild(strong)
+        pingConnector.appendChild(span)
+    }
+    listConnector.appendChild(requestsConnector);
+    listConnector.appendChild(rateLimitConnector);
+    listConnector.appendChild(pingConnector);
 }
 function renderTelemetrySystem(telemetry) {
     const listSystem = document.getElementById("telemetrySystem");

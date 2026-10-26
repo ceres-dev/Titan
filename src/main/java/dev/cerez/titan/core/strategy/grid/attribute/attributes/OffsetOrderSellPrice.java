@@ -5,7 +5,7 @@ import dev.cerez.titan.core.strategy.grid.GridManager;
 import dev.cerez.titan.core.strategy.grid.attribute.AttributeContext;
 import dev.cerez.titan.core.strategy.grid.attribute.BaseAttribute;
 import dev.cerez.titan.core.strategy.grid.attribute.SideAffected;
-import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
+import dev.cerez.titan.connector.model.OrderPreview;
 import dev.cerez.titan.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 

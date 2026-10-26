@@ -2,7 +2,7 @@ package dev.cerez.titan.core.strategy.grid.attribute;
 
 import dev.cerez.titan.core.strategy.grid.GridBuilder;
 import dev.cerez.titan.core.strategy.grid.model.Context;
-import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
+import dev.cerez.titan.connector.model.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;

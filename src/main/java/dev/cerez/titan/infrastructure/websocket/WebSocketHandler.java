@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @RequiredArgsConstructor
-public class PrivateWebSocketHandler extends TextWebSocketHandler {
+public class WebSocketHandler extends TextWebSocketHandler {
 
     private final TitanApplication titan;
 
@@ -84,7 +84,7 @@ public class PrivateWebSocketHandler extends TextWebSocketHandler {
             String payload = gson.toJson(webSocketContainer);
             executor.execute(() -> {
                 try {
-                    session.sendMessage(new TextMessage(payload));
+                    if (session.isOpen()) session.sendMessage(new TextMessage(payload));
                 } catch (IOException e) {
                     Log.exception(e);
                 }

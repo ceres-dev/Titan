@@ -1,6 +1,5 @@
-package dev.cerez.titan.core.strategy.grid.model;
+package dev.cerez.titan.connector.model;
 
-import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.utils.Order;
 import dev.cerez.titan.utils.Utils;
 import lombok.Data;

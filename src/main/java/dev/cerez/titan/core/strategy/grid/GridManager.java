@@ -1,8 +1,5 @@
 package dev.cerez.titan.core.strategy.grid;
 
-import dev.cerez.titan.core.StatusManager;
-import dev.cerez.titan.infrastructure.model.Telemetry;
-import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.exception.exchange.MarginNotSufficienException;
 import dev.cerez.titan.connector.exception.exchange.PostOnlyRejectException;
@@ -13,15 +10,17 @@ import dev.cerez.titan.connector.model.StatusOrder;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.ManagerStrategy;
 import dev.cerez.titan.core.PersistentNope;
+import dev.cerez.titan.core.StatusManager;
 import dev.cerez.titan.core.event.events.GridManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.core.strategy.grid.attribute.ApplyAttributes;
 import dev.cerez.titan.core.strategy.grid.attribute.SideAffected;
 import dev.cerez.titan.core.strategy.grid.attribute.attributes.*;
 import dev.cerez.titan.core.strategy.grid.model.Context;
-import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
+import dev.cerez.titan.connector.model.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.discord.StatusProfiler;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.*;
 import lombok.*;
@@ -110,30 +109,33 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
             }
             return 1;
         }));
-//        applyAttributes.add(new RemoveIf((order, c) -> {
-//               if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
-//                   switch(c.config().getSideGrid()) {
-//                       case LONG -> {
-//                           if (order.getSideOrder() == SideOrder.BUY){
-//                               return lastOrderFilled.getPrice().compareTo(order.getPrice()) <= 0;
-//                           }else {
-//                               return false;
-//                           }
-//                       }
-//                       case SHORT -> {
-//                            if (order.getSideOrder() == SideOrder.SELL){
-//                                return lastOrderFilled.getPrice().compareTo(order.getPrice()) >= 0;
-//                            }else {
-//                                return false;
-//                            }
-//                       }
-//                       case BOTH -> {
-//                            return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
-//                       }
-//                   }
-//               }
-//               return false;
-//        }));
+        applyAttributes.add(new RemoveIf((order, c) -> {
+            if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
+                switch(c.getConfig().getSideGrid()) {
+                    case LONG -> {
+                        if (order.getSideOrder() == SideOrder.BUY){
+                            return lastOrderFilled.getPrice().compareTo(order.getPrice()) <= 0;
+                        }else {
+                            return false;
+                        }
+                    }
+                    case SHORT -> {
+                        if (order.getSideOrder() == SideOrder.SELL){
+                            return lastOrderFilled.getPrice().compareTo(order.getPrice()) >= 0;
+                        }else {
+                            return false;
+                        }
+                    }
+                    case BOTH -> {
+                        return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
+                    }
+                }
+            }
+            return false;
+        }).addCondicion(c -> {
+            long amount = c.ordersResult().stream().filter(o -> !o.isReduceOnly()).count();
+            return amount <= getConfig().getMinOrderSafe();
+        }));
         applyAttributes.add(new RemoveIf((order, c) -> {
             if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
                 return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;

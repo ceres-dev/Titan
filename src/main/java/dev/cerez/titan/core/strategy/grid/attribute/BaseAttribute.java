@@ -1,6 +1,6 @@
 package dev.cerez.titan.core.strategy.grid.attribute;
 
-import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
+import dev.cerez.titan.connector.model.OrderPreview;
 import lombok.Data;
 import lombok.Getter;
 import org.jetbrains.annotations.Contract;

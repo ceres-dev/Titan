@@ -262,9 +262,13 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
             long totalMemory = runtime.totalMemory();
             long freeMemory = runtime.freeMemory();
             long usedMemory = totalMemory - freeMemory;
+            BaseConnector.RateLimit rateLimit = connector.getRateLimitFuture();
             return new Telemetry(
                     new Telemetry.Connector(
-                            snapshot.getRequestLastHour()
+                            snapshot.getRequestLastHour(),
+                            rateLimit.getUse(),
+                            rateLimit.getMax(),
+                            connector.wsPing()
                     ),
                     new Telemetry.System(
                             totalMemory,

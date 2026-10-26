@@ -56,6 +56,10 @@ public abstract class BaseConnector implements Connector {
     @NotNull private   final Object streamIncomingLock = new Object();
     @NotNull private   final StringBuilder streamIncomingMessage = new StringBuilder();
     @NotNull protected final Map<String, Map<String, Consumer<JsonNode>>> consumerStreamsMap = new ConcurrentHashMap<>();
+    @Getter
+    @NotNull protected final RateLimit rateLimitFuture = new RateLimit();
+    @Getter
+    @NotNull protected final RateLimit rateLimitSpot = new RateLimit();
 
     protected volatile boolean waitingForPong = false;
     protected volatile long delayPingPongNanoTime = -1;
@@ -221,14 +225,13 @@ public abstract class BaseConnector implements Connector {
         container.getWebSocket().sendText(content.replaceAll("\\s", ""), true);
     }
 
-    protected CompletableFuture<JsonNode> sendSignedWebSocketRequest(@NotNull String endpoint, @NotNull String id, @NotNull String method) {
-        return sendSignedWebSocketRequest(endpoint, method, id, new HashMap<>());
+    protected CompletableFuture<JsonNode> sendSignedWebSocketRequest(@NotNull String endpoint, @NotNull String method) {
+        return sendSignedWebSocketRequest(endpoint, method, new HashMap<>());
     }
 
     protected CompletableFuture<JsonNode> sendSignedWebSocketRequest(
             @NotNull String url,
             @NotNull String method,
-            @NotNull String id,
             @NotNull Map<String, Object> params
     ) {
         if (config.secret == null
@@ -253,8 +256,9 @@ public abstract class BaseConnector implements Connector {
         try {
             String signature = hmacSha256(queryString, config.secret);
 
+            UUID id = UUID.randomUUID();
             ObjectNode request = mapper.createObjectNode();
-            request.put("id", id);
+            request.put("id", id.toString());
             request.put("method", method);
             ObjectNode requestParams = mapper.createObjectNode();
 
@@ -266,21 +270,62 @@ public abstract class BaseConnector implements Connector {
             }
 
             requestParams.put("signature", signature);
-
             request.set("params", requestParams);
 
             if (config.isLogsRequest()) {
-                Log.info("P wws=%s", request);
+                Log.info("PR wws=%s", request);
             }
 
             sendWebSocket(url, request.toString());
             CompletableFuture<JsonNode> future = new CompletableFuture<>();
 //            System.out.println("id: " + id + " Send: " + request);
-            webSockets.get(url).getPendingResponse().put(id, future::complete);
+            webSockets.get(url).getPendingResponse().put(id.toString(), future::complete);
             return future;
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    protected CompletableFuture<JsonNode> sendPublicWebSocketRequest(@NotNull String endpoint, @NotNull String method) {
+        return sendPublicWebSocketRequest(endpoint, method, new HashMap<>());
+    }
+
+    protected CompletableFuture<JsonNode> sendPublicWebSocketRequest(
+            @NotNull String url,
+            @NotNull String method,
+            @NotNull Map<String, Object> params
+    ) {
+        if (config.secret == null
+                || config.key == null
+                || config.secret.isBlank()
+                || config.key.isBlank()) {
+
+            throw new NotSetApiKeysException("API Key not set");
+        }
+
+        UUID id = UUID.randomUUID();
+        ObjectNode request = mapper.createObjectNode();
+        request.put("id", id.toString());
+        request.put("method", method);
+        ObjectNode requestParams = mapper.createObjectNode();
+
+        for (Map.Entry<String, Object> entry : params.entrySet()) {
+            requestParams.set(
+                    entry.getKey(),
+                    mapper.valueToTree(entry.getValue())
+            );
+        }
+
+        if (!params.isEmpty()) request.set("params", requestParams);
+        if (config.isLogsRequest()) {
+            Log.info("PU wws=%s", request);
+        }
+
+        sendWebSocket(url, request.toString());
+        CompletableFuture<JsonNode> future = new CompletableFuture<>();
+//            System.out.println("id: " + id + " Send: " + request);
+        webSockets.get(url).getPendingResponse().put(id.toString(), future::complete);
+        return future;
     }
 
 
@@ -315,8 +360,8 @@ public abstract class BaseConnector implements Connector {
         params.put("timestamp", System.currentTimeMillis() + deltaClienteToServer);
         String queryString = buildQueryString(params);
         try {
-            String signature = hmacSha256(queryString, config.secret);
-            String finalUrl = baseUrl + endpoint + "?" + queryString + "&signature=" + signature;
+            final String signature = hmacSha256(queryString, config.secret);
+            final String finalUrl = baseUrl + endpoint + "?" + queryString + "&signature=" + signature;
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(finalUrl))
                     .header("X-MBX-APIKEY", config.key)
@@ -326,6 +371,7 @@ public abstract class BaseConnector implements Connector {
             JsonNode jsonRaw = null;
             try {
                 HttpResponse<String> response = clientHttp.send(request, HttpResponse.BodyHandlers.ofString());
+                onResponseHttps(finalUrl, response);
                 checkResponse(jsonRaw = mapper.readTree(response.body()), request);
                 return jsonRaw;
             } catch (IOException | InterruptedException e) {
@@ -384,7 +430,9 @@ public abstract class BaseConnector implements Connector {
         String jsonRaw = null;
         if (telemetry != null) telemetry.addRequestConnector(method, finalUrl);
         try {
-            jsonRaw = clientHttp.send(request, HttpResponse.BodyHandlers.ofString()).body();
+            HttpResponse<String> response = clientHttp.send(request, HttpResponse.BodyHandlers.ofString());
+            onResponseHttps(finalUrl, response);
+            jsonRaw = response.body();
             JsonNode node = mapper.readTree(jsonRaw);
             checkResponse(node, request);
             return node;
@@ -516,6 +564,26 @@ public abstract class BaseConnector implements Connector {
         return isNew.get();
     }
 
+    @Contract(value = "null -> null; !null -> !null")
+    protected String createId(Object o){
+        switch (o) {
+            case null -> {
+                return null;
+            }
+            case String s -> {
+                return s;
+            }
+            case Nameable n -> {
+                return o.getClass().getSimpleName() + ":" + n.getName();
+            }
+            default -> {
+            }
+        }
+        return o.toString();
+    }
+
+    protected void onResponseHttps(@NotNull String url, @NotNull HttpResponse<String> response) {}
+
     protected abstract void handleStreamRawExpress(@NotNull String wwsURL, @NotNull String contentToParse);
 
     protected abstract void handleStreamRaw(@NotNull String wwsURL, @NotNull JsonNode node);
@@ -566,21 +634,9 @@ public abstract class BaseConnector implements Connector {
         @Builder.Default private String secret = "";
     }
 
-    @Contract(value = "null -> null; !null -> !null")
-    protected String createId(Object o){
-        switch (o) {
-            case null -> {
-                return null;
-            }
-            case String s -> {
-                return s;
-            }
-            case Nameable n -> {
-                return o.getClass().getSimpleName() + ":" + n.getName();
-            }
-            default -> {
-            }
-        }
-        return o.toString();
+    @Data
+    public static final class RateLimit {
+        private long use = 0;
+        private long max = 6000;
     }
 }

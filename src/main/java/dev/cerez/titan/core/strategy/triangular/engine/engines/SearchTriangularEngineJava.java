@@ -51,7 +51,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
         startAssetsToAnalyze = new LinkedHashSet<>(2);
         Symbol symbol = allSymbolsMap.get(updatedSymbol);
         if (symbol == null) {
-            return List.of();
+            return List.copyOf(lastTriangular.values());
         }
         NameAsset baseAssetName = nameAssetCache.computeIfAbsent(symbol.getBaseAsset(), NameAssetIndexed::new);
         NameAsset quoteAssetName = nameAssetCache.computeIfAbsent(symbol.getQuoteAsset(), NameAssetIndexed::new);
@@ -68,13 +68,13 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
         }
 
         if (outgoingByFromAsset.size() < config.getMinCycleLength()) {
-            return List.of();
+            return List.copyOf(lastTriangular.values());
         }
 
         // Descarta símbolos no registrados
         startAssetsToAnalyze.retainAll(outgoingByFromAsset.keySet());
         if (startAssetsToAnalyze.isEmpty()) {
-            return List.of();
+            return List.copyOf(lastTriangular.values());
         }
 
         HashSet<String> seenCycles = new HashSet<>();

@@ -44,7 +44,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>dev.cerez.titan.Titan</mainClass>
+                            <mainClass>dev.cerez.titan.TitanApplication</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

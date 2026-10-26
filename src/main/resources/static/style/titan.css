@@ -1,23 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=Cascadia+Code:ital,wght@0,200..700;1,200..700&display=swap');
 * {
     margin: 0;
     padding: 0;
 }
+input, button, textarea, select {
+    font: inherit;
+}
 :root {
     --main-color: #194270;
-    --font-family-monospace: CascadiaCode;
-}
-
-@font-face {
-    font-family: 'CascadiaCode';
-    src: url('../assets/CascadiaCode.woff') format('woff');
-    font-weight: normal;
-    font-style: normal;
 }
 /* Estructura */
 body{
     background: black;
     color: white;
-    font-family: 'CascadiaCode', 'Courier New', serif;
+    font-family: 'Cascadia Code', 'Courier New', serif;
+    font-weight: 500;
     align-content: center;
     display: flex;
     flex-direction: column;
@@ -111,9 +108,7 @@ ul{
 /* Interactivo */
 
 button {
-    background: transparent;
     color: black;
-    font-family: var(--font-family-monospace), serif;
     font-size: 15px;
     background: var(--main-color);
     border: none;
@@ -133,7 +128,6 @@ input {
     background: transparent;
     color: var(--main-color);
     filter: brightness(120%);
-    font-family: var(--font-family-monospace), serif;
     transition: filter 0.3s ease;
     font-size: 15px;
 }

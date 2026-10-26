@@ -18,10 +18,6 @@ public class SimulateCycles {
     public @Nullable SimulationResult simulateCycleWithStepSize(@NotNull SearchTriangularEngine.ArbitrageEdge[] cycleEdges, double startedAmount, double feeRate) {
         double amount = startedAmount;
         for (SearchTriangularEngine.ArbitrageEdge edge : cycleEdges) {
-//            if (!Double.isFinite(amount) || amount <= 0.0) {
-//                return null;
-//            }
-
             SideOrder sideOrder = edge.getSideOrder();
             double referencePrice = edge.getReferencePrice();
             double referenceLiquidity = edge.getReferenceLiquidity();
@@ -29,35 +25,19 @@ public class SimulateCycles {
 
             if (SideOrder.SELL == sideOrder) {
                 double quantity = roundDownToStepSize(amount, stepSize);
-
-//                if (quantity <= 0.0) {
-//                    return null;
-//                }
-
                 if (quantity > referenceLiquidity) {
                     return null;
                 }
 
                 amount = quantity * referencePrice * (1.0 - feeRate);
-//                continue;
-            }
-
-            else /* if  (Action.BUY  == action) */{
+            }else{
                 double quantity = roundDownToStepSize(amount / referencePrice, stepSize);
-
-//                if (quantity <= 0.0) {
-//                    return null;
-//                }
-
                 if (quantity > referenceLiquidity) {
                     return null;
                 }
 
                 amount = quantity * (1.0 - feeRate);
-//                continue;
             }
-
-//            return null;
         }
 
         if (!Double.isFinite(amount) || amount <= 0.0) {
@@ -67,7 +47,8 @@ public class SimulateCycles {
     }
 
     private double roundDownToStepSize(double amount, double stepSize) {
-        return (int) (amount *  (Math.pow(stepSize, -1))) * stepSize;
+        if (!(stepSize > 0.0)) return amount;
+        return Math.floor(amount / stepSize + 1e-9) * stepSize;
     }
 
     public record SimulationResult(

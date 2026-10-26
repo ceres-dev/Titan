@@ -4,7 +4,7 @@ import dev.cerez.titan.core.strategy.grid.attribute.AttributeContext;
 import dev.cerez.titan.core.strategy.grid.attribute.AttributeMultiplySize;
 import dev.cerez.titan.core.strategy.grid.attribute.SideAffected;
 import dev.cerez.titan.core.strategy.grid.model.Context;
-import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
+import dev.cerez.titan.connector.model.OrderPreview;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;

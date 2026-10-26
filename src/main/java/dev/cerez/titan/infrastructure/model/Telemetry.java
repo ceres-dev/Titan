@@ -6,7 +6,11 @@ public record Telemetry(
         @NotNull Connector connector,
         @NotNull System system
 ) {
-    public record Connector(int requestLastHour){}
+    public record Connector(int requestLastHour,
+                            long useWeight,
+                            long maxWeight,
+                            long sPing
+    ){}
     public record System(
             long totalMemory,
             long usedMemory,

@@ -2,7 +2,7 @@ package dev.cerez.titan.core.strategy.grid;
 
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.core.strategy.grid.model.Context;
-import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
+import dev.cerez.titan.connector.model.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;

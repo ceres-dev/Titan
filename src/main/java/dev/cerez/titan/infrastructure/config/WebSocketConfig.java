@@ -1,6 +1,6 @@
 package dev.cerez.titan.infrastructure.config;
 
-import dev.cerez.titan.infrastructure.websocket.PrivateWebSocketHandler;
+import dev.cerez.titan.infrastructure.websocket.WebSocketHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
@@ -10,9 +10,9 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
 
-    private final PrivateWebSocketHandler handler;
+    private final WebSocketHandler handler;
 
-    public WebSocketConfig(PrivateWebSocketHandler handler) {
+    public WebSocketConfig(WebSocketHandler handler) {
         this.handler = handler;
     }
 

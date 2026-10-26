@@ -19,6 +19,7 @@ import org.jetbrains.annotations.Unmodifiable;
 
 import java.math.BigDecimal;
 import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,23 +30,23 @@ import java.util.stream.Collectors;
 
 public final class BinanceConnector extends BaseConnector {
 
-    private static final String BASE_HTTPS = "https://api.binance.com";
-    private static final String BASE_TESTNET_HTTPS = "https://testnet.binance.vision";
+    private static final String BASE_SPOT_HTTPS = "https://api.binance.com";
+    private static final String BASE_SPOT_HTTPS_TESTNET = "https://testnet.binance.vision";
 
-    private static final String BASE_HTTPS_FUTURE = "https://fapi.binance.com";
-    private static final String BASE_TESTNET_HTTPS_FUTURE = "https://testnet.binancefuture.com";
+    private static final String BASE_FUTURE_HTTPS = "https://fapi.binance.com";
+    private static final String BASE_FUTURE_HTTPS_TESTNET = "https://testnet.binancefuture.com";
 
-    private static final String BASE_WWS = "wss://ws-api.binance.com:443/ws-api/v3";
-    private static final String BASE_TESTNET_WWS = "wss://demo-ws-api.binance.com:443/ws-api/v3";
+    private static final String BASE_SPOT_WWS = "wss://ws-api.binance.com:443/ws-api/v3";
+    private static final String BASE_SPOT_WWS_TESTNET = "wss://demo-ws-api.binance.com:443/ws-api/v3";
 
-    private static final String BASE_WWS_FUTURE = "wss://ws-fapi.binance.com/ws-fapi/v1";
-    private static final String BASE_TESTNET_WWS_FUTURE = "wss://testnet.binancefuture.com/ws-fapi/v1";
+    private static final String BASE_FUTURE_WWS = "wss://ws-fapi.binance.com/ws-fapi/v1";
+    private static final String BASE_FUTURE_WWS_TESTNET = "wss://testnet.binancefuture.com/ws-fapi/v1";
 
-    private static final String BASE_WWS_STREAM = "wss://stream.binance.com:9443/stream";
-    private static final String BASE_TESTNET_WWS_STREAM = "wss://demo-stream.binance.com:9443/stream";
+    private static final String BASE_SPOT_WWS_STREAM = "wss://stream.binance.com:9443/stream";
+    private static final String BASE_SPOT_WWS_STREAM_TESTNET = "wss://demo-stream.binance.com:9443/stream";
 
-    private static final String BASE_WWS_FUTURE_STREAM = "wss://fstream.binance.com/stream";
-    private static final String BASE_WWS_FUTURE_USERDATA = "wss://fstream.binance.com/private/ws/%s";
+    private static final String BASE_FUTURE_WWS_STREAM = "wss://fstream.binance.com/stream";
+    private static final String BASE_FUTURE_WWS_USERDATA = "wss://fstream.binance.com/private/ws/%s";
 
     private String listenKey = null;
 
@@ -127,7 +128,7 @@ public final class BinanceConnector extends BaseConnector {
 
     @Override
     protected void internalStart(){
-        initWebSocket(config.isTestNet() ? BASE_TESTNET_WWS : BASE_WWS);
+        initWebSocket(config.isTestNet() ? BASE_SPOT_WWS_TESTNET : BASE_SPOT_WWS);
         initWebSocket(this.fGetWWStream());
         initWebSocket(this.fGetWWS());
         initWebSocket(this.sGetWWS());
@@ -166,7 +167,11 @@ public final class BinanceConnector extends BaseConnector {
     public @NotNull Map<String, Symbol> sGetAllSymbols() {
         JsonNode raw = sendPublicRequest(Method.GET, "/api/v1/exchangeInfo", new HashMap<>());
         HashMap<String, Symbol> symbols = new HashMap<>();
-
+        for (JsonNode node : raw.get("rateLimits")) {
+            if (node.get("rateLimitType").asText().equals("REQUEST_WEIGHT")) {
+                rateLimitSpot.setMax(node.get("limit").asInt());
+            }
+        }
         for (JsonNode node : raw.get("symbols")) {
             BigDecimal stepsize = BigDecimal.ZERO;
             BigDecimal minNotionalQuote = BigDecimal.ZERO;
@@ -304,12 +309,12 @@ public final class BinanceConnector extends BaseConnector {
 
     @Override
     public @NotNull String sGetHTTPS() {
-        return config.isTestNet() ? BASE_TESTNET_HTTPS : BASE_HTTPS;
+        return config.isTestNet() ? BASE_SPOT_HTTPS_TESTNET : BASE_SPOT_HTTPS;
     }
 
     @Override
     public @NotNull String sGetWWS() {
-        return config.isTestNet() ? BASE_TESTNET_WWS_STREAM : BASE_WWS_STREAM;
+        return config.isTestNet() ? BASE_SPOT_WWS_STREAM_TESTNET : BASE_SPOT_WWS_STREAM;
     }
 
     @Override
@@ -415,6 +420,12 @@ public final class BinanceConnector extends BaseConnector {
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
     }
 
+    public long wsPing(){
+        long start = System.nanoTime();
+        sendPublicWebSocketRequest(BASE_SPOT_WWS, "ping").join();
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+    }
+
     public void wsCreateBookTicker(@NotNull Consumer<BookTick> consumer, @Nullable String id, @NotNull String symbol){
         UUID uuid = UUID.randomUUID();
         String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
@@ -438,24 +449,24 @@ public final class BinanceConnector extends BaseConnector {
                     """.formatted(stream, uuid.toString().replace("-", "")));
     }
 
-    private @NotNull String fGetHttps(){
-        return config.isTestNet() ? BASE_TESTNET_HTTPS_FUTURE : BASE_HTTPS_FUTURE;
+    private @NotNull String fGetHTTPS(){
+        return config.isTestNet() ? BASE_FUTURE_HTTPS_TESTNET : BASE_FUTURE_HTTPS;
     }
 
     public @NotNull String fGetWWStream(){
-        return BASE_WWS_FUTURE_STREAM;
+        return BASE_FUTURE_WWS_STREAM;
     }
 
     private @NotNull String fGetWWS() {
-        return config.isTestNet() ? BASE_TESTNET_WWS_FUTURE: BASE_WWS_FUTURE;
+        return config.isTestNet() ? BASE_FUTURE_WWS_TESTNET : BASE_FUTURE_WWS;
     }
 
     public @NotNull String uGetWWS(){
-        return BASE_WWS_FUTURE_USERDATA.formatted(listenKey);
+        return BASE_FUTURE_WWS_USERDATA.formatted(listenKey);
     }
 
     public @NotNull @Unmodifiable Map<String, BigDecimal> fGetBalance() {
-        JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v3/balance");
+        JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/balance");
         Map<String, BigDecimal> result = new HashMap<>();
         for (JsonNode node : raw){
             BigDecimal balance =  new BigDecimal(node.get("maxWithdrawAmount").asText());
@@ -465,7 +476,7 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     public @NotNull @Unmodifiable Map<String, BigDecimal> fGetBalanceTotal() {
-        JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v3/balance");
+        JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/balance");
         Map<String, BigDecimal> result = new HashMap<>();
         for (JsonNode node : raw){
             result.put(node.get("asset").asText(), new BigDecimal(node.get("balance").asText()));
@@ -474,7 +485,7 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     public @NotNull @Unmodifiable Map<String, BigDecimal> fGetUnPNL() {
-        JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v3/balance");
+        JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/balance");
         Map<String, BigDecimal> result = new HashMap<>();
         for (JsonNode node : raw){
             result.put(node.get("asset").asText(), new BigDecimal(node.get("crossUnPnl").asText()));
@@ -491,7 +502,7 @@ public final class BinanceConnector extends BaseConnector {
         params.put("newOrderRespType", "RESULT");
         params.put("reduceOnly", reduceOnly);
         if (nameOrder != null) params.put("newClientOrderId", nameOrder);
-        sendSignedRequest(fGetHttps(), Method.POST, "/fapi/v1/order", params);
+        sendSignedRequest(fGetHTTPS(), Method.POST, "/fapi/v1/order", params);
     }
 
     public void fSendOrderToLimit(@NotNull String symbol,
@@ -511,26 +522,26 @@ public final class BinanceConnector extends BaseConnector {
         params.put("timeInForce", "GTX");
         params.put("price", s.roundPrice(price));
         if (nameOrder != null) params.put("newClientOrderId", nameOrder);
-        sendSignedRequest(fGetHttps(), Method.POST, "/fapi/v1/order", params);
+        sendSignedRequest(fGetHTTPS(), Method.POST, "/fapi/v1/order", params);
     }
 
     public void fCancelOrderAll(@NotNull String symbol) {
         HashMap<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
-        sendSignedRequest(fGetHttps(), Method.DELETE, "/fapi/v1/allOpenOrders", params);
+        sendSignedRequest(fGetHTTPS(), Method.DELETE, "/fapi/v1/allOpenOrders", params);
     }
 
     public void fCancelOrder(@NotNull String symbol, @NotNull String nameOrder) throws UnknownOrderException {
         HashMap<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
         params.put("origClientOrderId", nameOrder);
-        sendSignedRequest(fGetHttps(), Method.DELETE, "/fapi/v1/order", params);
+        sendSignedRequest(fGetHTTPS(), Method.DELETE, "/fapi/v1/order", params);
     }
 
     public @Nullable BinanceConnector.FuturePosition fGetPosition(@NotNull String symbol) {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
-        JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v3/positionRisk", params);
+        JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/positionRisk", params);
         for (JsonNode node : raw) {
             String s = node.get("symbol").asText();
             if (s.equals(symbol.toUpperCase(Locale.US))) {
@@ -547,7 +558,7 @@ public final class BinanceConnector extends BaseConnector {
 
     public @NotNull List<BinanceConnector.FuturePosition> fGetPositions() {
         List<BinanceConnector.FuturePosition> result = new ArrayList<>();
-        JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v3/positionRisk");
+        JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/positionRisk");
         for (JsonNode node : raw) {
             result.add(new FuturePosition(
                     node.get("symbol").asText(),
@@ -567,7 +578,12 @@ public final class BinanceConnector extends BaseConnector {
             return Map.copyOf(fCachedSymbols);
         }
         Map<String, Symbol> symbols = new HashMap<>();
-        JsonNode raw = sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/exchangeInfo");
+        JsonNode raw = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/exchangeInfo");
+        for (JsonNode node : raw.get("rateLimits")) {
+            if (node.get("rateLimitType").asText().equals("REQUEST_WEIGHT")) {
+                rateLimitFuture.setMax(node.get("limit").asInt());
+            }
+        }
         for (JsonNode node : raw.get("symbols")) {
             BigDecimal stepsize = BigDecimal.ZERO;
             BigDecimal minNotionalQuote = BigDecimal.ZERO;
@@ -607,7 +623,7 @@ public final class BinanceConnector extends BaseConnector {
     public @NotNull List<OrderFuture> fGetAllOrder(@NotNull String symbol) {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
-        JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v1/allOrders", params);
+        JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v1/allOrders", params);
         List<OrderFuture> orders = new LinkedList<>();
         for (JsonNode node : raw) {
             orders.add(new OrderFuture(
@@ -627,7 +643,7 @@ public final class BinanceConnector extends BaseConnector {
 
     public long fPing(){
         long start = System.nanoTime();
-        sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/ping");
+        sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/ping");
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
     }
 
@@ -642,12 +658,12 @@ public final class BinanceConnector extends BaseConnector {
     public @NotNull BigDecimal fGetPrice(@NotNull String symbol) {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
-        return new BigDecimal(sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/premiumIndex", params).get("markPrice").asText());
+        return new BigDecimal(sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/premiumIndex", params).get("markPrice").asText());
     }
 
     @Contract(" -> new")
     public @NotNull Map<String, BigDecimal> fGetAllPrice() {
-        JsonNode raw = sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/premiumIndex");
+        JsonNode raw = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/premiumIndex");
         HashMap<String, BigDecimal> priceMap = new HashMap<>();
         for (JsonNode node : raw) {
             priceMap.put(node.get("symbol").asText(), new BigDecimal(node.get("markPrice").asText()));
@@ -659,7 +675,7 @@ public final class BinanceConnector extends BaseConnector {
     public @NotNull BinanceConnector.BookTick fGetBookTick(@NotNull String symbol) {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
-        JsonNode node = sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/depth", params);
+        JsonNode node = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/depth", params);
         JsonNode bid = node.get("bids").iterator().next();
         JsonNode ask = node.get("asks").iterator().next();
         BigDecimal bidPrice = new BigDecimal(bid.iterator().next().asText());
@@ -668,7 +684,7 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     public @NotNull Map<String, FundingRate> fGetFundingRate(){
-        JsonNode raw0 = sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/fundingInfo");
+        JsonNode raw0 = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/fundingInfo");
         Map<String, FundingConfig> result0 = new HashMap<>();
         for (JsonNode node : raw0) {
             String symbol = node.get("symbol").asText();
@@ -679,7 +695,7 @@ public final class BinanceConnector extends BaseConnector {
                     )
             );
         }
-        JsonNode raw1 = sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/premiumIndex");
+        JsonNode raw1 = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/premiumIndex");
         Map<String, FundingRate> result1 = new HashMap<>();
         for (JsonNode node : raw1) {
             String symbol = node.get("symbol").asText();
@@ -704,7 +720,7 @@ public final class BinanceConnector extends BaseConnector {
         params.put("startTime", start);
         params.put("endTime", end);
         params.put("limit", 500);
-        JsonNode raw = sendSignedRequest(fGetHttps(), Method.GET, "/fapi/v1/income", params);;
+        JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v1/income", params);;
         List<Transaction> transactions = new LinkedList<>();
         for (JsonNode node : raw) {
             transactions.add(new Transaction(
@@ -723,7 +739,7 @@ public final class BinanceConnector extends BaseConnector {
         HashMap<String, BigDecimal> resultAllSymbols = new HashMap<>();
         HashMap<String, Object> params = new HashMap<>();
         params.put("limit", mapAllSymbols.size());
-        JsonNode raw = sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/fundingRate", params);
+        JsonNode raw = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/fundingRate", params);
         for (JsonNode node : raw){
             resultAllSymbols.put(node.get("symbol").asText(), new BigDecimal(node.get("fundingRate").asText()));
         }
@@ -732,7 +748,7 @@ public final class BinanceConnector extends BaseConnector {
 
     public @NotNull Map<String, BigDecimal> fGetAllFundingRateCurrent(){
         HashMap<String, BigDecimal> resultAllSymbols = new HashMap<>();
-        JsonNode raw = sendPublicRequest(fGetHttps(), Method.GET, "/fapi/v1/premiumIndex");
+        JsonNode raw = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/premiumIndex");
         for (JsonNode node : raw){
             resultAllSymbols.put(node.get("symbol").asText(), new BigDecimal(node.get("lastFundingRate").asText()));
         }
@@ -740,7 +756,7 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     public void fStartUserData(){
-        listenKey = sendSignedRequest(fGetHttps(), Method.POST, "/fapi/v1/listenKey").get("listenKey").asText();
+        listenKey = sendSignedRequest(fGetHTTPS(), Method.POST, "/fapi/v1/listenKey").get("listenKey").asText();
         executor.execute(() -> {
             while (listenKey != null) {
                 fKeepLiveUserData();
@@ -750,12 +766,12 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     public void fKeepLiveUserData(){
-        sendSignedRequest(fGetHttps(), Method.PUT, "/fapi/v1/listenKey");
+        sendSignedRequest(fGetHTTPS(), Method.PUT, "/fapi/v1/listenKey");
     }
 
     public void fCloseUserData(){
         this.listenKey = null;
-        sendSignedRequest(fGetHttps(), Method.DELETE, "/fapi/v1/listenKey");
+        sendSignedRequest(fGetHTTPS(), Method.DELETE, "/fapi/v1/listenKey");
     }
 
     public void wfCreateBookTicker(@NotNull Consumer<BookTick> consumer, @Nullable String id, @NotNull String symbol) {
@@ -789,7 +805,7 @@ public final class BinanceConnector extends BaseConnector {
         params.put("reduceOnly", reduceOnly);
         params.put("type", "MARKET");
         if (nameOrder != null) params.put("nameOrder", nameOrder);
-        return sendSignedWebSocketRequest(fGetWWS(), "order.place", Utils.uuidToBase36(UUID.randomUUID()), params);
+        return sendSignedWebSocketRequest(fGetWWS(), "order.place", params);
     }
 
     public void wuCreateEventOrderTradeUpdate(Consumer<OrderUpdate> consumer, @Nullable Object id){
@@ -1043,6 +1059,15 @@ public final class BinanceConnector extends BaseConnector {
                 "/sapi/v1/margin/borrow-repay",
                 params
         );
+    }
+    @Override
+    protected void onResponseHttps(@NotNull String url, @NotNull HttpResponse<String> response) {
+        if (url.startsWith(fGetHTTPS())) {
+            response.headers().firstValueAsLong("X-MBX-USED-WEIGHT-1M").ifPresent(rateLimitFuture::setUse);
+        }
+        if (url.startsWith(sGetHTTPS())) {
+            response.headers().firstValueAsLong("X-MBX-USED-WEIGHT-1M").ifPresent(rateLimitSpot::setUse);
+        }
     }
 
     public record OrderUpdate(String name, String symbol, SideOrder sideOrder, StatusOrder statusOrder) {}

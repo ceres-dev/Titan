@@ -8,7 +8,6 @@ body{
     margin: 0;
     color: var(--main-login-color);
     background: radial-gradient(ellipse at center, hsl(from var(--main-login-color) h s calc(l - 20)) 0%, #000000 40%);
-    font-family: CascadiaCode, monospace, serif
 }
 #screen {
     display: flex;
@@ -39,13 +38,8 @@ form{
 }
 input {
     border: var(--main-login-color);
-    margin: 0;
-    background: transparent;
     color: var(--main-login-color);
     filter: brightness(120%);
-    font-family: var(--font-family-monospace), serif;
-    transition: filter 0.3s ease;
-    font-size: 15px;
 }
 input:hover, input:focus {
     filter: brightness(170%);
@@ -59,13 +53,7 @@ input::placeholder {
 button {
     background: transparent;
     color: var(--main-login-color);
-    font-family: var(--font-family-monospace), serif;
     font-size: 15px;
-    padding: 0;
-    border: none;
-    cursor: pointer;
-    transition: filter 0.2s ease;
-    width: min-content;
 }
 button:hover {
     filter: brightness(150%);

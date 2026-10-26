@@ -1,7 +1,7 @@
 package dev.cerez.titan.core.strategy.grid.attribute;
 
 import dev.cerez.titan.core.strategy.grid.model.Context;
-import dev.cerez.titan.core.strategy.grid.model.OrderPreview;
+import dev.cerez.titan.connector.model.OrderPreview;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 

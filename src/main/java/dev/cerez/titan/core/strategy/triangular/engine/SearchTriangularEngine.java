@@ -41,30 +41,6 @@ public abstract class SearchTriangularEngine implements Configurable<SearchTrian
         buildGraf(allSymbolMap, liveTickers);
     }
 
-//    public int getTotalCycle(){
-//        int totalCycle = 0;
-//        for (NameAsset a : outgoingByFromAsset.keySet()) {
-//            List<ArbitrageEdge> edgesAB = List.copyOf(outgoingByFromAsset.get(a));
-//
-//            for (ArbitrageEdge ab : edgesAB) {
-//                NameAsset b = ab.getToAsset();
-//                List<ArbitrageEdge> edgesBC = List.copyOf(outgoingByFromAsset.get(b));
-//
-//                for (ArbitrageEdge bc : edgesBC) {
-//                    NameAsset c = bc.getToAsset();
-//                    if (c.equals(a)) continue;
-//                    List<ArbitrageEdge> edgesCA = List.copyOf(outgoingByFromAsset.get(c));
-//                    for (ArbitrageEdge ca : edgesCA) {
-//                        if (ca.getToAsset().equals(a)) {
-//                            totalCycle++;
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//        return totalCycle;
-//    }
-
     protected abstract void buildGraf(@NotNull Map<String, Symbol> exchangeInfoSpot, @NotNull Map<String, BookTickDouble> liveTickers);
 
     protected abstract @NotNull Map<NameAsset, ArrayList<ArbitrageEdge>> updateGraf(
@@ -131,24 +107,20 @@ public abstract class SearchTriangularEngine implements Configurable<SearchTrian
             long AbsoluteDelayComputeNanoTime
     ){}
 
-    @Getter
-    public static final class NameAssetIndexed extends NameAsset {
+    private final AtomicInteger indexCurrent = new AtomicInteger(0);
+    private final ConcurrentMap<String, Integer> indexes = new ConcurrentHashMap<>();
 
-        private static final AtomicInteger indexCurrent = new AtomicInteger(0);
-        private static final ConcurrentMap<String, Integer> indexes = new ConcurrentHashMap<>();
+    @Getter
+    public final class NameAssetIndexed extends NameAsset {
 
         private final int index;
 
         public NameAssetIndexed(String asset) {
             super(asset);
-            if (indexes.containsKey(asset)) throw new IllegalCallerException("No se puede dos instancia con asset iguales");
+            if (indexes.containsKey(asset))
+                throw new IllegalCallerException("No se puede dos instancia con asset iguales");
             this.index = indexes.computeIfAbsent(asset, (a) -> indexCurrent.getAndIncrement());
         }
-
-        public static int currentIndex() {
-            return indexCurrent.get();
-        }
-
         @Override
         public int hashCode() {
             return index;
