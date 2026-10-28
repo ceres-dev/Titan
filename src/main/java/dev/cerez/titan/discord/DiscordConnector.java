@@ -39,7 +39,7 @@ public class DiscordConnector implements Switch, Configurable<DiscordConnector.D
         jda.awaitReady();
         executorService.execute(() -> {
             while (running) {
-                LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(4));
+                LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(5));
                 if (statusProfiler == null) continue;
                 StatusProfiler.PresenceProfile presenceProfiler = statusProfiler.getPresenceProfile();
                 jda.getPresence().setStatus(presenceProfiler.onlineStatus());

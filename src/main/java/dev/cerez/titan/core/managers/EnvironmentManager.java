@@ -198,7 +198,7 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
 
         public List<Position> getPositions() {
             Map<String, Symbol> symbolMap = connector.fGetAllSymbols();
-            Map<String, BinanceConnector.FundingRate> nextFundingMap = connector.fGetFundingRate();;
+            Map<String, BinanceConnector.FundingRate> nextFundingMap = connector.fGetFundingRate();
             return connector.fGetPositions().stream().map((futurePosition -> {
                 Symbol symbol = symbolMap.get(futurePosition.symbol());
                 BigDecimal nextFunding = nextFundingMap.get(futurePosition.symbol()).nextFundingRate();

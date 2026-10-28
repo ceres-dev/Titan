@@ -47,6 +47,10 @@ socket.addEventListener("message", event => {
             renderTelemetrySystem(payload.data.system);
             break
         }
+        case "Position": {
+            renderPosition(payload.data);
+            break;
+        }
         default: {
             console.error("Unknow Response: " + payload.data);
         }

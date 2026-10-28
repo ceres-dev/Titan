@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class HistoryAppender<E> extends AppenderBase<E> {
 
     private final Deque<E> history = new ConcurrentLinkedDeque<>();
-    private static final int MAX_LOGS = 1000;
+    private static final int MAX_LOGS = 500;
 
     @Override
     protected void append(E event) {
