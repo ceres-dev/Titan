@@ -133,7 +133,7 @@ public final class BinanceConnector extends BaseConnector {
         initWebSocket(this.fGetWWS());
         initWebSocket(this.sGetWWS());
         super.internalStart();
-        fStartUserData();
+        if (!config.isTestNet()) fStartUserData();
         initWebSocket(this.uGetWWS());
     }
 
@@ -274,8 +274,29 @@ public final class BinanceConnector extends BaseConnector {
         }
 //        params.put("isIsolated", true);
 //        params.put("newClientOrderId", nameOrder);
-        sendSignedRequest(Method.POST, "/api/v3/order", params);
-        return null;
+        JsonNode node = sendSignedRequest(Method.POST, "/api/v3/order", params);
+        String id = node.get("orderId").asText();
+        BigDecimal executedQty = node.get("executedQty").decimalValue();
+        BigDecimal cumulativeQuoteQty = node.get("cummulativeQuoteQty").decimalValue();
+        BigDecimal receivedQty = sideOrder == SideOrder.BUY ? executedQty : cumulativeQuoteQty;
+        for (JsonNode fills : node.get("fills")){
+            if (fills.get("tradeId").asText().equals(id)){
+                return new OrderResult(
+                        id,
+                        receivedQty.subtract(fills.decimalValue()),
+                        cumulativeQuoteQty,
+                        receivedQty.max(BigDecimal.ZERO)
+                );
+            }
+        }
+
+
+        return new OrderResult(
+                id,
+                executedQty,
+                cumulativeQuoteQty,
+                receivedQty.max(BigDecimal.ZERO)
+        );
     }
 
     @Override
@@ -678,8 +699,8 @@ public final class BinanceConnector extends BaseConnector {
         JsonNode node = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/depth", params);
         JsonNode bid = node.get("bids").iterator().next();
         JsonNode ask = node.get("asks").iterator().next();
-        BigDecimal bidPrice = new BigDecimal(bid.iterator().next().asText());
-        BigDecimal askPrice = new BigDecimal(ask.iterator().next().asText());
+        BigDecimal bidPrice = bid.iterator().next().decimalValue();
+        BigDecimal askPrice = ask.iterator().next().decimalValue();
         return new BookTick(bidPrice, BigDecimal.ZERO, askPrice, BigDecimal.ZERO);
     }
 
@@ -726,7 +747,7 @@ public final class BinanceConnector extends BaseConnector {
             transactions.add(new Transaction(
                     node.get("symbol").asText(),
                     IncomeType.valueOf(node.get("incomeType").asText()),
-                    new BigDecimal(node.get("income").asText()),
+                    node.get("income").decimalValue(),
                     node.get("asset").asText(),
                     node.get("time").longValue()
             ));
@@ -741,7 +762,7 @@ public final class BinanceConnector extends BaseConnector {
         params.put("limit", mapAllSymbols.size());
         JsonNode raw = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/fundingRate", params);
         for (JsonNode node : raw){
-            resultAllSymbols.put(node.get("symbol").asText(), new BigDecimal(node.get("fundingRate").asText()));
+            resultAllSymbols.put(node.get("symbol").asText(), node.get("fundingRate").decimalValue());
         }
         return resultAllSymbols;
     }

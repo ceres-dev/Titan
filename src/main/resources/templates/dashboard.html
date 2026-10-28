@@ -12,15 +12,14 @@
     <link rel="stylesheet" href="/style/dashboard.css">
 </head>
 <body>
-<div class="rgbEffect"></div>
-<header class="mainSections">
-    <div class="navBar box" style="margin-bottom: 1rem">
-        <nav class="barLeft">
+<main>
+    <header class="headerBar box">
+        <div class="barLeft">
             <h1>Titan</h1>
             <p id="timeLocal">Local --:--:--</p>
             <p id="timeRemote">Remote --:--:--</p>
             <p id="timeExchange">Exchange --:--:--</p>
-        </nav>
+        </div>
         <div class="barRight">
             <form style="display: flex" method="post" th:action="@{/auth/logout}" novalidate>
                 <button type="submit">
@@ -29,27 +28,15 @@
             </form>
             <button id="resetWindows">Reset</button>
         </div>
-    </div>
-</header>
-<section class="mainSections" style="display: grid; grid-template-columns: 1fr 1fr 1fr;">
-    <section class="window" id="logsWindow">
-        <header class="windowHeader">
-            <span>titan://root/logs</span>
-            <button class="windowCloser">X</button>
-        </header>
-        <div class="windowContent">
+    </header>
+    <article class="mainSections">
+        <section class="box" id="logsWindow">
             <h2>Logs</h2>
             <div class="box" id="logs">
                 <div class="cliLoader"></div>
             </div>
-        </div>
-    </section>
-    <section class="window" id="balanceWindow">
-        <header class="windowHeader">
-            <span>titan://root/balance</span>
-            <button class="windowCloser">X</button>
-        </header>
-        <div class="windowContent">
+        </section>
+        <section class="box" id="balanceWindow">
             <h2>Balance</h2>
             <div>
                 <h3>Futuros USDⓈ-M</h3>
@@ -80,16 +67,10 @@
                     </li>
                 </ul>
             </div>
-        </div>
-        <footer id="roi"><div class="cliLoader"></div></footer>
-    </section>
-    <section class="window" id="telemetryWindow">
-        <header class="windowHeader">
-            <span>titan://root/telemetry</span>
-            <button class="windowCloser">X</button>
-        </header>
-        <div class="windowContent">
-            <h2>Telemetría</h2>
+            <footer id="roi"><div class="cliLoader"></div></footer>
+        </section>
+        <section class="box" id="telemetryWindow">
+            <h2>Telemetría <div class="webSocketClose" id="webSocketIndicator"></div></h2>
             <div>
                 <h3>Connector</h3>
                 <ul id="telemetryConnector">
@@ -106,14 +87,8 @@
                     </li>
                 </ul>
             </div>
-        </div>
-    </section>
-    <section class="window" id="positionWindow">
-        <header class="windowHeader">
-            <span>titan://root/positions</span>
-            <button class="windowCloser">X</button>
-        </header>
-        <div class="windowContent">
+        </section>
+        <section class="box" id="positionWindow">
             <h2>Posiciones</h2>
             <table>
                 <thead>
@@ -133,23 +108,18 @@
                 </tr>
                 </tbody>
             </table>
-        </div>
-    </section>
-    <section class="window" id="strategyWindow">
-        <header class="windowHeader">
-            <span>titan://root/strategy</span>
-            <button class="windowCloser">X</button>
-        </header>
-        <div class="windowContent">
+        </section>
+        <section class="box" id="strategyWindow">
             <h2>Estrategias</h2>
             <ul id="strategy">
                 <li>
                     <div class="cliLoader"></div>
                 </li>
             </ul>
-        </div>
-    </section>
-</section>
+        </section>
+    </article>
+</main>
+<div class="rgbEffect"></div>
 
 <pre id="output"></pre>
 <script src="/script/utils.js"></script>

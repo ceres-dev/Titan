@@ -32,7 +32,7 @@ public class TriangularCommand extends BaseCommand {
         ExecutorCycles.ExecutorCyclesConfig configExecutor = ExecutorCycles.ExecutorCyclesConfig.builder()
                 .maxLag(20L)
                 .minProfit(0.1d)
-                .isTest(true)
+                .isTest(false)
                 .build();
         TelemetryCollector.TelemetryConfig telemetryConfig = TelemetryCollector.TelemetryConfig.builder()
                 .maxDelaysDeltaComputeNanoTime(500)
@@ -51,7 +51,7 @@ public class TriangularCommand extends BaseCommand {
         Loader loader =                 new Loader();
         StorageManager storageManager = new StorageManagerMemory(Utils.getRootId());
         StorageManagerJsonLocal storageManagerJsonLocal = new StorageManagerJsonLocal(Utils.getRootId());
-        storageManagerJsonLocal.setConfigProfilerName(BaseConnector.ConnectorConfig.class, "triangular");
+        storageManagerJsonLocal.setConfigProfilerName(BaseConnector.ConnectorConfig.class, "testnetSpot");
         Connector connector =           new BinanceConnector(storageManagerJsonLocal);
         ExecutorCycles executorCycles = new ExecutorCycles(configExecutor, connector);
 

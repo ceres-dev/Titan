@@ -10,6 +10,9 @@ const socket = new WebSocket(
 );
 
 socket.addEventListener("open", () => {
+    const indicator = document.getElementById("webSocketIndicator");
+    indicator.classList.remove("webSocketIndicatorClose");
+    indicator.classList.add("webSocketIndicatorOpen");
     console.log("websocket open");
 });
 
@@ -51,6 +54,9 @@ socket.addEventListener("message", event => {
 });
 
 socket.addEventListener("close", (close) => {
+    const indicator = document.getElementById("webSocketIndicator");
+    indicator.classList.remove("webSocketIndicatorOpen");
+    indicator.classList.add("webSocketIndicatorClose");
     console.log("Websocket close: " + close);
 
 });

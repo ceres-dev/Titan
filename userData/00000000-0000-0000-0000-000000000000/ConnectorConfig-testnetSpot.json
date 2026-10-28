@@ -1,0 +1,8 @@
+{
+  "maxStreamsPerSubscribe": 200,
+  "cooldownMsPerRequest": 1000,
+  "isTestNet": true,
+  "logsRequest": true,
+  "key": "BZO19XRg897PC6f1k37MRzMRR1PwSwtVZaHxhHDGsRK7mDvDjr7AvpZvSQUjxCs5",
+  "secret": "bkl5P0I5F0Pfl1yX10QiQwOPCbMDnO9uqAiBfVRRIiNVhJuV5Lx6qD6K5VdZjl40"
+}

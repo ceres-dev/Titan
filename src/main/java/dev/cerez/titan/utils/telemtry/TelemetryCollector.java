@@ -1,7 +1,7 @@
 package dev.cerez.titan.utils.telemtry;
 
 import dev.cerez.titan.connector.BaseConnector;
-import dev.cerez.titan.core.strategy.triangular.utils.TriangularArbitrageOpportunity;
+import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
 import dev.cerez.titan.utils.Configurable;
 import dev.cerez.titan.utils.Utils;
 import lombok.*;
@@ -27,7 +27,7 @@ public class TelemetryCollector implements TelemetryConnector, Configurable<Tele
 
     @NotNull
     private LinkedList<Long> deltaDelayComputeNanoTimeList = new LinkedList<>();
-    private LinkedList<TriangularArbitrageOpportunity> opportunities = new LinkedList<>();
+    private LinkedList<SearchTriangularEngine.Opportunity> opportunities = new LinkedList<>();
     private LinkedList<TelemetryRequestConnector> requestConnectors = new LinkedList<>();
     private long totalUpdateCounter = 0;
     private int updateCounterPrev = 0;
@@ -83,14 +83,14 @@ public class TelemetryCollector implements TelemetryConnector, Configurable<Tele
         updateCounterCurrentInFrameTime++;
     }
 
-    public void addOpportunities(Collection<TriangularArbitrageOpportunity> onOpportunities) {
+    public void addOpportunities(Collection<SearchTriangularEngine.Opportunity> opportunities) {
         if (config.mode != Mode.FULL){
             return;
         }
         if (inSnapshot) {
             return;
         }
-        opportunities.addAll(onOpportunities);
+        this.opportunities.addAll(opportunities);
     }
 
     /*Connector*/

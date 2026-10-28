@@ -1,13 +1,13 @@
 package dev.cerez.titan.core.strategy.triangular;
 
-import dev.cerez.titan.log.Log;
-import dev.cerez.titan.connector.exception.ApiException;
 import dev.cerez.titan.connector.Connector;
+import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.connector.exception.ApiException;
 import dev.cerez.titan.connector.model.OrderResult;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
-import dev.cerez.titan.core.strategy.triangular.utils.TriangularArbitrageOpportunity;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.utils.Utils;
 import lombok.Builder;
 import lombok.Getter;
@@ -24,13 +24,13 @@ import java.util.concurrent.locks.LockSupport;
 
 public class ExecutorCycles {
 
-    private volatile TriangularArbitrageOpportunity currentOpportunity;
+    private volatile SearchTriangularEngine.Opportunity currentOpportunity;
     private volatile CompletableFuture<Object> runLoop = CompletableFuture.completedFuture(new Object());
     private volatile long nanoTimeStartCycles = 0;
     private BigDecimal pnl;
 
     private final @NotNull DecimalFormat decimalFormat = new DecimalFormat("0.00#######");
-    private final @NotNull Set<TriangularArbitrageOpportunity> opportunityWindows = new HashSet<>();
+    private final @NotNull Set<SearchTriangularEngine.Opportunity> opportunityWindows = new HashSet<>();
     private final @NotNull Executor executor = Executors.newFixedThreadPool(4, Utils.getThreadFactory(this));
     private final @NotNull HashMap<String, Symbol> symbolsByName;
     private final @NotNull Connector connector;
@@ -46,8 +46,8 @@ public class ExecutorCycles {
         this.symbolsByName = symbolsByName;
     }
 
-    public synchronized void onOpportunities(SearchTriangularEngine.@NotNull OnOpportunities onOpportunities) {
-        HashSet<TriangularArbitrageOpportunity> current = new HashSet<>(onOpportunities.opportunities());
+    public synchronized void onOpportunities(List<SearchTriangularEngine.@NotNull Opportunity> onOpportunities, long nanotime) {
+        HashSet<SearchTriangularEngine.Opportunity> current = new HashSet<>(onOpportunities);
 
         boolean changed = current.size() != opportunityWindows.size() || !current.containsAll(opportunityWindows);
         if (!changed) {
@@ -57,23 +57,23 @@ public class ExecutorCycles {
             opportunityWindows.addAll(current);
         }
 
-        long opportunityNanoTime = onOpportunities.AbsoluteDelayComputeNanoTime();
+        long opportunityNanoTime = nanotime;
         if (currentOpportunity != null && !current.contains(currentOpportunity)) {
             long currentNanoTime = System.nanoTime();
             Log.info("<red>Cierre del bucle (Termino Ventana). Duración: %.2fms (Computo: %.2fms, Ticks: %d)",
                     (currentNanoTime - nanoTimeStartCycles) / 1_000_000d,
                     (currentNanoTime - opportunityNanoTime) / 1_000_000d,
-                    currentOpportunity.getLifeTime().getTicks()
+                    currentOpportunity.lifeTime().ticks()
             );
-            currentOpportunity.getLifeTime().setCloseNanoTime(currentNanoTime);
-            currentOpportunity.getLifeTime().setOpenNanoTime(nanoTimeStartCycles);
+            currentOpportunity.lifeTime().closed(currentNanoTime);
+//            currentOpportunity.lifeTime().(nanoTimeStartCycles);
             this.currentOpportunity = null;
             return;
         }
 
-        TriangularArbitrageOpportunity newOpportunity = null;
-        for (TriangularArbitrageOpportunity opportunity : onOpportunities.opportunities()) {
-            if (newOpportunity == null || opportunity.getProfitPercent() > newOpportunity.getProfitPercent()) {
+        SearchTriangularEngine.Opportunity newOpportunity = null;
+        for (SearchTriangularEngine.Opportunity opportunity : onOpportunities) {
+            if (newOpportunity == null || opportunity.profitPercent() > newOpportunity.profitPercent()) {
                 newOpportunity = opportunity;
             }
         }
@@ -85,7 +85,7 @@ public class ExecutorCycles {
                 }
 
                 if (this.currentOpportunity == newOpportunity &&
-                        newOpportunity.getProfitPercent() < this.currentOpportunity.getProfitPercent()
+                        newOpportunity.profitPercent() < this.currentOpportunity.profitPercent()
                 ) {
                     long currentNanoTime = System.nanoTime();
                     Log.info("<red>Cierre del bucle (El Profit cayo). Duración: %.2fms (Computo: %.2fms)",
@@ -93,34 +93,35 @@ public class ExecutorCycles {
                             (currentNanoTime - opportunityNanoTime) / 1_000_000d
 
                     );
-                    currentOpportunity.getLifeTime().setCloseNanoTime(currentNanoTime);
-                    currentOpportunity.getLifeTime().setOpenNanoTime(nanoTimeStartCycles);
+                    currentOpportunity.lifeTime().closed(currentNanoTime);
+//                    currentOpportunity.lifeTime().setOpenNanoTime(nanoTimeStartCycles);
                     this.currentOpportunity = null;
                     return;
                 }
 
-                if (newOpportunity.getProfitPercent() < config.getMinProfit() ||
-                        newOpportunity.getProfitPercent() < this.currentOpportunity.getProfitPercent()){
+                if (newOpportunity.profitPercent() < config.getMinProfit() ||
+                        newOpportunity.profitPercent() < this.currentOpportunity.profitPercent()){
                     return;
                 }
             }
-            SearchTriangularEngine.ArbitrageEdge USDT = null;
-            for (SearchTriangularEngine.ArbitrageEdge edge : newOpportunity.getEdges()) {
-                if (config.getPreferredStartAsset().equals(edge.getFromAsset().getName())) {
+            SearchTriangularEngine.Leg USDT = null;
+            for (SearchTriangularEngine.Leg edge : newOpportunity.legs()) {
+                if (config.getPreferredStartAsset().equals(edge.from().name())) {
                     USDT = edge;
                     break;
                 }
             }
-            int index = newOpportunity.getEdges().indexOf(USDT);
-            List<SearchTriangularEngine.ArbitrageEdge> rotatedEdges = new ArrayList<>(newOpportunity.getEdges());
+            if (USDT == null) return;
+            int index = newOpportunity.legs().indexOf(USDT);
+            List<SearchTriangularEngine.Leg> rotatedEdges = new ArrayList<>(newOpportunity.legs());
             if (index != -1) {
                 Collections.rotate(rotatedEdges, -index);
             }
             List<String> rotatedAssets = new ArrayList<>(rotatedEdges.size() + 1);
             if (!rotatedEdges.isEmpty()) {
-                rotatedAssets.add(rotatedEdges.getFirst().getFromAsset().getName());
-                for (SearchTriangularEngine.ArbitrageEdge edge : rotatedEdges) {
-                    rotatedAssets.add(edge.getToAsset().getName());
+                rotatedAssets.add(rotatedEdges.getFirst().from().name());
+                for (SearchTriangularEngine.Leg edge : rotatedEdges) {
+                    rotatedAssets.add(edge.to().name());
                 }
             }
 
@@ -140,7 +141,7 @@ public class ExecutorCycles {
             printCycles(newOpportunity, opportunityNanoTime);
 
             this.nanoTimeStartCycles = System.nanoTime();
-            this.currentOpportunity = newOpportunity.copyAndSetAssetsCycle(rotatedAssets, rotatedEdges);
+            this.currentOpportunity = newOpportunity;//.copyAndSetAssetsCycle(rotatedAssets, rotatedEdges);
 
             if (config.isUseDelay()){
                 CompletableFuture.runAsync(() -> {
@@ -165,14 +166,14 @@ public class ExecutorCycles {
                         if (currentOpportunity == null) {
                             return new Object();
                         }
-                        List<SearchTriangularEngine.ArbitrageEdge> edges = new ArrayList<>(currentOpportunity.getEdges());
+                        List<SearchTriangularEngine.Leg> legs = new ArrayList<>(currentOpportunity.legs());
                         BigDecimal initialBalance = config.getDefaultStartAmount();
                         BigDecimal balance = initialBalance;
-                        for (SearchTriangularEngine.ArbitrageEdge edge : edges) {
-                            Log.info("Ejecutando: %s %s", edge.getSymbol(), (edge.getSideOrder().equals(SideOrder.SELL) ? "<red>SELL" : "<green>BUY") + "<reset>");
-                            Symbol symbol = symbolsByName.get(edge.getSymbol());
+                        for (SearchTriangularEngine.Leg leg : legs) {
+                            Log.info("Ejecutando: %s %s", leg.symbol(), (leg.side().equals(SideOrder.SELL) ? "<red>SELL" : "<green>BUY") + "<reset>");
+                            Symbol symbol = symbolsByName.get(leg.symbol());
                             if (symbol == null) {
-                                Log.warning("Símbolo no soportado en este entorno: " + edge.getSymbol());
+                                Log.warning("Símbolo no soportado en este entorno: " + leg.symbol());
                                 currentOpportunity = null;
                                 break;
                             }
@@ -180,15 +181,15 @@ public class ExecutorCycles {
                             try {
                                 OrderResult orderResult = connector.sSendOrderToMkt(
                                         symbol.toString(),
-                                        edge.getSideOrder(),
+                                        leg.side(),
                                         balance,
                                         uuid,
-                                        edge.getSideOrder() != SideOrder.SELL
+                                        leg.side() == SideOrder.SELL
                                 );
-                                Log.info(balance + " @ " + edge.getFromAsset().getName() + " -> " + orderResult.receivedQty() + " @ " + edge.getToAsset().getName());
+                                Log.info(balance + " @ " + leg.from().name() + " -> " + orderResult.executedQty() + " @ " + leg.to().name());
 
                                 balance = orderResult.receivedQty();
-                                if (edge.getSymbol().equals(config.getPreferredStartAsset())) {
+                                if (leg.symbol().equals(config.getPreferredStartAsset())) {
                                     pnl = pnl.add(balance.remainder(config.getDefaultStartAmount()));
                                     String balanceString = (balance.compareTo(initialBalance) > 0 ?
                                             "<green>Ganado: " + " +" +decimalFormat.format(balance.remainder(initialBalance)) :
@@ -223,26 +224,25 @@ public class ExecutorCycles {
         }
     }
 
-    public void printCycles(@NotNull TriangularArbitrageOpportunity opportunity, long opportunityNanoTime) {
+    public void printCycles(@NotNull SearchTriangularEngine.Opportunity opportunity, long opportunityNanoTime) {
         long nano = System.nanoTime();
         Log.info(
                 "  %s | retorno %.6f | profit %.4f%% | peso %.8f | Lag: %.2fms (%dms+)",
-                String.join(" -> ", opportunity.getAssetsCycle()),
-                opportunity.getRateProduct(),
-                opportunity.getProfitPercent(),
-                opportunity.getTotalWeight(),
+                String.join(" -> ", opportunity.legs().stream().map(SearchTriangularEngine.Leg::symbol).toList()),
+                opportunity.netRateProduct(),
+                opportunity.profitPercent(),
+                -1f,
                 (nano - opportunityNanoTime) / 1_000_000d,
                 config.isUseDelay() ? config.getDelay() : 0
         );
-        for (SearchTriangularEngine.ArbitrageEdge edge : opportunity.getEdges()) {
+        for (SearchTriangularEngine.Leg leg : opportunity.legs()) {
             Log.info(
                     "    %s %s via %s @ %.10f -> rate %.10f ",
-                    (edge.getSideOrder().equals(SideOrder.BUY) ? "<green>BUY" : "<red>SELL") + "<reset>",
-                    edge.getFromAsset().getName() + "/" + edge.getToAsset().getName(),
-                    edge.getSymbol(),
-                    edge.getReferencePrice(),
-                    edge.getRate(),
-                    edge.getWeight()
+                    (leg.side().equals(SideOrder.BUY) ? "<green>BUY" : "<red>SELL") + "<reset>",
+                    leg.from().name() + "/" + leg.to().name(),
+                    leg.symbol(),
+                    leg.price(),
+                    -1f
             );
         }
     }

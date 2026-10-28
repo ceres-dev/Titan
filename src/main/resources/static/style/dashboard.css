@@ -1,33 +1,69 @@
 body{
     padding-top: 1rem;
 }
+:root{
+    --glow-size: 10px
+}
 .log{
     margin: 0;
+}
+.barLeft, .barRight, .headerBar{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-grow: 1;
+    gap: var(--gap);
+}
+.barRight{
+    flex-direction: row-reverse;
+}
+main{
+    width: min(100%, var(--max-width));
+    background: black;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid var(--main-color);
+    gap: var(--gap);
+}
+h2{
+    margin-bottom: 0.5rem;
+}
+.strategyElement{
+    display: flex;
+    align-items: center;
+    gap: var(--gap);
+}
+
+.webSocketOpen, .webSocketClose{
+    width: 1rem;
+    height: 1rem;
+    align-self: center;
+    display: inline-block;
+    border-radius: 50%;
+}
+.webSocketOpen{
+    animation: webSocketOpen 1.5s infinite ease;
+}
+.webSocketClose{
+    animation: webSocketClose 1.5s infinite ease;
+}
+@keyframes webSocketOpen{
+    0%, 100% { background: #327320; box-shadow: 0 0 var(--glow-size) #327320; }
+    50% { background: #60ff2b; box-shadow: 0 0 var(--glow-size) #60ff2b;}
+}
+@keyframes webSocketClose{
+    0%, 100% { background: #732020; box-shadow: 0 0 var(--glow-size) #732020; }
+    50% { background: #ff2b2b; box-shadow: 0 0 var(--glow-size) #ff2b2b;}
+}
+/* Secciones */
+#logsWindow{
+    grid-column: 1 / 3;
 }
 #logs{
     height: 300px;
     overflow: scroll;
     white-space: nowrap;
-}
-
-.barLeft, .barRight, .navBar{
-    display: flex;
-    flex-direction: row;
-    max-width: 80rem;
-    align-items: center;
-    flex-grow: 1;
-    gap: 1rem;
-}
-.barRight{
-    flex-direction: row-reverse;
-}
-.strategyElement{
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-#logsWindow{
-    grid-column: 1 / 3;
 }
 #positionWindow{
     grid-column: 2 / 4;
@@ -39,29 +75,31 @@ body{
 #telemetryWindow{
     grid-row: 2 / 4;
 }
-h2{
-    margin-bottom: 0.5rem;
-}
+/* Ganancias y perdidas */
 .profit{
-    animation: profitAnimation 2s infinite linear;
+    animation: profitAnimation 3s infinite linear;
 }
 .loses{
-    animation: losesAnimation 2s infinite linear;
+    animation: losesAnimation 3s infinite linear;
 }
 @keyframes losesAnimation{
     0%, 100% {
-        color: #fd2020;
+        color: #ff1515;
+        text-shadow: 0 0 12px #ff1515;
     }
     50% {
-        color: #ff6161;
+        color: #c22424;
+        text-shadow: 0 0 12px #c22424;
     }
 }
 @keyframes profitAnimation{
     0%, 100% {
         color: #2ffd20;
+        text-shadow: 0 0 12px #2ffd20;
     }
     50% {
-        color: #96ff61;
+        color: #5ac523;
+        text-shadow: 0 0 12px #5ac523;
     }
 }
 /*Effects Type */
@@ -90,28 +128,28 @@ h2{
     animation: statusInoperative 1.5s infinite ease-in-out;
 }
 @keyframes statusSTOPING{
-    0%, 100% { color: #bbbbbb; }
-    50% { color: #ff6161; }
+    0%, 100% { color: #bbbbbb; text-shadow: 0 0 var(--glow-size) #bbbbbb; }
+    50% { color: #ff6161; text-shadow: 0 0 var(--glow-size) #ff6161; }
 }
 @keyframes statusWaiting{
-    0%, 100% { color: #5e5eff}
-    50% { color: #2b2bff}
+    0%, 100% { color: #5e5eff; text-shadow: 0 0 var(--glow-size) #5e5eff; }
+    50% { color: #2b2bff; text-shadow: 0 0 var(--glow-size) #2b2bff; }
 }
 @keyframes statusWorking{
-    0%, 100% { color: #a6ff8f}
-    50% { color: #60ff2b}
+    0%, 100% { color: #a6ff8f; text-shadow: 0 0 var(--glow-size) #a6ff8f; }
+    50% { color: #60ff2b; text-shadow: 0 0 var(--glow-size) #60ff2b;}
 }
 @keyframes statusPreparing{
-    0%, 100% { color: #21ffbd; }
-    50% { color: #a6ff8f; }
+    0%, 100% { color: #21ffbd; text-shadow: 0 0 var(--glow-size) #21ffbd;}
+    50% { color: #a6ff8f; text-shadow: 0 0 var(--glow-size) #a6ff8f;}
 }
 @keyframes statusStarting{
-    0%, 100% { color: #bbbbbb; }
-    50% { color: #a6ff8f; }
+    0%, 100% { color: #bbbbbb; text-shadow: 0 0 var(--glow-size) #bbbbbb;}
+    50% { color: #a6ff8f; text-shadow: 0 0 var(--glow-size) #a6ff8f;}
 }
 @keyframes statusInoperative{
-    0%, 100% { color: #ff0000; }
-    50% { color: #590000; }
+    0%, 100% { color: #ff0000; text-shadow: 0 0 var(--glow-size) #ff0000;}
+    50% { color: #590000; text-shadow: 0 0 var(--glow-size) #590000;}
 }
 .variable{
     color: #00ffbb;

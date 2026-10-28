@@ -1,20 +1,19 @@
 package dev.cerez.titan.core.strategy.triangular;
 
-import dev.cerez.titan.core.StatusManager;
-import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.model.AssetRate;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.connector.model.Volume24H;
+import dev.cerez.titan.core.ManagerStrategy;
 import dev.cerez.titan.core.PersistentNope;
+import dev.cerez.titan.core.StatusManager;
 import dev.cerez.titan.core.event.events.TriangularManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
-import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
 import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularEngineJava;
-import dev.cerez.titan.core.strategy.triangular.utils.TriangularArbitrageOpportunity;
-import dev.cerez.titan.core.ManagerStrategy;
+import dev.cerez.titan.discord.StatusProfiler;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.telemtry.TelemetryCollector;
 import lombok.*;
@@ -25,13 +24,14 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 
 public final class TriangularManager extends ManagerStrategy<TriangularManager.TriangularManagerConfiguration, PersistentNope, Connector, TriangularManagerListener> implements StatusProfiler {
 
     @Setter @Nullable private SearchTriangularEngine engine;
-    @Setter @Nullable private Consumer<SearchTriangularEngine.OnOpportunities> onOpportunities;
+    @Setter @Nullable private BiConsumer<List<SearchTriangularEngine.Opportunity>, Long> onOpportunities;
     @Setter @Nullable private TelemetryCollector telemetry;
 
     @Nullable private Map<String, Symbol> allSymbolsMap = null;
@@ -40,7 +40,7 @@ public final class TriangularManager extends ManagerStrategy<TriangularManager.T
     @SneakyThrows
     public TriangularManager(@NotNull StorageManager storageManager, @NotNull Connector connector) {
         super(storageManager.createProfilerManager(TriangularManagerConfiguration.class, PersistentNope.class), connector, TypeManager.FUNDING_TRIANGULAR);
-        this.engine = getConfig().getEngine().getConstructor(SearchTriangularEngine.EngineConfigurationProvider.class).newInstance(getConfig());
+        this.engine = getConfig().getEngine().getConstructor(SearchTriangularEngine.EngineConfiguration.class).newInstance(getConfig());
     }
 
     @Override
@@ -103,12 +103,12 @@ public final class TriangularManager extends ManagerStrategy<TriangularManager.T
         try {
             long currentNanoTime = System.nanoTime();
 
-            List<TriangularArbitrageOpportunity> list = Objects.requireNonNull(engine, "Engine no asignado")
+            List<SearchTriangularEngine.Opportunity> list = Objects.requireNonNull(engine, "Engine no asignado")
                     .computeTriangularArbitrageOpportunities(
                             // Si es nulo se hará una analizáis total al grafo
                             updatedTicker
                     );
-            onOpportunities.accept(new SearchTriangularEngine.OnOpportunities(list, currentNanoTime));
+            onOpportunities.accept(list, currentNanoTime);
             if (telemetry != null) {
                 telemetry.addDeltaDelayComputeNanoTime(System.nanoTime() - currentNanoTime);
                 telemetry.incrementUpdateCounter();
@@ -250,7 +250,7 @@ public final class TriangularManager extends ManagerStrategy<TriangularManager.T
     @Data
     @SuperBuilder
     @EqualsAndHashCode(callSuper = true)
-    public static class TriangularManagerConfiguration extends SearchTriangularEngine.EngineConfigurationProvider {
+    public static class TriangularManagerConfiguration extends SearchTriangularEngine.EngineConfiguration {
         @Builder.Default public int maxSymbolsHighVolumen = 500;
         @Builder.Default public int maxSymbolsLowVolumen = 500;
         @Builder.Default public Set<String> banAssets = Set.of();
