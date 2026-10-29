@@ -169,11 +169,3 @@ main{
 .inputPassword{
     width: 9rem;
 }
-form, section{
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-section h2:first-child {
-    margin-bottom: -0.5rem;
-}

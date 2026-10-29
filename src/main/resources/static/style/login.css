@@ -6,13 +6,6 @@ body{
     background: black;
     margin: 0;
 }
-#screen {
-    display: flex;
-    height: 100vh;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-}
 #loginButton{
     margin-bottom: 15px;
 }
@@ -56,32 +49,7 @@ button:active {
     filter: brightness(0.7);
 }
 label {
-    padding: 5px 10px;
-    margin-bottom: 15px;
     background: rgba(0, 0, 0, 0.13);
     width: min-content;
     border: 2px solid var(--main-color);
-}
-/* Alto Contraste */
-@media (prefers-contrast: more) {
-    body {
-        background-color: #000000;
-        color: #ffffff;
-    }
-}
-.error {
-    color: red;
-    text-shadow: 0 0 14px red;
-    position: relative;
-}
-.temble, .error{
-    animation: tremble 0.12s infinite;
-}
-@keyframes tremble {
-    0%   { transform: translate(0, 0); }
-    20%  { transform: translate(-0.8px, 0.5px); }
-    40%  { transform: translate(0.6px, -0.8px); }
-    60%  { transform: translate(-0.5px, 0.6px); }
-    80%  { transform: translate(0.8px, -0.3px); }
-    100% { transform: translate(0, 0); }
 }

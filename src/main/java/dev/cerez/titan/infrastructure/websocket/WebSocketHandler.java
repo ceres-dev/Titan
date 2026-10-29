@@ -37,9 +37,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
         if (user != null){
             EnvironmentManager manager = titan.getEnvironmentManager(user.getId());
             manager.setWebSocketServer(new WebSocketMessenger(session));
-            Log.info("Conectado como: " + user.getUsername());
         }else {
-            Log.info("Connection desconocida");
             session.close(CloseStatus.NOT_ACCEPTABLE);
         }
     }

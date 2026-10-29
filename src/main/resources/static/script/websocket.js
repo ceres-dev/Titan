@@ -62,12 +62,12 @@ socket.addEventListener("close", (close) => {
     const indicator = document.getElementById("webSocketIndicator");
     indicator.classList.remove("webSocketOpen");
     indicator.classList.add("webSocketClose");
-    console.log("Websocket close: " + close);
+    console.log("Websocket close: " + close.reason + " Code=" + close.code);
 
 });
 
 socket.addEventListener("error", (error) => {
-    console.log("Websocket error: " + error);
+    console.log("Websocket error: " + error.type);
 
 });
 

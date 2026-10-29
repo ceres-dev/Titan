@@ -15,6 +15,13 @@ input, button, textarea, select {
     --padding: 1rem;
 }
 /* Estructura */
+#centerScreen {
+    display: flex;
+    height: 100vh;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
 body{
     background: black;
     color: var(--main-color-text);
@@ -33,7 +40,6 @@ body::-webkit-scrollbar {
     height: 8px;
     background-color: #aaaaaa; /* or add it to the track */
 }
-
 .box{
     border : 2px solid var(--main-color);
     flex-grow: 1;
@@ -61,6 +67,11 @@ body::-webkit-scrollbar {
         flex-direction: column;
         gap: var(--gap);
     }
+}
+form, section{
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 footer{
     margin-top: auto;
@@ -180,7 +191,15 @@ input::placeholder {
     color: var(--main-color);
     font-style: italic;
 }
-
+a{
+    color: var(--main-color-text);
+}
+a:hover{
+    filter: brightness(1.2);
+}
+a:visited{
+    color: var(--main-color-text);
+}
 /* Listas */
 li{
     margin-top: 0.5rem;
@@ -229,7 +248,7 @@ th:first-child, td:first-child {
     position: fixed;
     pointer-events: none;
     inset: 0;
-    z-index: 0;
+    z-index: -1;
     opacity: 80%;
     background: repeating-linear-gradient( to top, transparent 0px, transparent 3px, rgba(0, 0, 0, 0.25) 3px, rgba(0, 0, 0, 0.25) 4px );
 }
@@ -265,4 +284,19 @@ th:first-child, td:first-child {
         background-position: -200% 0;
     }
 }
-
+.error {
+    color: red;
+    text-shadow: 0 0 14px red;
+    position: relative;
+}
+.tembleEffect, .error{
+    animation: tremble 0.12s infinite;
+}
+@keyframes tremble {
+    0%   { transform: translate(0, 0); }
+    20%  { transform: translate(-0.8px, 0.5px); }
+    40%  { transform: translate(0.6px, -0.8px); }
+    60%  { transform: translate(-0.5px, 0.6px); }
+    80%  { transform: translate(0.8px, -0.3px); }
+    100% { transform: translate(0, 0); }
+}

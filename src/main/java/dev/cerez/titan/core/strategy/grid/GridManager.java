@@ -141,7 +141,8 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
                 return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
             }else {
                 return c.getOrders().stream().filter(Order::isReduceOnly).count() > getConfig().getMinOrderGreed() &&
-                        !order.isReduceOnly();
+                        !order.isReduceOnly() &&
+                        (c.getPosition() != null && c.getPosition().entryPriceAvg().compareTo(order.getPrice()) <= 0);
             }
         }));
 //        applyAttributes.add(new CallOnUpdate((order, c) -> {

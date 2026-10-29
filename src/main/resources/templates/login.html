@@ -1,4 +1,4 @@
-<!-- Estilo Inspirado De Murder Drones -->
+<!-- Estilo inspirado/tomados de https://absolutesolver.com -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,11 +12,14 @@
     <link rel="stylesheet" href="/style/titan.css">
     <link rel="stylesheet" href="/style/login.css">
 </head>
-<body id="screen">
-<!--Vas a entrar a la DeepWeb, Qué miedo-->
+<body id="centerScreen">
+<!--
+Evolución de Darwin:
+Pez -> Furro
+Fin.
+ -->
 <main>
     <h1 class="title">Titan</h1>
-
     <section class="box windowContent" id="loginWindow">
         <form method="post" th:action="@{/auth/login}" novalidate>
             <label>
@@ -25,16 +28,14 @@
             <label>
                 <input class="loginInput" type="password" name="password" placeholder="password" autocomplete="off" required>
             </label>
-            <button type="submit">
-                Login
-            </button>
-            <div th:if="${param.error}" class="error" style="margin-top: 0.8rem">Invalid Credentials</div>
+            <button type="submit">Login</button>
+            <div th:if="${param.error}" class="error">Invalid Credentials</div>
         </form>
     </section>
-    <small style="position: fixed; top: 20px; right: 20px; opacity: 30%;">Titan Project</small>
+    <small style="position: fixed; top: 20px; right: 20px; opacity: 30%;"><a href="https://github.com/ceres-dev/Titan">Hecho Por Ceres</a></small>
 </main>
 <div class="rgbEffect"></div>
-<!--<div class="linesEffect"></div>-->
+<div class="linesEffect"></div>
 
 <script src="/script/window.js"></script>
 <script src="../static/script/window.js"></script>
