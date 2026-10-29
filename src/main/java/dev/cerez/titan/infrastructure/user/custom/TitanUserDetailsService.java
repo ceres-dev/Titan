@@ -46,10 +46,10 @@ public class TitanUserDetailsService implements UserDetailsService {
                     "Current password is incorrect");
         }
 
-        if (newPassword == null || newPassword.length() < 12) {
-            throw new IllegalArgumentException(
-                    "Password must contain at least 12 characters");
-        }
+//        if (newPassword == null || newPassword.length() < 12) {
+//            throw new IllegalArgumentException(
+//                    "Password must contain at least 12 characters");
+//        }
 
         user.setPassword(passwordEncoder.encode(newPassword));
 

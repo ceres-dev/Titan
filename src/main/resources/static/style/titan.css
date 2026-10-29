@@ -8,7 +8,8 @@ input, button, textarea, select {
     font: inherit;
 }
 :root {
-    --main-color: #194270;
+    --main-color: #1d4c80;
+    --main-color-text: #dedede;
     --max-width: 1400px;
     --gap: 1rem;
     --padding: 1rem;
@@ -16,7 +17,7 @@ input, button, textarea, select {
 /* Estructura */
 body{
     background: black;
-    color: #dedede;
+    color: var(--main-color-text);
     font-family: 'Cascadia Code', 'Courier New', serif;
     font-weight: 500;
     align-content: center;
@@ -38,7 +39,7 @@ body::-webkit-scrollbar {
     flex-grow: 1;
     padding: var(--padding);
     display: flex;
-    background: rgb(0, 0, 15);
+    background: rgb(0, 0, 21);
     flex-direction: column;
 }
 .box > .box{
@@ -111,29 +112,31 @@ footer{
     content: 'X';
 }
 /* Texto */
-h1{
-    text-align: center;
-}
-h2, h3{
-    margin: 0;
-}
-p{
+p h2 h1 h3{
     text-align: center;
 }
 small{
     opacity: 80%;
+    font-style: italic;
 }
 ul{
     list-style-type: none;
 }
 
 /* Interactivo */
+label{
+    padding: 5px 10px;
+    width: min-content;
+    border: 2px solid var(--main-color);
+    background-color: black;
+}
 button {
     color: var(--main-color);
     font-size: 15px;
     background-color: #000;
     border: 2px solid var(--main-color);
     padding: 2px 1rem;
+    width: min-content;
     cursor: pointer;
 }
 .windowHeader > button{
@@ -142,27 +145,40 @@ button {
 }
 button:hover {
     filter: brightness(1.5);
+    background-color: var(--main-color);
+    color: #000000;
 }
 button:active {
     filter: brightness(0.7);
 }
-input {
+input, select {
     border: var(--main-color);
     margin: 0;
     background: transparent;
-    color: var(--main-color);
-    filter: brightness(120%);
-    transition: filter 0.3s ease;
+    color: var(--main-color-text);
     font-size: 15px;
 }
-input:hover, input:focus {
+select{
+    background-color: #000
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+input:hover, input:focus, select:focus, select:hover {
     filter: brightness(170%);
 }
-input:focus {
+input:focus, select:focus {
     outline: none;
 }
 input::placeholder {
     color: var(--main-color);
+    font-style: italic;
 }
 
 /* Listas */

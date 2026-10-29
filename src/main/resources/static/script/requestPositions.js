@@ -7,17 +7,22 @@ async function loadPosition() {
 
         const positions = await response.json();
 
-        renderPosition("positions", positions);
+        renderPosition(positions);
     } catch (error) {
         console.error("Error obteniendo el balance:", error);
     }
 }
-function renderPosition(elementId, positions) {
-    const table = document.getElementById(elementId);
+function renderPosition(positions) {
+    const table = document.getElementById("positions");
     table.innerHTML = "";
 
     if (positions.length > 0) {
         positions.forEach((position) => {
+            const format = new Intl.NumberFormat('en-us', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+                signDisplay: 'always'
+            });
             const tr = document.createElement("tr");
 
             const tdSymbol = document.createElement("td");
@@ -36,17 +41,17 @@ function renderPosition(elementId, positions) {
             tr.appendChild(tdEntryPriceAvg);
             const span = document.createElement("span");
             colorForProfit(span, position.pnlUnrealize);
-            span.textContent = `${utils.trunc(position.pnlUnrealize, 3)} ${position.quoteAsset}`
+            span.textContent = `${format.format(position.pnlUnrealize, 3)} ${position.quoteAsset}`
             tdPnlUnrealize.appendChild(span);
             tr.appendChild(tdPnlUnrealize);
             table.appendChild(tr);
         })
     }else {
-        const li = document.createElement("li");
+        const tr = document.createElement("tr");
         const strong = document.createElement("strong");
         strong.textContent = "Sin Posiciones";
-        li.appendChild(strong);
-        list.appendChild(li);
+        tr.appendChild(strong);
+        table.appendChild(tr);
     }
 }
 loadPosition();

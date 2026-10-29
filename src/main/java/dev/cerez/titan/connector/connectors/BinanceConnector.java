@@ -276,14 +276,14 @@ public final class BinanceConnector extends BaseConnector {
 //        params.put("newClientOrderId", nameOrder);
         JsonNode node = sendSignedRequest(Method.POST, "/api/v3/order", params);
         String id = node.get("orderId").asText();
-        BigDecimal executedQty = node.get("executedQty").decimalValue();
-        BigDecimal cumulativeQuoteQty = node.get("cummulativeQuoteQty").decimalValue();
+        BigDecimal executedQty = new BigDecimal(node.get("executedQty").asText());
+        BigDecimal cumulativeQuoteQty = new BigDecimal(node.get("cummulativeQuoteQty").asText());
         BigDecimal receivedQty = sideOrder == SideOrder.BUY ? executedQty : cumulativeQuoteQty;
         for (JsonNode fills : node.get("fills")){
             if (fills.get("tradeId").asText().equals(id)){
                 return new OrderResult(
                         id,
-                        receivedQty.subtract(fills.decimalValue()),
+                        receivedQty.subtract(new BigDecimal(fills.asText())),
                         cumulativeQuoteQty,
                         receivedQty.max(BigDecimal.ZERO)
                 );
@@ -377,20 +377,20 @@ public final class BinanceConnector extends BaseConnector {
             case SPOT_TO_FUTURE -> fGetBalance().get(asset);
         };
         sendSignedRequest(Method.POST, "/sapi/v1/asset/transfer", params0);
-        int attempts = 0;
-        while (attempts++ < 10){
-            BigDecimal postBalance = switch (transfer){
-                case FUTURE_TO_SPOT, MARGIN_TO_SPOT -> sGetBalance().get(asset);
-                case MARGIN_TO_ISOLATED -> miGetBalance(symbol).asset(asset).free();
-                case ISOLATED_TO_MARGIN, SPOT_TO_MARGIN -> mcGetBalance(asset).free();
-                case SPOT_TO_FUTURE -> fGetBalance().get(asset);
-            };
-            if ((postBalance.subtract(prevBalance)).compareTo(amount) == 0){
-                break;
-            }
-            // ¿Sirve tener esto aquí???
-            prevBalance = postBalance;
-        }
+//        int attempts = 0;
+//        while (attempts++ < 10){
+//            BigDecimal postBalance = switch (transfer){
+//                case FUTURE_TO_SPOT, MARGIN_TO_SPOT -> sGetBalance().get(asset);
+//                case MARGIN_TO_ISOLATED -> miGetBalance(symbol).asset(asset).free();
+//                case ISOLATED_TO_MARGIN, SPOT_TO_MARGIN -> mcGetBalance(asset).free();
+//                case SPOT_TO_FUTURE -> fGetBalance().get(asset);
+//            };
+//            if ((postBalance.subtract(prevBalance)).compareTo(amount) == 0){
+//                break;
+//            }
+//            // ¿Sirve tener esto aquí???
+//            prevBalance = postBalance;
+//        }
     }
 
     @Getter
@@ -699,8 +699,8 @@ public final class BinanceConnector extends BaseConnector {
         JsonNode node = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/depth", params);
         JsonNode bid = node.get("bids").iterator().next();
         JsonNode ask = node.get("asks").iterator().next();
-        BigDecimal bidPrice = bid.iterator().next().decimalValue();
-        BigDecimal askPrice = ask.iterator().next().decimalValue();
+        BigDecimal bidPrice = new BigDecimal(bid.iterator().next().asText());
+        BigDecimal askPrice = new BigDecimal(ask.iterator().next().asText());
         return new BookTick(bidPrice, BigDecimal.ZERO, askPrice, BigDecimal.ZERO);
     }
 
@@ -747,7 +747,7 @@ public final class BinanceConnector extends BaseConnector {
             transactions.add(new Transaction(
                     node.get("symbol").asText(),
                     IncomeType.valueOf(node.get("incomeType").asText()),
-                    node.get("income").decimalValue(),
+                    new BigDecimal(node.get("income").asText()),
                     node.get("asset").asText(),
                     node.get("time").longValue()
             ));
@@ -762,7 +762,7 @@ public final class BinanceConnector extends BaseConnector {
         params.put("limit", mapAllSymbols.size());
         JsonNode raw = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/fundingRate", params);
         for (JsonNode node : raw){
-            resultAllSymbols.put(node.get("symbol").asText(), node.get("fundingRate").decimalValue());
+            resultAllSymbols.put(node.get("symbol").asText(), new BigDecimal(node.get("fundingRate").asText()));
         }
         return resultAllSymbols;
     }

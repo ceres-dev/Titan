@@ -42,14 +42,19 @@ function renderBalance(elementId, balances) {
 }
 function renderRoi(elementId, roi) {
     const content = document.getElementById(elementId);
+    const format = new Intl.NumberFormat('en-us', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        signDisplay: 'always'
+    });
     content.innerHTML = "";
 
     const div1D = document.createElement("div");
     const span1D = document.createElement("span");
     div1D.textContent = "ROI 1D: "
-    colorForProfit(span1D, roi.percent1D*100);
+    colorForProfit(span1D, format.format(roi.percent1D*100));
 
-    span1D.innerHTML = `${utils.trunc(roi.percent1D*100, 2)}% ${utils.trunc(roi.absolute1D, 2)} USD~`;
+    span1D.innerHTML = `${format.format(roi.percent1D*100)}% ${format.format(roi.absolute1D)} USD~`;
     div1D.appendChild(span1D);
 
     const div7D = document.createElement("div");
@@ -57,7 +62,7 @@ function renderRoi(elementId, roi) {
     div7D.textContent = "ROI 7D: "
     colorForProfit(span, roi.percent7D*100);
 
-    span.innerHTML = `${utils.trunc(roi.percent7D*100, 2)}% ${utils.trunc(roi.absolute7D, 2)} USD~`;
+    span.innerHTML = `${format.format(roi.percent7D*100)}% ${format.format(roi.absolute7D)} USD~`;
     div7D.appendChild(span);
 
     content.appendChild(div1D);

@@ -1,5 +1,5 @@
-<!DOCTYPE html>
 <!-- Estilo Inspirado De Murder Drones -->
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -14,39 +14,29 @@
 </head>
 <body id="screen">
 <!--Vas a entrar a la DeepWeb, Qué miedo-->
-<div >
+<main>
     <h1 class="title">Titan</h1>
-    <div id="desktop">
-        <section class="window windowAbsolute" id="loginWindow">
-            <header class="windowHeader">
-                <span>titan://login</span>
-                <button class="windowCloser">X</button>
-            </header>
-            <div class="windowContent">
-                <form method="post" th:action="@{/auth/login}" novalidate>
-                    <label>
-                        <input class="loginInput" type="text" name="username" placeholder="Username" required>
-                    </label>
-                    <label>
-                        <input class="loginInput" type="password" name="password" placeholder="Password" required>
-                    </label>
-                    <button id="loginButton" type="submit">
-                        Login
-                    </button>
-                </form>
-            </div>
-        </section>
-    </div>
-</div>
+
+    <section class="box windowContent" id="loginWindow">
+        <form method="post" th:action="@{/auth/login}" novalidate>
+            <label>
+                <input class="loginInput" type="text" name="username" placeholder="username" autocomplete="off" required>
+            </label>
+            <label>
+                <input class="loginInput" type="password" name="password" placeholder="password" autocomplete="off" required>
+            </label>
+            <button type="submit">
+                Login
+            </button>
+            <div th:if="${param.error}" class="error" style="margin-top: 0.8rem">Invalid Credentials</div>
+        </form>
+    </section>
+    <small style="position: fixed; top: 20px; right: 20px; opacity: 30%;">Titan Project</small>
+</main>
 <div class="rgbEffect"></div>
-<div class="linesEffect"></div>
+<!--<div class="linesEffect"></div>-->
 
 <script src="/script/window.js"></script>
 <script src="../static/script/window.js"></script>
-<script>
-    createWindow({
-        id: "loginWindow",
-    });
-</script>
 </body>
 </html>

@@ -11,8 +11,8 @@ const socket = new WebSocket(
 
 socket.addEventListener("open", () => {
     const indicator = document.getElementById("webSocketIndicator");
-    indicator.classList.remove("webSocketIndicatorClose");
-    indicator.classList.add("webSocketIndicatorOpen");
+    indicator.classList.remove("webSocketClose");
+    indicator.classList.add("webSocketOpen");
     console.log("websocket open");
 });
 
@@ -34,8 +34,9 @@ socket.addEventListener("message", event => {
             break;
         }
         case "Balance": {
-            addRenderLogs("futureBalance", payload.data.future);
-            addRenderLogs("spotBalance", payload.data.spot);
+            renderBalance("spotBalance", payload.data.spot);
+            renderBalance("futureBalance", payload.data.future);
+            renderBalance("futureValued", payload.data.futureValued);
             break;
         }
         case "Strategy": {
@@ -59,8 +60,8 @@ socket.addEventListener("message", event => {
 
 socket.addEventListener("close", (close) => {
     const indicator = document.getElementById("webSocketIndicator");
-    indicator.classList.remove("webSocketIndicatorOpen");
-    indicator.classList.add("webSocketIndicatorClose");
+    indicator.classList.remove("webSocketOpen");
+    indicator.classList.add("webSocketClose");
     console.log("Websocket close: " + close);
 
 });

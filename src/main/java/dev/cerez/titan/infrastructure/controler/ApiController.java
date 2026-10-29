@@ -1,9 +1,12 @@
 package dev.cerez.titan.infrastructure.controler;
 
 import dev.cerez.titan.TitanApplication;
+import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.connector.exception.ApiException;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.infrastructure.model.*;
 import dev.cerez.titan.infrastructure.user.custom.TitanUserDetails;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.utils.TemporalRefence;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -11,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -58,6 +62,30 @@ public class ApiController {
                                                   @RequestParam(value = "command") String command
     ) {
         getPort(user).executeCommand(command);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/transfer")
+    private ResponseEntity<Void> transfer(@AuthenticationPrincipal TitanUserDetails user,
+                                          @NotNull @RequestParam String asset,
+                                          @NotNull @RequestParam BigDecimal amount,
+                                          @NotNull @RequestParam String direction
+    ){
+        try {
+            BinanceConnector.Transfer.valueOf(direction.toUpperCase());
+        }catch (IllegalArgumentException e){
+            return ResponseEntity.badRequest().build();
+        }
+        try {
+            getPort(user).transferBalance(asset, amount, BinanceConnector.Transfer.valueOf(direction.toUpperCase()));
+        }catch (ApiException e){
+            Log.exception(e);
+            return ResponseEntity.badRequest().build();
+        }catch (Exception e){
+            Log.exception(e);
+            return ResponseEntity.internalServerError().build();
+        }
+        Log.info("User:%s Transfer %s @ %.4f %s", user.getUsername(), asset, amount, direction.toUpperCase());
         return ResponseEntity.ok().build();
     }
 

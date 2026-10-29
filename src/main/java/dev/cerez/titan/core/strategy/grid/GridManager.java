@@ -139,8 +139,10 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         applyAttributes.add(new RemoveIf((order, c) -> {
             if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
                 return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
+            }else {
+                return c.getOrders().stream().filter(Order::isReduceOnly).count() > getConfig().getMinOrderGreed() &&
+                        !order.isReduceOnly();
             }
-            return false;
         }));
 //        applyAttributes.add(new CallOnUpdate((order, c) -> {
 //            BigDecimal stepSize = c.config().getStepSize();
@@ -397,6 +399,7 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         @NotNull private BigDecimal sizePerOrderBaseAsset;
         @NotNull private SideGrid sideGrid;
         private int minOrderSafe;
+        private int minOrderGreed;
         private int leverage;
         private boolean logsEndPoints;
         private int amountPriceOffset;

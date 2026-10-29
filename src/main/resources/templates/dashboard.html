@@ -1,3 +1,4 @@
+<!-- Estilos inspirados de https://absolutesolver.com -->
 <!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/html">
 <head>
@@ -21,12 +22,7 @@
             <p id="timeExchange">Exchange --:--:--</p>
         </div>
         <div class="barRight">
-            <form style="display: flex" method="post" th:action="@{/auth/logout}" novalidate>
-                <button type="submit">
-                    Logout
-                </button>
-            </form>
-            <button id="resetWindows">Reset</button>
+
         </div>
     </header>
     <article class="mainSections">
@@ -38,34 +34,52 @@
         </section>
         <section class="box" id="balanceWindow">
             <h2>Balance</h2>
-            <div>
-                <h3>Futuros USDⓈ-M</h3>
-                <ul>
-                    <li>
-                        <strong>Disponible</strong>
-                        <ul class="listSmall" id="futureBalance">
-                            <li>
-                                <span class="cliLoader"></span>
-                            </li>
-                        </ul>
-                    </li>
-                    <li>
-                        <strong>Valorado</strong>
-                        <ul class="listSmall" id="futureValued">
-                            <li>
-                                <span class="cliLoader"></span>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-            <div>
-                <h3>Spot</h3>
-                <ul class="listSmall" id="spotBalance">
-                    <li>
-                        <div class="cliLoader"></div>
-                    </li>
-                </ul>
+            <div style="display: flex; flex-direction: row; ">
+                <div>
+                    <h3>Futuros USDⓈ-M</h3>
+                    <ul>
+                        <li>
+                            <strong>Disponible</strong>
+                            <ul class="listSmall" id="futureBalance">
+                                <li>
+                                    <span class="cliLoader"></span>
+                                </li>
+                            </ul>
+                        </li>
+                        <li>
+                            <strong>Valorado</strong>
+                            <ul class="listSmall" id="futureValued">
+                                <li>
+                                    <span class="cliLoader"></span>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <h3>Spot</h3>
+                    <ul class="listSmall" id="spotBalance">
+                        <li>
+                            <div class="cliLoader"></div>
+                        </li>
+                    </ul>
+                </div>
+                <form id="formTransfer" style="margin-left: auto; align-items: end" novalidate>
+                    <h3>Transferir</h3>
+                    <label>
+                        <input class="inputTransfer" type="text" name="asset" placeholder="Activo" autocomplete="off" required>
+                    </label>
+                    <label>
+                        <input class="inputTransfer" type="number" name="amount" placeholder="Cantidad" autocomplete="off" required>
+                    </label>
+                    <label>
+                        <select name="direction">
+                            <option value="SPOT_TO_FUTURE">Spot -> Futuros</option>
+                            <option value="FUTURE_TO_SPOT">Futuros -> Spot</option>
+                        </select>
+                    </label>
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                    <button id="sumitTransfer">Transferir</button>
+                    <div id="errorTransfer"></div>
+                </form>
             </div>
             <footer id="roi"><div class="cliLoader"></div></footer>
         </section>
@@ -117,6 +131,24 @@
                 </li>
             </ul>
         </section>
+        <section class="box" id="accountWindow">
+            <h2>Cuenta</h2>
+            <strong>Username: <span class="cliLoader"></span></strong>
+            <form style="margin-left: auto; display: flex; flex-direction: row; align-items: center; gap: 1rem;" th:action="@{/auth/changePassword}" method="post" novalidate>
+                <label>
+                    <input class="inputPassword" type="text" name="oldPassword" autocomplete="off" placeholder="contraseña vieja">
+                </label>
+                <label>
+                    <input class="inputPassword" type="text" name="newPassword" autocomplete="off" placeholder="contraseña nueva">
+                </label>
+                <button type="submit">Cambiar</button>
+            </form>
+            <form style="display: flex" method="post" th:action="@{/auth/logout}" novalidate>
+                <button type="submit">
+                    Logout
+                </button>
+            </form>
+        </section>
     </article>
 </main>
 <div class="rgbEffect"></div>
@@ -130,16 +162,10 @@
 <script src="/script/requestPositions.js"></script>
 <script src="/script/requestTelemetry.js"></script>
 <script src="/script/websocket.js"></script>
+<script src="/script/transfer.js"></script>
 
 <script src="/script/window.js"></script>
 <script src="../static/script/window.js"></script>
-<script>
-    createWindow({id: "logsWindow",});
-    createWindow({id: "balanceWindow",});
-    createWindow({id: "strategyWindow",});
-    createWindow({id: "telemetryWindow",});
-    createWindow({id: "positionWindow",});
-</script>
 
 </body>
 </html>

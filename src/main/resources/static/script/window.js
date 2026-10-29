@@ -56,10 +56,11 @@ function makeDraggable(windowElement, header, closer) {
         windowElement.style.visibility = "hidden";
         windowElement.style.pointerEvents = "none";
     })
-
-    resetButton.addEventListener("click", (event) => {
-        windowElement.style.visibility = "visible";
-        windowElement.style.pointerEvents = "all";
-        windowElement.style.transform = `translate(0px, 0px)`;
-    })
+    if (resetButton != null) {
+        resetButton.addEventListener("click", (event) => {
+            windowElement.style.visibility = "visible";
+            windowElement.style.pointerEvents = "all";
+            windowElement.style.transform = `translate(0px, 0px)`;
+        })
+    }
 }

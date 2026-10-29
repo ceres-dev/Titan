@@ -80,7 +80,7 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
                 webSocketServer.sendMessage(List.of(new LogRecord(Utils.cleanAnsi(log.getMessage()), log.getThreadName(), log.getLevel().toString(), log.getTimeStamp()))));
         executor.scheduleAtFixedRate(() -> webSocketServer.sendMessage(getPort().getTelemetry()), 5, 5, TimeUnit.SECONDS);
         executor.scheduleAtFixedRate(() -> webSocketServer.sendMessage(getPort().getPositions()), 15, 15, TimeUnit.SECONDS);
-        executor.scheduleAtFixedRate(() -> webSocketServer.sendMessage(getPort().getBalance()), 5, 5, TimeUnit.MINUTES);
+        executor.scheduleAtFixedRate(() -> webSocketServer.sendMessage(getPort().getBalance()), 1, 1, TimeUnit.MINUTES);
 
     }
 
@@ -276,6 +276,11 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
                             System.currentTimeMillis() - uptime
                     )
             );
+        }
+
+        public void transferBalance(String asset, BigDecimal amount, BinanceConnector.Transfer transfer) {
+            connector.wTransfer(null, transfer, asset, amount);
+            executor.schedule(() -> webSocketServer.sendMessage(getPort().getBalance()), 2, TimeUnit.SECONDS);
         }
 
         public record ManagerBuilder(Class<? extends Manager<?, ?>> manager, Object config, String name) {}
