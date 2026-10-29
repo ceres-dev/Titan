@@ -1,16 +1,14 @@
 package dev.cerez.titan.infrastructure.controler;
 
 
+import dev.cerez.titan.infrastructure.model.Account;
 import dev.cerez.titan.infrastructure.user.custom.TitanUserDetails;
 import dev.cerez.titan.infrastructure.user.custom.TitanUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
@@ -21,7 +19,7 @@ public class AuthController {
 
     @PostMapping("/changePassword")
     public ResponseEntity<Void> changePassword(
-            @AuthenticationPrincipal TitanUserDetails user,
+            @NotNull @AuthenticationPrincipal TitanUserDetails user,
             @NotNull @RequestParam String oldPassword,
             @NotNull @RequestParam String newPassword) {
 
@@ -32,6 +30,11 @@ public class AuthController {
         );
 
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/account")
+    public ResponseEntity<Account> getUsername(@NotNull @AuthenticationPrincipal TitanUserDetails user) {
+        return ResponseEntity.ok(new Account(user.getUsername()));
     }
 
 }

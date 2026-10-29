@@ -133,7 +133,9 @@
         </section>
         <section class="box" id="accountWindow">
             <h2>Cuenta</h2>
-            <strong>Username: <span class="cliLoader"></span></strong>
+            <div id="account">
+                <strong>Username: <span class="cliLoader"></span></strong>
+            </div>
             <form style="margin-left: auto; display: flex; flex-direction: row; align-items: center; gap: 1rem;" th:action="@{/auth/changePassword}" method="post" novalidate>
                 <label>
                     <input class="inputPassword" type="text" name="oldPassword" autocomplete="off" placeholder="contraseña vieja">
@@ -161,6 +163,7 @@
 <script src="/script/requestLogs.js"></script>
 <script src="/script/requestPositions.js"></script>
 <script src="/script/requestTelemetry.js"></script>
+<script src="/script/requestAccount.js"></script>
 <script src="/script/websocket.js"></script>
 <script src="/script/transfer.js"></script>
 
