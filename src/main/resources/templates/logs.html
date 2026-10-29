@@ -1,0 +1,39 @@
+<!-- Estilos inspirados/tomados de https://absolutesolver.com -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Titan</title>
+    <meta name="robots" content="noindex">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--Local (ignorame)-->
+    <link rel="stylesheet" href="../static/style/titan.css">
+    <link rel="stylesheet" href="../static/style/logs.css">
+    <!--Remote-->
+    <link rel="stylesheet" href="/style/titan.css">
+    <link rel="stylesheet" href="/style/logs.css">
+</head>
+<body id="centerScreen">
+<main style="height: 100vh; width: 100vw;">
+    <section class="box" style="margin: 2rem; height: calc(100% - 4rem);  width: calc(100% - 4rem);" >
+        <header style="display: flex; justify-content: space-between; align-items: center; padding-right: 1rem;">
+            <h1>Logs</h1>
+            <small><a href="/dashboard">Volver</a></small>
+        </header>
+        <div class="box" id="logs" style="overflow: scroll; white-space: nowrap;">
+            <div class="cliLoader"></div>
+        </div>
+    </section>
+</main>
+<div class="rgbEffect"></div>
+<div class="linesEffect"></div>
+
+<script src="/script/utils.js"></script>
+<script src="/script/requestLogs.js"></script>
+<script src="/script/websocket.js"></script>
+<script>
+    startWebSocket(["LogRecord"])
+</script>
+</body>
+<!-- Bastian = Seriedad -->
+</html>

@@ -22,6 +22,12 @@ input, button, textarea, select {
     justify-content: center;
     flex-direction: column;
 }
+.waterDrop{
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    opacity: 30%;
+}
 body{
     background: black;
     color: var(--main-color-text);
@@ -192,6 +198,7 @@ input::placeholder {
     font-style: italic;
 }
 a{
+    text-decoration-thickness: 0.1em;
     color: var(--main-color-text);
 }
 a:hover{

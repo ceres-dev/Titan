@@ -33,7 +33,7 @@ import java.util.concurrent.locks.LockSupport;
 
 public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeManager.FundingManagerConfig, PersistentNope, BinanceConnector, FundingOnTimeManagerListener> {
 
-    private final ConcurrentMap<String, SymbolTarget> symbolsPending = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, SymbolTarget> symbolsPendingForClose = new ConcurrentHashMap<>();
 
     public FundingOnTimeManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
         super(storageManager.createProfilerManager(FundingManagerConfig.class, PersistentNope.class), connector, TypeManager.FUNDING_ON_TIME);
@@ -46,8 +46,8 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
             if (node.get("m").asText().equals("FUNDING_FEE")){
                 JsonNode nodeSymbol = node.get("S");
                 if (nodeSymbol != null){
-                    Log.info("Notificación de Funding, de: " + nodeSymbol.asText());
-                    SymbolTarget symbolTarget = symbolsPending.remove(nodeSymbol.asText());
+                    Log.info("Cierre Automático de Funding, de: " + nodeSymbol.asText());
+                    SymbolTarget symbolTarget = symbolsPendingForClose.remove(nodeSymbol.asText());
                     if (symbolTarget != null) symbolTarget.closePosition();
                 }
             }
@@ -66,7 +66,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
         connector.wuDeleteEventAccountUpdate(null);
     }
 
-    private void searchFunding(){
+    private void searchFunding() {
         var config = getConfig();
         Instant now = Instant.now();
         Instant nextHour = now
@@ -103,7 +103,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
 
         Log.info("Symbols Disponible: %s",
                 String.join(", ",
-                        targetFiltered.stream().map(f ->f.symbol() + "@" + f.nextFundingRate()).toList()
+                        targetFiltered.stream().map(f -> f.symbol() + "@" + f.nextFundingRate()).toList()
                 )
         );
 
@@ -118,9 +118,10 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
             callEvent(FundingOnTimeManagerListener::onAbort);
             return;
         }
-
         // Preparación para mover fondo o cancelar otras ordenes
+        callEvent(FundingOnTimeManagerListener::onINeedMoney);
         // Esperar que se actualize la cache
+        LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
         Map<String, BigDecimal> balanceAvailable = fGetBalance();
 
         BigDecimal balance = balanceAvailable.get("USDT");
@@ -138,10 +139,9 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
                 .toList()
                 .getLast()
         );
-        setStatus(StatusManager.STARTING);
         try {
             Log.info("Delta temporal: Avg: %dms, Max: %dms, Min: %dms", remote.avg(), remote.max(), remote.min());
-            symbolsPending.clear();
+            symbolsPendingForClose.clear();
             waitForFunding(remote, targets);
         } catch (Exception e) {
             callEvent(FundingOnTimeManagerListener::onAbort);
@@ -173,10 +173,21 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
         // Esperar hasta el momento de apertura
         parkUntil(waitFinal);
 
-        symbols.forEach(symbolTarget -> symbolsPending.put(symbolTarget.getTarget().symbol(), symbolTarget));
+        symbols.forEach(symbolTarget -> symbolsPendingForClose.put(symbolTarget.getTarget().symbol(), symbolTarget));
         symbols.forEach(SymbolTarget::openPosition);
         // Espera hasta la hora exacta
         parkUntil(fundingTimeLocal);
+        // Por si tarda mucho la notificación, un cierre manual
+        executor.schedule(() -> symbolsPendingForClose.values().removeIf((s) -> {
+            try {
+                Log.warning("Cierre manual de Funding, de: " + s.symbol);
+                s.closePosition();
+                s.closePositionCheck();
+                return true;
+            }catch (Exception e) {
+                return false;
+            }
+        }), 800,  TimeUnit.MILLISECONDS);
     }
 
 
@@ -305,7 +316,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
             long startTime = System.nanoTime();
             try {
                 if (config.isSendTrade())
-                    connector.wfSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true)
+                    connector.wfSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true)
                             .thenAccept((jsonNode -> {
                                 int status = jsonNode.get("status").asInt();
                                 try {
@@ -319,7 +330,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
                                     if (status != 200){
                                         Log.info("Repuesta: %s", jsonNode);
                                         Log.info("Enviando orden de emergencia");
-                                        connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true);
+                                        connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true);
                                     }
                                     order = null;
                                 }catch (Exception e) {
@@ -348,7 +359,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
 
             if (config.isSendTrade()) connector.wfSendOrderToMkt(target.symbol(),
                     sideOrder,
-                    position.quantity(),
+                    position.quantity().abs(),
                     "close-" + Utils.uuidToBase36(UUID.randomUUID()),
                     true
             ).thenAccept((jsonNode -> {
@@ -362,7 +373,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
                         if (status != 200){
                             Log.info("Repuesta: %s", jsonNode);
                             Log.info("Enviando orden de emergencia");
-                            connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity(), null, true);
+                            connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true);
                         }
                     }else {
                         Log.info("Posición Cerrada Repuesta: %s", jsonNode);

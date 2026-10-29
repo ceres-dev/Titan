@@ -7,6 +7,8 @@ public interface FundingOnTimeManagerListener extends BaseListener {
 
     default void onPrepare() {}
 
+    default void onINeedMoney() {}
+
     default void onClosePosition() {}
 
     default void onEndWindow() {}

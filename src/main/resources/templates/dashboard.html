@@ -5,12 +5,15 @@
     <meta charset="UTF-8">
     <title>Titan Dashboard</title>
     <meta name="robots" content="noindex">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!--Local (ignorame)-->
     <link rel="stylesheet" href="../static/style/titan.css">
     <link rel="stylesheet" href="../static/style/dashboard.css">
+    <link rel="stylesheet" href="../static/style/logs.css">
     <!--Remote-->
     <link rel="stylesheet" href="/style/titan.css">
     <link rel="stylesheet" href="/style/dashboard.css">
+    <link rel="stylesheet" href="/style/logs.css">
 </head>
 <body>
 <main>
@@ -27,7 +30,7 @@
     </header>
     <article class="mainSections">
         <section class="box" id="logsWindow">
-            <h2>Logs</h2>
+            <h2><a href="/dashboard/logs">Logs</a></h2>
             <div class="box" id="logs">
                 <div class="cliLoader"></div>
             </div>
@@ -164,9 +167,11 @@
 <script src="/script/requestPositions.js"></script>
 <script src="/script/requestTelemetry.js"></script>
 <script src="/script/requestAccount.js"></script>
-<script src="/script/websocket.js"></script>
 <script src="/script/transfer.js"></script>
-
+<script src="/script/websocket.js"></script>
+<script>
+    startWebSocket(["LogRecord"])
+</script>
 <script src="/script/window.js"></script>
 <script src="../static/script/window.js"></script>
 

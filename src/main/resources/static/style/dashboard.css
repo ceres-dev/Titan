@@ -153,15 +153,6 @@ main{
     0%, 100% { color: #ff0000; text-shadow: 0 0 var(--glow-size) #ff0000;}
     50% { color: #590000; text-shadow: 0 0 var(--glow-size) #590000;}
 }
-.variable{
-    color: #00ffbb;
-}
-.variableBuy{
-    color: #2be356;
-}
-.variableSell{
-    color: #e32b56;
-}
 /* Botones */
 .inputTransfer{
     width: 5rem;

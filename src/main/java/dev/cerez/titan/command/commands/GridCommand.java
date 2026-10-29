@@ -66,12 +66,12 @@ public class GridCommand extends BaseCommand {
 
         fundingOnTimeManager.registerListener(new Listener() {
             @Override
-            public void onPrepare() {
-                gridManager.stop();
-            }
-            @Override
             public void onClosePosition() {
                 gridManager.start();
+            }
+            @Override
+            public void onINeedMoney() {
+                gridManager.stop();
             }
             @Override
             public void onAbort() {

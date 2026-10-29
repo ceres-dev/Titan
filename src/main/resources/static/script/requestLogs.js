@@ -8,15 +8,15 @@ async function loadBalance() {
         const logs = await response.json();
         document.getElementById("logs").innerHTML = "";
 
-        addRenderLogs("logs", logs);
+        addRenderLogs(logs);
 
     } catch (error) {
         console.error("Error obteniendo el balance:", error);
     }
 }
 
-function addRenderLogs(elementId, logs) {
-    const container = document.getElementById(elementId);
+function addRenderLogs(logs) {
+    const container = document.getElementById("logs");
     if (logs.length > 0) {
         logs.forEach((log) => {
             const li = document.createElement("pre");
