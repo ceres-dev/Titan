@@ -356,7 +356,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
             Log.info("Posición abierta: %s", position);
             Log.info("Send order close: %s".formatted(target.symbol()));
             SideOrder sideOrder = Utils.toSide(position.sidePosition()).inverse();
-
+            AtomicBoolean isOk = new AtomicBoolean(false);
             if (config.isSendTrade()) connector.wfSendOrderToMkt(target.symbol(),
                     sideOrder,
                     position.quantity().abs(),
@@ -365,26 +365,27 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
             ).thenAccept((jsonNode -> {
                 try {
                     int status = jsonNode.get("status").asInt();
-                    if (order != null){
-                        Log.info("Order status: %d, symbol=%s",
-                                status,
-                                order.symbol()
-                        );
-                        if (status != 200){
-                            Log.info("Repuesta: %s", jsonNode);
-                            Log.info("Enviando orden de emergencia");
-                            connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true);
+                    if (status != 200){
+                        Log.warning("Repuesta: %s", jsonNode);
+                        // Si es: ReduceOnly Order is rejected. Esta bien.
+                        int code = jsonNode.get("error").get("code").asInt();
+                        if (code == -2022){
+                            isOk.set(true);
+                            return;
                         }
-                    }else {
-                        Log.info("Posición Cerrada Repuesta: %s", jsonNode);
-                    }
+                        Log.info("Enviando orden de emergencia");
+                        connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true);
+                    }else isOk.set(true);
                 } catch (Exception e) {
                     Log.exception(e);
                 } finally {
                     connector.checkWebSockets();
                 }
             })).join();
-            Log.info("Posición Cerrada");
+            if (isOk.get()) {
+                Log.info("Cierre de la posición exitoso");
+                return;
+            }
             // Una pequeña espera para que se actualize la cache
             LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
             closePositionCheck();

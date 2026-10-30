@@ -126,13 +126,14 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
         for (Manager<?, ?> m : manager) {
             if (!this.equals(m.getEnvironmentManager())) m.setEnvironmentManager(this);
             managerMap.put(m.getId(), m);
+            Log.info("Manager Registrado: name=%s type=%s".formatted(m.getName(), m.getClass().getSimpleName()));
             if (m instanceof ManagerStrategy<?, ?, ?, ?> strategy){
-                executor.execute(() -> strategy.registerListener(new Listener() {
+                strategy.registerListener(new Listener() {
                     @Override
                     public void changeStatus() {
                         webSocketServer.sendMessage(getPort().getStrategy());
                     }
-                }));
+                });
             }
         }
     }

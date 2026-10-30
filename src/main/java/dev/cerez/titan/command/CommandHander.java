@@ -38,11 +38,17 @@ public class CommandHander implements Switch {
             Log.warning("No such command: " + args[0]);
             return;
         }
-        if (args.length > 1) {
-            CompletableFuture.runAsync(() -> command.execute(Arrays.stream(Arrays.copyOfRange(args, 1, args.length)).toList()), executor);
-        }else {
-            CompletableFuture.runAsync(() -> command.execute(List.of()), executor);
-        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                if (args.length > 1) {
+                    command.execute(Arrays.stream(Arrays.copyOfRange(args, 1, args.length)).toList());
+                }else {
+                    command.execute(List.of());
+                }
+            }catch (Exception e){
+                Log.exception(e);
+            }
+        }, executor);
     }
 
     @Getter

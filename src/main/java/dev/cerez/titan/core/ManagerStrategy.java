@@ -6,7 +6,9 @@ import dev.cerez.titan.core.event.BaseListener;
 import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
 import dev.cerez.titan.core.strategy.TypeManager;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.storage.StorageProfiler;
+import dev.cerez.titan.utils.Utils;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
@@ -14,12 +16,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersistent, O extends Connector, L extends BaseListener> extends BaseManager<C, P, O> {
 
-    @Getter @NotNull protected final Set<Listener> listeners = new HashSet<>();
-    @Getter @NotNull private StatusManager status = StatusManager.STOPING;
+
+    @Getter @NotNull private volatile StatusManager status = StatusManager.STOPING;
 
     @Getter @Setter @Nullable protected BalanceMaxRiskManager balanceMaxRiskManager;
 
@@ -28,10 +31,6 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
                            @NotNull TypeManager typeManager
     ) {
         super(storageManager, connector, typeManager);
-    }
-
-    public void registerListener(Listener listener){
-        listeners.add(listener);
     }
 
     protected Map<String, BigDecimal> fGetBalance(){
@@ -85,17 +84,16 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
     }
 
     protected void setStatus(StatusManager status){
-        if (this.status != status) {
-            this.status = status;
-            callEvent(BaseListener::changeStatus);
-        }
+        this.status = status;
+        callEvent(BaseListener::changeStatus);
     }
-
 
     @SuppressWarnings("unchecked")
     protected void callEvent(Consumer<L> consumer){
-        for (BaseListener listener : listeners) {
-            consumer.accept((L) listener);
+        synchronized (listeners){
+            for (BaseListener listener : listeners) {
+                consumer.accept((L) listener);
+            }
         }
     }
 }

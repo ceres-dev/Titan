@@ -269,7 +269,6 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         callEvent(GridManagerListener::onUpdate);
         BigDecimal currentPrice = connector.fGetPrice(symbol);
         CompletableFuture<BinanceConnector.FuturePosition> positionFuture = CompletableFuture.supplyAsync(() -> connector.fGetPosition(symbol));
-//        CompletableFuture<BigDecimal> currentPriceFuture = CompletableFuture.supplyAsync(() -> );
         CompletableFuture<List<BinanceConnector.OrderFuture>> ordersFuture = CompletableFuture.supplyAsync(() -> connector.fGetAllOrder(symbol));
         CompletableFuture<BigDecimal> balanceFuture = CompletableFuture.supplyAsync(() -> fGetBalanceTotal().getOrDefault(getConfig().quoteAsset, BigDecimal.ZERO));
         CompletableFuture<BinanceConnector.BookTick> bookTickerFuture = CompletableFuture.supplyAsync(() -> connector.fGetBookTick(symbol));
@@ -277,7 +276,6 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         GridManagerConfig config = getConfig();
 
         BinanceConnector.FuturePosition position = positionFuture.join();
-//        BigDecimal currentPrice = currentPriceFuture.join();
         List<BinanceConnector.OrderFuture> orders = ordersFuture.join();
         BigDecimal balance = balanceFuture.join();
         BinanceConnector.BookTick bookTicker = bookTickerFuture.join();

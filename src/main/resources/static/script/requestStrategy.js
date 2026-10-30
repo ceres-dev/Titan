@@ -7,14 +7,14 @@ async function loadStrategy() {
 
         const strategy = await response.json();
 
-        renderStrategy("strategy", strategy);
+        renderStrategy(strategy);
     } catch (error) {
         console.error("Error obteniendo el balance:", error);
     }
 }
 
-function renderStrategy(elementId, strategies) {
-    const list = document.getElementById(elementId);
+function renderStrategy(strategies) {
+    const list = document.getElementById("strategy");
 
     // Limpiar contenido anterior
     list.innerHTML = "";

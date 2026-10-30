@@ -1,6 +1,8 @@
 package dev.cerez.titan.core;
 
 import dev.cerez.titan.TitanApplication;
+import dev.cerez.titan.core.event.BaseListener;
+import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.Connector;
@@ -15,11 +17,14 @@ import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Consumer;
 
 public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent, O extends Connector> implements Manager<C, P> {
 
@@ -29,15 +34,17 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
     @Getter @NotNull protected final O connector;
     @Getter @NotNull protected final UUID id = UUID.randomUUID();
     @Getter @Setter @NotNull protected String name = id.toString();
-    @Getter @Setter(value = AccessLevel.NONE) protected boolean running = false;
+    @Getter @Setter(value = AccessLevel.NONE) protected volatile boolean running = false;
     @Getter protected final TypeManager typeManager;
     @Getter @Setter protected EnvironmentManager environmentManager;
+    @Getter @NotNull protected final Set<Listener> listeners;
 
     protected BaseManager(@NotNull StorageProfiler<C, P> storageProfiler, @NotNull O connector, @NotNull TypeManager typeManager) {
         this.configStorage = storageProfiler.config();
         this.persistenceStorage = storageProfiler.persistent();
         this.connector = connector;
         this.typeManager = typeManager;
+        this.listeners = new HashSet<>();
         autoRegister();
     }
 
@@ -57,6 +64,12 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
             return cachePersistence = this.persistenceStorage.load();
         }else {
             return Objects.requireNonNull(cachePersistence);
+        }
+    }
+
+    public void registerListener(@NotNull Listener listener){
+        synchronized (listeners){
+            listeners.add(listener);
         }
     }
 
@@ -101,7 +114,6 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
                 EnvironmentManager environment = TitanApplication.getInstance().getEnvironmentManager(uuid);
                 if (environment != null) environment.registerManager(this);
             }catch (Exception ignored){
-                ignored.printStackTrace();
             }
         }
     }

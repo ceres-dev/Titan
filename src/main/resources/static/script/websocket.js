@@ -44,7 +44,7 @@ async function startWebSocket(whiteList = []){
                 break;
             }
             case "Strategy": {
-                renderStrategy("strategy", payload.data);
+                renderStrategy(payload.data);
                 break;
             }
             case "Telemetry": {
