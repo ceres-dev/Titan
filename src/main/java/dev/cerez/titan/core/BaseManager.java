@@ -1,7 +1,6 @@
 package dev.cerez.titan.core;
 
 import dev.cerez.titan.TitanApplication;
-import dev.cerez.titan.core.event.BaseListener;
 import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.log.Log;
@@ -24,7 +23,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.Consumer;
 
 public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent, O extends Connector> implements Manager<C, P> {
 
@@ -104,13 +102,9 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
             return;
         }
 
-        Thread current = Thread.currentThread();
-        String[] split = current.getName().split("-");
-        if (split.length > 1) {
-            String uuidBase64 = split[1];
-
+        UUID uuid = Utils.getUserUUUIDByThread();
+        if (uuid != null) {
             try {
-                UUID uuid = Utils.base64ToUuid(uuidBase64);
                 EnvironmentManager environment = TitanApplication.getInstance().getEnvironmentManager(uuid);
                 if (environment != null) environment.registerManager(this);
             }catch (Exception ignored){

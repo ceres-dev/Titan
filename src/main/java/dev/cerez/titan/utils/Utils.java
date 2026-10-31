@@ -3,7 +3,6 @@ package dev.cerez.titan.utils;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
-import dev.cerez.titan.core.Manager;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
@@ -16,8 +15,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.jspecify.annotations.NonNull;
-import org.springframework.core.env.Environment;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -27,11 +24,9 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 
 @UtilityClass
 public class Utils {
-
 
     public @NotNull String uuidToBase36(UUID uuid) {
         BigInteger value = uuidToBigInteger(uuid);
@@ -153,14 +148,14 @@ public class Utils {
     }
 
     public @NotNull ThreadFactory getThreadFactory(@NotNull Object o, @Nullable EnvironmentManager environment) {
-        String id = Utils.uuidToBase64(UUID.randomUUID());
-        if (environment != null){
+        UUID uuid = environment != null ? environment.getIdOwner() : getUserUUUIDByThread();
+        if (uuid != null){
             return Thread.ofVirtual()
-                    .name(id + "-" + Utils.uuidToBase64(environment.getIdOwner()) + "-" + o.getClass().getSimpleName() + "-", 0)
+                    .name("user:" + Utils.uuidToBase64(uuid) + "-" + o.getClass().getSimpleName() + "-", 0)
                     .factory();
         }else {
             return Thread.ofVirtual()
-                    .name(id + "-" + o.getClass().getSimpleName() + "-", 0)
+                    .name(o.getClass().getSimpleName() + "-", 0)
                     .factory();
         }
     }
@@ -179,6 +174,19 @@ public class Utils {
                         .orElse("Unknown")
                         .replaceFirst("^dev\\.cerez\\.titan\\.", "")
                 );
+    }
+
+    public @Nullable UUID getUserUUUIDByThread(){
+        Thread currentThread = Thread.currentThread();
+        String name = currentThread.getName();
+        if (name.startsWith("user:")) {
+            String[] split = name.substring(5).split("-");
+            if (split.length > 1) {
+                String uuidBase64 = split[1];
+                return Utils.base64ToUuid(uuidBase64);
+            }
+        }
+        return null;
     }
 
     public @NotNull @Unmodifiable List<BinanceConnector.OrderFuture> filterFilled(@NotNull List<BinanceConnector.OrderFuture> orders) {
