@@ -73,6 +73,9 @@ body::-webkit-scrollbar {
         flex-direction: column;
         gap: var(--gap);
     }
+    .noneForMaxWidth{
+        display: none;
+    }
 }
 form, section{
     display: flex;
@@ -142,10 +145,7 @@ ul{
 
 /* Interactivo */
 label{
-    padding: 5px 10px;
-    width: min-content;
-    border: 2px solid var(--main-color);
-    background-color: black;
+
 }
 button {
     color: var(--main-color);
@@ -170,10 +170,12 @@ button:active {
 }
 input, select {
     border: var(--main-color);
-    margin: 0;
     background: transparent;
     color: var(--main-color-text);
     font-size: 15px;
+    padding: 5px 10px;
+    width: min-content;
+    border: 2px solid var(--main-color);
 }
 select{
     background-color: #000
@@ -228,6 +230,7 @@ li:last-child{
 /* Tablas */
 table{
     border-spacing: 0;
+    width: 100%;
 }
 th, td{
     padding-right: 0.5rem;

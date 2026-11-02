@@ -56,7 +56,8 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
             while (running) {
                 Log.info("Starting FundingManger");
                 searchFunding();
-                LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(5));
+                // Un pequeño margúen de seguridad
+                LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(5));
             }
         });
     }
@@ -185,6 +186,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
                 s.closePositionCheck();
                 return true;
             }catch (Exception e) {
+                Log.exception(e);
                 return false;
             }
         }), 800,  TimeUnit.MILLISECONDS);

@@ -34,6 +34,8 @@ import java.util.function.Consumer;
  *       simula con redondeo, mínimos y liquidez. Los triángulos inactivos que siguen sin ser rentables se descartan
  *       sin escribir en memoria compartida.</li>
  * </ol>
+ *
+ * @author Cluade
  */
 public class SearchTriangularEngineJava extends SearchTriangularEngine {
 

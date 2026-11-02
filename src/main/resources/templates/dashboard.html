@@ -19,10 +19,10 @@
 <main>
     <header class="headerBar box">
         <div class="barLeft">
-            <h1>Titan</h1>
-            <p id="timeLocal">Local --:--:--</p>
-            <p id="timeRemote">Remote --:--:--</p>
-            <p id="timeExchange">Exchange --:--:--</p>
+            <nav><h1 id="breadcrumb"></h1></nav>
+            <span class="noneForMaxWidth" id="timeLocal">Local --:--:--</span>
+            <span class="noneForMaxWidth" id="timeRemote">Remote --:--:--</span>
+            <span class="noneForMaxWidth" id="timeExchange">Exchange --:--:--</span>
         </div>
         <div class="barRight">
 
@@ -65,7 +65,7 @@
                         </li>
                     </ul>
                 </div>
-                <form id="formTransfer" style="margin-left: auto; align-items: end" novalidate>
+                <form class="noneForMaxWidth" id="formTransfer" style="margin-left: auto; align-items: end" novalidate>
                     <h3>Transferir</h3>
                     <label>
                         <input class="inputTransfer" type="text" name="asset" placeholder="Activo" autocomplete="off" required>
@@ -107,24 +107,28 @@
         </section>
         <section class="box" id="positionWindow">
             <h2>Posiciones</h2>
-            <table>
-                <thead>
-                <tr>
-                    <th>Símbolo</th>
-                    <th>quantity</th>
-                    <th>entryPriceAvg</th>
-                    <th>pnlUnrealize</th>
-                </tr>
-                </thead>
-                <tbody id="positions">
-                <tr>
-                    <td><div class="cliLoader"></div></td>
-                    <td><div class="cliLoader"></div></td>
-                    <td><div class="cliLoader"></div></td>
-                    <td><div class="cliLoader"></div></td>
-                </tr>
-                </tbody>
-            </table>
+            <div style="overflow-x: auto; display: flex; flex-grow: 1">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Símbolo</th>
+                        <th>Cantidad</th>
+                        <th>EPA</th>
+                        <th>PNL</th>
+                        <th>Financiación</th>
+                    </tr>
+                    </thead>
+                    <tbody id="positions">
+                    <tr>
+                        <td><div class="cliLoader"></div></td>
+                        <td><div class="cliLoader"></div></td>
+                        <td><div class="cliLoader"></div></td>
+                        <td><div class="cliLoader"></div></td>
+                        <td><div class="cliLoader"></div></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
         <section class="box" id="strategyWindow">
             <h2>Estrategias</h2>
@@ -139,13 +143,15 @@
             <div id="account">
                 <strong>Username: <span class="cliLoader"></span></strong>
             </div>
-            <form style="margin-left: auto; display: flex; flex-direction: row; align-items: center; gap: 1rem;" th:action="@{/auth/changePassword}" method="post" novalidate>
-                <label>
-                    <input class="inputPassword" type="text" name="oldPassword" autocomplete="off" placeholder="contraseña vieja">
-                </label>
-                <label>
-                    <input class="inputPassword" type="text" name="newPassword" autocomplete="off" placeholder="contraseña nueva">
-                </label>
+            <form th:action="@{/auth/changePassword}" method="post" novalidate>
+                <div style="display: flex; flex-direction: row; align-items: center; gap: var(--gap); flex-wrap: wrap;">
+                    <label>
+                        <input class="inputPassword" type="text" name="oldPassword" autocomplete="off" placeholder="contraseña vieja">
+                    </label>
+                    <label>
+                        <input class="inputPassword" type="text" name="newPassword" autocomplete="off" placeholder="contraseña nueva">
+                    </label>
+                </div>
                 <button type="submit">Cambiar</button>
             </form>
             <form style="display: flex" method="post" th:action="@{/auth/logout}" novalidate>
@@ -169,11 +175,12 @@
 <script src="/script/requestAccount.js"></script>
 <script src="/script/transfer.js"></script>
 <script src="/script/websocket.js"></script>
+<script src="/script/breadcrumb.js"></script>
+<script src="/script/window.js"></script>
+
 <script>
     startWebSocket()
 </script>
-<script src="/script/window.js"></script>
-<script src="../static/script/window.js"></script>
 
 </body>
 </html>

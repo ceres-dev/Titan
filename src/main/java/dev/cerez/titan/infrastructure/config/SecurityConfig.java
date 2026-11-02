@@ -36,7 +36,7 @@ public class SecurityConfig {
                             String userAgent = request.getHeader("User-Agent");
 
                             Log.info(
-                                    "LOGIN_SUCCESS user=%S ip=%S userAgent=\"%s\"",
+                                    "LOGIN_SUCCESS user=%s ip=%s userAgent=\"%s\"",
                                     username,
                                     ip,
                                     userAgent

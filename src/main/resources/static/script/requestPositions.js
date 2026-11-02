@@ -35,15 +35,28 @@ function renderPosition(positions) {
             tdEntryPriceAvg.textContent = utils.trunc(position.entryPriceAvg, 2)
 
             const tdPnlUnrealize = document.createElement("td");
+            const tdFundingRate = document.createElement("td");
 
             tr.appendChild(tdSymbol);
             tr.appendChild(tdQuantity);
             tr.appendChild(tdEntryPriceAvg);
-            const span = document.createElement("span");
-            colorForProfit(span, position.pnlUnrealize);
-            span.textContent = `${format.format(position.pnlUnrealize, 3)} ${position.quoteAsset}`
-            tdPnlUnrealize.appendChild(span);
+
+            const spanPnlUnrealize = document.createElement("span");
+            colorForProfit(spanPnlUnrealize, position.pnlUnrealize);
+            spanPnlUnrealize.textContent = `${format.format(position.pnlUnrealize, 3)} ${position.quoteAsset}`
+            tdPnlUnrealize.appendChild(spanPnlUnrealize);
             tr.appendChild(tdPnlUnrealize);
+
+            const spanFundingRate = document.createElement("span");
+            if (tdQuantity > 0){
+                colorForProfit(spanFundingRate, position.nextComision*100);
+            }else {
+                colorForProfit(spanFundingRate, -position.nextComision*100);
+            }
+            spanFundingRate.textContent = position.nextComision*100 + "%"
+            tdFundingRate.appendChild(spanFundingRate);
+            tr.appendChild(tdFundingRate);
+
             table.appendChild(tr);
         })
     }else {

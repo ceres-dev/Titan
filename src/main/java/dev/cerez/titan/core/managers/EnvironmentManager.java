@@ -2,6 +2,9 @@ package dev.cerez.titan.core.managers;
 
 import dev.cerez.titan.command.CommandHander;
 import dev.cerez.titan.command.commands.*;
+import dev.cerez.titan.command.profilers.FundingOnTimeCommand;
+import dev.cerez.titan.command.profilers.GridCommand;
+import dev.cerez.titan.command.profilers.TriangularCommand;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.Symbol;
@@ -49,8 +52,8 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
     private final DiscordConnector discordConnector;
     private final CommandHander commandHandler;
     private final TelemetryCollector telemetry;
-    private WebSocketServer webSocketServer = message -> {};
     private final long uptime = System.currentTimeMillis();
+    private WebSocketServer webSocketServer = message -> {};
 
     private EnvironmentManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector binanceConnector, @NotNull UUID idOwner) {
         super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), binanceConnector, TypeManager.ENVIRONMENT);
@@ -66,8 +69,6 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
         commandHandler.registerCommand(
                 new ExitCommand(this),
                 new TriangularCommand(this),
-                new FundingCommand(this),
-                new CheckFundingCommand(this),
                 new GridCommand(this),
                 new FundingOnTimeCommand(this)
         );
@@ -114,6 +115,7 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
     protected void internalStop() {
         connector.stop();
         commandHandler.stop();
+        managerMap.values().forEach(Manager::stop);
         discordConnector.stop();
     }
 
@@ -165,7 +167,7 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
         }
 
         public void executeCommand(String cmd){
-            EnvironmentManager.this.commandHandler.dispatch(cmd);
+            EnvironmentManager.this.commandHandler.dispatchFromRaw(cmd);
         }
 
         public void addManager(@NotNull Manager<?, ?> @NotNull... manager) {

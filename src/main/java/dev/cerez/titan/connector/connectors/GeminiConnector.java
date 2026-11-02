@@ -15,6 +15,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+@Deprecated
 public final class GeminiConnector extends BaseConnector implements AutoCloseable {
 
     private static final String BASE_HTTPS = "https://api.gemini.com";

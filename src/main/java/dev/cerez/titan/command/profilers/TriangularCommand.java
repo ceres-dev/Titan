@@ -1,5 +1,6 @@
-package dev.cerez.titan.command.commands;
+package dev.cerez.titan.command.profilers;
 
+import dev.cerez.titan.command.ProfilerSetup;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.connector.BaseConnector;
@@ -20,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 import java.util.Set;
 
-public class TriangularCommand extends BaseCommand {
+public class TriangularCommand extends BaseCommand implements ProfilerSetup {
     public TriangularCommand(EnvironmentManager environmentManager) {
         super("triangular", "t", environmentManager);
     }

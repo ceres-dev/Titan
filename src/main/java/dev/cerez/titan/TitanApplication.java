@@ -68,6 +68,7 @@ public class TitanApplication implements Switch {
     public void stop() {
         if (!running) return;
         running = false;
+        this.environmentManagers.values().forEach(EnvironmentManager::stop);
         SpringApplication.exit(context);
         System.exit(0);
     }

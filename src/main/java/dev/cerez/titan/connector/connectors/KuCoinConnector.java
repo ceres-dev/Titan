@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.Consumer;
 
+@Deprecated
 public final class KuCoinConnector extends BaseConnector implements AutoCloseable {
 
     private static final String BASE_HTTPS = "https://api.kucoin.com";

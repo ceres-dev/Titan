@@ -1,6 +1,7 @@
-package dev.cerez.titan.command.commands;
+package dev.cerez.titan.command.profilers;
 
 import dev.cerez.titan.command.BaseCommand;
+import dev.cerez.titan.command.ProfilerSetup;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
@@ -18,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 @ToString
-public class GridCommand extends BaseCommand {
+public class GridCommand extends BaseCommand implements ProfilerSetup {
     public GridCommand(EnvironmentManager environmentManager) {
         super("grid", "g", environmentManager);
     }
