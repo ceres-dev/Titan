@@ -182,8 +182,8 @@ public class Utils {
         String name = currentThread.getName();
         if (name.startsWith("user:")) {
             String[] split = name.substring(5).split("-");
-            if (split.length > 1) {
-                String uuidBase64 = split[1];
+            if (split.length > 0) {
+                String uuidBase64 = split[0];
                 return Utils.base64ToUuid(uuidBase64);
             }
         }

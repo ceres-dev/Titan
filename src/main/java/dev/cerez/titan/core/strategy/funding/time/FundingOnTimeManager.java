@@ -99,7 +99,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
 
         List<BinanceConnector.FundingRate> targetLimited = targetFiltered.stream()
                 .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRateAbs).reversed())
-                .limit(6)
+                .limit(config.maxSymbolsCandidate)
                 .toList();
 
         Log.info("Symbols Disponible: %s",
@@ -114,16 +114,17 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
             return;
         }
 
-        if (targetLimited.size() < 3) {
+        if (targetLimited.size() < config.maxCompetition) {
             Log.info("Abort: Mucha competencia %d", targetLimited.size());
             callEvent(FundingOnTimeManagerListener::onAbort);
             return;
         }
+
         // Preparación para mover fondo o cancelar otras ordenes
         callEvent(FundingOnTimeManagerListener::onINeedMoney);
         // Esperar que se actualize la cache
         LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
-        Map<String, BigDecimal> balanceAvailable = fGetBalance();
+        Map<String, BigDecimal> balanceAvailable = fGetBalanceAvailable();
 
         BigDecimal balance = balanceAvailable.get("USDT");
         Log.info("Balance Disponible: %.4f USDT", balance);
@@ -143,6 +144,8 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
         try {
             Log.info("Delta temporal: Avg: %dms, Max: %dms, Min: %dms", remote.avg(), remote.max(), remote.min());
             symbolsPendingForClose.clear();
+            targetLimited.forEach(target -> connector.fSetLeverage(target.symbol(), config.leverage));
+
             waitForFunding(remote, targets);
         } catch (Exception e) {
             callEvent(FundingOnTimeManagerListener::onAbort);
@@ -252,6 +255,8 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
         @Builder.Default private boolean sendTrade = false;
         @Builder.Default private long windowSize = 1000; // MS
         @Builder.Default private int leverage = 1;
+        @Builder.Default private int maxCompetition = 3;
+        @Builder.Default private int maxSymbolsCandidate = 5;
     }
 
     @Getter
@@ -296,7 +301,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
                     sideOpen.isBuy() ? currentBookTick.askPrice() : currentBookTick.bidPrice(),
                     quantityBase,
                     quantityQuote,
-                    2
+                    config.leverage
             );
 
             if (quantityQuoteMax.compareTo(quantityQuote) <= 0){

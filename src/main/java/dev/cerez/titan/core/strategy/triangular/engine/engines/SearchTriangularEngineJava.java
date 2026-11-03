@@ -72,7 +72,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
         ArrayList<Symbol> symbols = new ArrayList<>(allSymbolMap.size());
         HashSet<String> seenNames = new HashSet<>();
         for (Symbol s : allSymbolMap.values()) {
-            if (!Boolean.TRUE.equals(s.getIsAllowTrading())) continue;
+            if (!s.getIsAllowTrading()) continue;
             String base = s.getBaseAsset();
             String quote = s.getQuoteAsset();
             if (base.equals("?") || quote.equals("?") || base.equals(quote)) continue;

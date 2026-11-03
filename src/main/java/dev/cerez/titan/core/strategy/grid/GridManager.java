@@ -77,7 +77,7 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         connector.fGetAllSymbols();
         connector.fSetLeverage(symbol, getConfig().leverage);
 
-        Log.info("Balance disponible %.4f %s", fGetBalance().get(getConfig().quoteAsset), getConfig().quoteAsset);
+        Log.info("Balance disponible %.4f %s", fGetBalanceAvailable().get(getConfig().quoteAsset), getConfig().quoteAsset);
         connector.wuCreateEventOrderTradeUpdate(orderUpdate -> {
             if (!orderUpdate.symbol().equals(symbol)) {
                 return;
@@ -133,7 +133,7 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         BigDecimal currentPrice = connector.fGetPrice(symbol);
         CompletableFuture<BinanceConnector.FuturePosition> positionFuture = CompletableFuture.supplyAsync(() -> connector.fGetPosition(symbol));
         CompletableFuture<List<BinanceConnector.OrderFuture>> ordersFuture = CompletableFuture.supplyAsync(() -> connector.fGetAllOrder(symbol));
-        CompletableFuture<BigDecimal> balanceFuture = CompletableFuture.supplyAsync(() -> fGetBalanceTotal().getOrDefault(getConfig().quoteAsset, BigDecimal.ZERO));
+        CompletableFuture<BigDecimal> balanceFuture = CompletableFuture.supplyAsync(() -> fGetBalanceValued().getOrDefault(getConfig().quoteAsset, BigDecimal.ZERO));
         CompletableFuture<BinanceConnector.BookTick> bookTickerFuture = CompletableFuture.supplyAsync(() -> connector.fGetBookTick(symbol));
 
         GridManagerConfig config = getConfig();
@@ -261,6 +261,7 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         @NotNull private BigDecimal sizePerOrderBaseAsset;
         @NotNull private SideGrid sideGrid;
         private int minOrderSafe;
+        /** Sí hay la cantidad de órdenes es menor al número, agrega órdenes de aúmento en un precio menos favorable */
         private int minOrderGreed;
         private int leverage;
 

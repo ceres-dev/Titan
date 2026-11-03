@@ -29,7 +29,7 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
         super(storageManager, connector, typeManager);
     }
 
-    protected Map<String, BigDecimal> fGetBalance(){
+    protected @NotNull Map<String, BigDecimal> fGetBalanceAvailable(){
         if (balanceMaxRiskManager == null){
             if (connector instanceof BinanceConnector binanceConnector) {
                 return binanceConnector.fGetBalanceAvailable();
@@ -37,11 +37,11 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
                 return Collections.emptyMap();
             }
         }else {
-            return balanceMaxRiskManager.futuroBalanceAviable(this);
+            return balanceMaxRiskManager.futuroBalanceAvailable(this);
         }
     }
 
-    protected Map<String, BigDecimal> fGetBalanceTotal(){
+    protected @NotNull Map<String, BigDecimal> fGetBalanceValued(){
         if (balanceMaxRiskManager == null){
             if (connector instanceof BinanceConnector binanceConnector) {
                 return binanceConnector.fGetBalanceValued();
@@ -49,7 +49,19 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
                 return Collections.emptyMap();
             }
         }else {
-            return balanceMaxRiskManager.futuroBalanceTotal(this);
+            return balanceMaxRiskManager.futuroBalanceValued(this);
+        }
+    }
+
+    protected @NotNull BinanceConnector.BalanceFuture fGetBalance(){
+        if (balanceMaxRiskManager == null){
+            if (connector instanceof BinanceConnector binanceConnector) {
+                return binanceConnector.fGetBalance();
+            }else {
+                return new BinanceConnector.BalanceFuture(Collections.emptyMap(), Collections.emptyMap());
+            }
+        }else {
+            return balanceMaxRiskManager.futuroBalance(this);
         }
     }
 
