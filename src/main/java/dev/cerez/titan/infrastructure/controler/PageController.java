@@ -25,4 +25,9 @@ public class PageController {
     public String dashboardLogs() {
         return "logs";
     }
+
+    @GetMapping("/dashboard/balance")
+    public String dashboardBalance() {
+        return "balance";
+    }
 }

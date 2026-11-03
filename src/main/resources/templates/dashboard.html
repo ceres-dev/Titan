@@ -17,16 +17,13 @@
 </head>
 <body>
 <main>
-    <header class="headerBar box">
-        <div class="barLeft">
-            <nav><h1 id="breadcrumb"></h1></nav>
+    <header class="box" style="flex-direction: row;">
+        <nav><h1 id="breadcrumb"></h1></nav>
+        <span>
             <span class="noneForMaxWidth" id="timeLocal">Local --:--:--</span>
             <span class="noneForMaxWidth" id="timeRemote">Remote --:--:--</span>
             <span class="noneForMaxWidth" id="timeExchange">Exchange --:--:--</span>
-        </div>
-        <div class="barRight">
-
-        </div>
+        </span>
     </header>
     <article class="mainSections">
         <section class="box" id="logsWindow">
@@ -36,7 +33,7 @@
             </div>
         </section>
         <section class="box" id="balanceWindow">
-            <h2>Balance</h2>
+            <h2><a href="/dashboard/balance">Balance</a></h2>
             <div style="display: flex; flex-direction: row; ">
                 <div>
                     <h3>Futuros USDⓈ-M</h3>

@@ -53,7 +53,7 @@ function renderPosition(positions) {
             }else {
                 colorForProfit(spanFundingRate, -position.nextComision*100);
             }
-            spanFundingRate.textContent = position.nextComision*100 + "%"
+            spanFundingRate.textContent = utils.trunc(position.nextComision*100, 5) + "%"
             tdFundingRate.appendChild(spanFundingRate);
             tr.appendChild(tdFundingRate);
 

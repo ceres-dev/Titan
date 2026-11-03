@@ -14,6 +14,7 @@ import dev.cerez.titan.core.StatusManager;
 import dev.cerez.titan.core.event.events.GridManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.core.strategy.grid.attribute.ApplyAttributes;
+import dev.cerez.titan.core.strategy.grid.attribute.BaseAttribute;
 import dev.cerez.titan.core.strategy.grid.attribute.SideAffected;
 import dev.cerez.titan.core.strategy.grid.attribute.attributes.*;
 import dev.cerez.titan.core.strategy.grid.model.Context;
@@ -38,6 +39,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
+import java.util.function.Function;
 
 public final class GridManager extends ManagerStrategy<GridManager.GridManagerConfig, PersistentNope, BinanceConnector, GridManagerListener> implements StatusProfiler {
 
@@ -49,14 +51,13 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
     @NotNull private final HashSet<String> forOpen = new HashSet<>();
     @NotNull private final PriceAlarm priceAlarm;
     @NotNull private final GridBuilder gridBuilder;
-    @NotNull private final ApplyAttributes applyAttributes;
+    @NotNull private final ApplyAttributes applyAttributes = GridProfiler.DEFAULT.getApplyAttributes(this);
 
     public GridManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
         super(storageManager.createProfilerManager(GridManagerConfig.class, PersistentNope.class), connector, TypeManager.GRID);
         this.symbol = getConfig().baseAsset + getConfig().quoteAsset;
         this.priceAlarm = new PriceAlarm(connector, symbol);
         this.gridBuilder = new GridBuilder(getConfig());
-        this.applyAttributes = new ApplyAttributes(gridBuilder);
     }
 
     @Override
@@ -75,145 +76,6 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         connector.fGetAllSymbols();
         connector.fSetLeverage(symbol, getConfig().leverage);
 
-        applyAttributes.add(new OffsetOrderSellPrice(new BigDecimal("0.15")));
-        applyAttributes.add(new DontSendOrder(SideAffected.AGAINST, c -> {
-            //noinspection DataFlowIssue
-            return c.getPosition().entryPriceAvg();
-        }, false).addCondicion(c -> c.context().getPosition() != null));
-        applyAttributes.add(new MultiplyFirstOrderSize(SideAffected.AGAINST, (orders, c) -> {
-            // Cantidad APROXIMADA no puede ser que no sea la cantidad real
-            final int amountOrder = getAmountOrderApprox(c);
-            switch(c.getConfig().getSideGrid()) {
-                case LONG -> {
-                    return Math.max(amountOrder - Utils.filterBuy(orders).size(), 1);
-                }
-                case SHORT -> {
-                    return Math.max(amountOrder - Utils.filterSell(orders).size(), 1);
-                }
-                case BOTH -> {
-                    return Math.max(amountOrder - Math.min(Utils.filterSell(orders).size(), Utils.filterBuy(orders).size()), 1);
-                }
-            }
-            return 1;
-        }));
-        applyAttributes.add(new MultiplyFirstOrderSize(SideAffected.FAVOR, (orders, c) -> {
-            // Cantidad APROXIMADA no puede ser que no sea la cantidad real
-            final int amountOrder = getAmountOrderApprox(c);
-            switch(c.getConfig().getSideGrid()) {
-                case LONG -> {
-                    return Math.max(amountOrder/3 - Utils.filterSell(orders).size(), 1);
-                }
-                case SHORT -> {
-                    return Math.max(amountOrder/3 - Utils.filterBuy(orders).size(), 1);
-                }
-            }
-            return 1;
-        }));
-        applyAttributes.add(new RemoveIf((order, c) -> {
-            if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
-                switch(c.getConfig().getSideGrid()) {
-                    case LONG -> {
-                        if (order.getSideOrder() == SideOrder.BUY){
-                            return lastOrderFilled.getPrice().compareTo(order.getPrice()) <= 0;
-                        }else {
-                            return false;
-                        }
-                    }
-                    case SHORT -> {
-                        if (order.getSideOrder() == SideOrder.SELL){
-                            return lastOrderFilled.getPrice().compareTo(order.getPrice()) >= 0;
-                        }else {
-                            return false;
-                        }
-                    }
-                    case BOTH -> {
-                        return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
-                    }
-                }
-            }
-            return false;
-        }).addCondicion(c -> {
-            long amount = c.ordersResult().stream().filter(o -> !o.isReduceOnly()).count();
-            return amount <= getConfig().getMinOrderSafe();
-        }));
-        applyAttributes.add(new RemoveIf((order, c) -> {
-            if (lastOrderFilled != null && lastOrderFilled.getSideOrder() == order.getSideOrder()){
-                return lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
-            }else {
-                return c.getOrders().stream().filter(Order::isReduceOnly).count() > getConfig().getMinOrderGreed() &&
-                        !order.isReduceOnly() &&
-                        (c.getPosition() != null && c.getPosition().entryPriceAvg().compareTo(order.getPrice()) <= 0);
-            }
-        }));
-//        applyAttributes.add(new CallOnUpdate((order, c) -> {
-//            BigDecimal stepSize = c.config().getStepSize();
-//            BigDecimal currentPrice = c.currentPrice();
-//            priceAlarm.clear();
-//            OrderPreview sell = order.stream()
-//                    .filter(OrderPreview::isSell)
-//                    .min(Comparator.comparing(OrderPreview::getPrice))
-//                    .orElse(null);
-//
-//            OrderPreview buy = order.stream()
-//                    .filter(OrderPreview::isBuy)
-//                    .max(Comparator.comparing(OrderPreview::getPrice))
-//                    .orElse(null);
-//
-//            if (sell != null) {
-//                BigDecimal delta = sell.getPrice().subtract(stepSize);
-//
-//                if (currentPrice.compareTo(delta) > 0) {
-//                    Log.info("Add Alarm Sell " + c.currentPrice());
-//                    priceAlarm.addAlarm(false, delta, () -> {
-//                        Log.info("Sell price: %.2f Alarm: %.2f", c.currentPrice(), delta);
-//                        updateGrid();
-//                    });
-//                }
-//            }
-//
-//            if (buy != null) {
-//                BigDecimal delta = buy.getPrice().add(stepSize);
-//                if (currentPrice.compareTo(delta) < 0) {
-//                    Log.info("Add Alarm Buy " + c.currentPrice());
-//                    priceAlarm.addAlarm(true, delta, () -> {
-//                        Log.info("Buy price: %.2f Alarm: %.2f", c.currentPrice(), delta);
-//                        updateGrid();
-//                    });
-//                }
-//            }
-//
-//            if (priceAlarm.isEmpty() && (waitForUpdate.isCancelled() || waitForUpdate.isDone())) {
-//                waitForUpdate = executor.schedule(this::updateGrid, 5, TimeUnit.MINUTES);
-//            }
-//        }));
-        applyAttributes.add(new CallOnUpdate((order, c) -> {
-            long amount = order.stream().filter(o -> !o.isReduceOnly()).count();
-            GridManagerConfig config = c.getConfig();
-            if (amount > config.getMinOrderSafe()) {
-                if (config.getStepSizePriority() != null) {
-                    config.setStepSizePriority(null);
-                    Log.info("Disminuyendo StepSize=%.4f", config.getStepSize());
-                }
-            } else {
-                if (config.getStepSizePriority() == null) {
-                    BigDecimal stepSize = config.getStepSize().multiply(BigDecimal.TWO);
-                    Log.info("Aúmento De StepSize=%.4f", stepSize);
-                    config.setStepSizePriority(stepSize);
-                }
-            }
-            if (order.stream().allMatch(Order::isReduceOnly)){
-                setStatus(StatusManager.INOPERATIVE);
-            }else {
-                setStatus(StatusManager.WORKING);
-
-                if (order.stream().noneMatch(Order::isReduceOnly)) {
-                    setStatus(StatusManager.WAITING);
-                }else {
-                    setStatus(StatusManager.WORKING);
-                }
-            }
-
-        }));
         Log.info("Balance disponible %.4f %s", fGetBalance().get(getConfig().quoteAsset), getConfig().quoteAsset);
         connector.wuCreateEventOrderTradeUpdate(orderUpdate -> {
             if (!orderUpdate.symbol().equals(symbol)) {
@@ -430,6 +292,120 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
                 lastMarketSession = marketSessionStatus;
             }
             return stepSize;
+        }
+    }
+
+    @RequiredArgsConstructor
+    @Getter
+    public enum GridProfiler{
+        DEFAULT((girdManager) -> List.of(
+                new OffsetOrderSellPrice(new BigDecimal("0.15")),
+                new DontSendOrder(SideAffected.AGAINST, c -> {
+                    //noinspection DataFlowIssue
+                    return c.getPosition().entryPriceAvg();
+                }, false).addCondicion(c -> c.context().getPosition() != null),
+                new MultiplyFirstOrderSize(SideAffected.AGAINST, (orders, c) -> {
+                    // Cantidad APROXIMADA no puede ser que no sea la cantidad real
+                    final int amountOrder = girdManager.getAmountOrderApprox(c);
+                    switch(c.getConfig().getSideGrid()) {
+                        case LONG -> {
+                            return Math.max(amountOrder - Utils.filterBuy(orders).size(), 1);
+                        }
+                        case SHORT -> {
+                            return Math.max(amountOrder - Utils.filterSell(orders).size(), 1);
+                        }
+                        case BOTH -> {
+                            return Math.max(amountOrder - Math.min(Utils.filterSell(orders).size(), Utils.filterBuy(orders).size()), 1);
+                        }
+                    }
+                    return 1;
+                }),
+                new MultiplyFirstOrderSize(SideAffected.FAVOR, (orders, c) -> {
+                    // Cantidad APROXIMADA no puede ser que no sea la cantidad real
+                    final int amountOrder = girdManager.getAmountOrderApprox(c);
+                    switch(c.getConfig().getSideGrid()) {
+                        case LONG -> {
+                            return Math.max(amountOrder/3 - Utils.filterSell(orders).size(), 1);
+                        }
+                        case SHORT -> {
+                            return Math.max(amountOrder/3 - Utils.filterBuy(orders).size(), 1);
+                        }
+                    }
+                    return 1;
+                }),
+                new RemoveIf((order, c) -> {
+                    if (girdManager.lastOrderFilled != null && girdManager.lastOrderFilled.getSideOrder() == order.getSideOrder()){
+                        switch(c.getConfig().getSideGrid()) {
+                            case LONG -> {
+                                if (order.getSideOrder() == SideOrder.BUY){
+                                    return girdManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) <= 0;
+                                }else {
+                                    return false;
+                                }
+                            }
+                            case SHORT -> {
+                                if (order.getSideOrder() == SideOrder.SELL){
+                                    return girdManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) >= 0;
+                                }else {
+                                    return false;
+                                }
+                            }
+                            case BOTH -> {
+                                return girdManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
+                            }
+                        }
+                    }
+                    return false;
+                }).addCondicion(c -> {
+                    long amount = c.ordersResult().stream().filter(o -> !o.isReduceOnly()).count();
+                    return amount <= c.context().getConfig().getMinOrderSafe();
+                }),
+                new RemoveIf((order, c) -> {
+                    if (girdManager.lastOrderFilled != null && girdManager.lastOrderFilled.getSideOrder() == order.getSideOrder()){
+                        return girdManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
+                    }else {
+                        return c.getOrders().stream().filter(Order::isReduceOnly).count() > c.getConfig().getMinOrderGreed() &&
+                                !order.isReduceOnly() &&
+                                (c.getPosition() != null && c.getPosition().entryPriceAvg().compareTo(order.getPrice()) <= 0);
+                    }
+                }),
+                new CallOnUpdate((order, c) -> {
+                    long amount = order.stream().filter(o -> !o.isReduceOnly()).count();
+                    GridManagerConfig config = c.getConfig();
+                    if (amount > config.getMinOrderSafe()) {
+                        if (config.getStepSizePriority() != null) {
+                            config.setStepSizePriority(null);
+                            Log.info("Disminuyendo StepSize=%.4f", config.getStepSize());
+                        }
+                    } else {
+                        if (config.getStepSizePriority() == null) {
+                            BigDecimal stepSize = config.getStepSize().multiply(BigDecimal.TWO);
+                            Log.info("Aúmento De StepSize=%.4f", stepSize);
+                            config.setStepSizePriority(stepSize);
+                        }
+                    }
+                    if (order.stream().allMatch(Order::isReduceOnly)){
+                        girdManager.setStatus(StatusManager.INOPERATIVE);
+                    }else {
+                        girdManager.setStatus(StatusManager.WORKING);
+
+                        if (order.stream().noneMatch(Order::isReduceOnly)) {
+                            girdManager.setStatus(StatusManager.WAITING);
+                        }else {
+                            girdManager.setStatus(StatusManager.WORKING);
+                        }
+                    }
+                })
+        ));
+
+        private final Function<GridManager, List<BaseAttribute>> constructorProfiler;
+
+        @Contract(pure = true, value = "_ -> new")
+        public @NotNull ApplyAttributes getApplyAttributes(@NotNull GridManager gridManager) {
+            ApplyAttributes attribute = new ApplyAttributes(gridManager.gridBuilder);
+            List<BaseAttribute> attributes = constructorProfiler.apply(gridManager);
+            attributes.forEach(attribute::add);
+            return attribute;
         }
     }
 }

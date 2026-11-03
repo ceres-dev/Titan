@@ -7,13 +7,6 @@ body{
 .log{
     margin: 0;
 }
-.barLeft, .barRight, .headerBar{
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    flex-grow: 1;
-    gap: var(--gap);
-}
 .barRight{
     flex-direction: row-reverse;
 }

@@ -272,11 +272,9 @@ public final class BinanceConnector extends BaseConnector {
         } else {
             params.put("quoteOrderQty", cachedSymbols.getOrCompute().get(symbol).roundQuoteQuantity(amount));
         }
-//        params.put("isIsolated", true);
-//        params.put("newClientOrderId", nameOrder);
         JsonNode node = sendSignedRequest(Method.POST, "/api/v3/order", params);
         String id = node.get("orderId").asText();
-        BigDecimal executedQty = new BigDecimal(node.get("executedQty").asText());
+        BigDecimal executedQty = new BigDecimal(node.get("baseAssetQty").asText());
         BigDecimal cumulativeQuoteQty = new BigDecimal(node.get("cummulativeQuoteQty").asText());
         BigDecimal receivedQty = sideOrder == SideOrder.BUY ? executedQty : cumulativeQuoteQty;
         for (JsonNode fills : node.get("fills")){
@@ -289,7 +287,6 @@ public final class BinanceConnector extends BaseConnector {
                 );
             }
         }
-
 
         return new OrderResult(
                 id,
@@ -417,7 +414,7 @@ public final class BinanceConnector extends BaseConnector {
         JsonNode raw =  sendSignedRequest(Method.GET, "/api/v3/allOrders", params);
         for (JsonNode node : raw){
             if (node.get("clientOrderId").asText().equals(nameOrder)) {
-                return new SpotOrder(new BigDecimal(node.get("executedQty").asText()), new BigDecimal(node.get("cummulativeQuoteQty").asText()));
+                return new SpotOrder(new BigDecimal(node.get("baseAssetQty").asText()), new BigDecimal(node.get("cummulativeQuoteQty").asText()));
             }
         }
         return null;
