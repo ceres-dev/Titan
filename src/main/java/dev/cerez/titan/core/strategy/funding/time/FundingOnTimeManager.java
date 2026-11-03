@@ -251,6 +251,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
         @Builder.Default private BigDecimal fundingRateMin = BigDecimal.valueOf(0.002);
         @Builder.Default private boolean sendTrade = false;
         @Builder.Default private long windowSize = 1000; // MS
+        @Builder.Default private int leverage = 1;
     }
 
     @Getter

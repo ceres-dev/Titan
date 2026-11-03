@@ -1,6 +1,7 @@
 package dev.cerez.titan.utils;
 
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.connector.model.order.Order;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
 import dev.cerez.titan.core.managers.EnvironmentManager;

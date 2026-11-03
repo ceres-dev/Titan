@@ -46,15 +46,15 @@ public class TestFunding {
                     }
                 }),
                 new Test("Min Conversion possible", (b, q) -> {
-                    BinanceConnector.Convert convert = connector.cGetMinMaxConvert(q, b);
-                    if (convert == null) {
+                    BinanceConnector.ConvertConfig convertConfig = connector.cGetMinMaxConvert(q, b);
+                    if (convertConfig == null) {
                         return ResultType.FAIL.toResult("No exits");
                     }
                     BigDecimal price = connector.sGetPrice(b+q);
-                    if (convert.toMin() >= balancePreview.getBookingQuote().doubleValue()){
-                        return ResultType.FAIL.toResult(q + " = C=" + convert.toMin() + " < P=" + balancePreview.getBookingQuote());
-                    }else if (convert.fromMin() >= balancePreview.getBookingBase(price).doubleValue()) {
-                        return ResultType.FAIL.toResult(b + " = C=" + convert.fromMin() + " < P=" + balancePreview.getBookingBase(price));
+                    if (convertConfig.toMin() >= balancePreview.getBookingQuote().doubleValue()){
+                        return ResultType.FAIL.toResult(q + " = C=" + convertConfig.toMin() + " < P=" + balancePreview.getBookingQuote());
+                    }else if (convertConfig.fromMin() >= balancePreview.getBookingBase(price).doubleValue()) {
+                        return ResultType.FAIL.toResult(b + " = C=" + convertConfig.fromMin() + " < P=" + balancePreview.getBookingBase(price));
                     }
                     return ResultType.OK.toResult();
                 }),
@@ -104,7 +104,7 @@ public class TestFunding {
                 }),
                 new Test("Profit Rate", (b, q) -> {
                     BinanceConnector.FundingRate fundingRate = connector.fGetFundingRate().get(b + q);
-                    double interest = connector.mGetInterest(b).doubleValue() * fundingRate.interval();
+                    double interest = connector.mGetInterest(b).doubleValue() * fundingRate.config().interval();
                     double funding = Math.abs(fundingRate.nextFundingRate().doubleValue());
                     if (interest*10 < funding){
                         return ResultType.OK.toResult();

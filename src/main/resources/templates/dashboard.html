@@ -25,7 +25,7 @@
             <span class="noneForMaxWidth" id="timeExchange">Exchange --:--:--</span>
         </span>
     </header>
-    <article class="mainSections">
+    <div class="mainSections" style="grid-template-columns: 1fr 1fr 1fr;">
         <section class="box" id="logsWindow">
             <h2><a href="/dashboard/logs">Logs</a></h2>
             <div class="box" id="logs">
@@ -140,6 +140,7 @@
             <div id="account">
                 <strong>Username: <span class="cliLoader"></span></strong>
             </div>
+            <h3>Cambia Contraseña</h3>
             <form th:action="@{/auth/changePassword}" method="post" novalidate>
                 <div style="display: flex; flex-direction: row; align-items: center; gap: var(--gap); flex-wrap: wrap;">
                     <label>
@@ -152,12 +153,12 @@
                 <button type="submit">Cambiar</button>
             </form>
             <form style="display: flex" method="post" th:action="@{/auth/logout}" novalidate>
-                <button type="submit">
+                <button type="submit" class="importantButton">
                     Logout
                 </button>
             </form>
         </section>
-    </article>
+    </div>
 </main>
 <div class="rgbEffect"></div>
 

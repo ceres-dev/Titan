@@ -24,16 +24,15 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 
 public final class TriangularManager extends ManagerStrategy<TriangularManager.TriangularManagerConfiguration, PersistentNope, Connector, TriangularManagerListener> implements StatusProfiler {
 
     @Setter @Nullable private SearchTriangularEngine engine;
-    @Setter @Nullable private BiConsumer<List<SearchTriangularEngine.Opportunity>, Long> onOpportunities;
     @Setter @Nullable private TelemetryCollector telemetry;
 
+    private ExecutorCycles executorCycles;
     @Nullable private Map<String, Symbol> allSymbolsMap = null;
     @Nullable private Consumer<BookTickDouble> streamListener = null;
 
@@ -70,6 +69,10 @@ public final class TriangularManager extends ManagerStrategy<TriangularManager.T
             Log.info("Starting engine...");
             engine.configure(symbolsToSubscribe, tickersMap);
             Log.info("<green>Engine Ready: %s.", engine.getClass().getName());
+            ExecutorCycles.ExecutorCyclesConfig configExecutor = ExecutorCycles.ExecutorCyclesConfig.builder()
+                    .dryRun(false)
+                    .build();
+            executorCycles = new ExecutorCycles(configExecutor, connector, engine);
             Log.info("Starting Api...");
             connector.wsSubscribeBookTicker(streamListener = this::onBookTickerUpdate, symbolsToSubscribe.keySet());
             setStatus(StatusManager.WORKING);
@@ -94,6 +97,7 @@ public final class TriangularManager extends ManagerStrategy<TriangularManager.T
         }
         streamListener = null;
         allSymbolsMap = null;
+        executorCycles = null;
     }
 
     private void onBookTickerUpdate(@NotNull BookTickDouble updatedTicker) {
@@ -104,11 +108,8 @@ public final class TriangularManager extends ManagerStrategy<TriangularManager.T
             long currentNanoTime = System.nanoTime();
 
             List<SearchTriangularEngine.Opportunity> list = Objects.requireNonNull(engine, "Engine no asignado")
-                    .computeTriangularArbitrageOpportunities(
-                            // Si es nulo se hará una analizáis total al grafo
-                            updatedTicker
-                    );
-            onOpportunities.accept(list, currentNanoTime);
+                    .computeTriangularArbitrageOpportunities(updatedTicker);
+            executorCycles.onOpportunities(list, currentNanoTime);
             if (telemetry != null) {
                 telemetry.addDeltaDelayComputeNanoTime(System.nanoTime() - currentNanoTime);
                 telemetry.incrementUpdateCounter();

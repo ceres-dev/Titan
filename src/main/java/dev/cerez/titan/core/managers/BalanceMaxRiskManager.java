@@ -4,7 +4,6 @@ import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.*;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.StorageManager;
-import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.SuperBuilder;
@@ -25,15 +24,15 @@ public class BalanceMaxRiskManager extends BaseManager<BalanceMaxRiskManager.Bal
         balanceRisk.putAll(normalize(getConfig().getBalanceDivision()));
     }
 
-    public Map<String, BigDecimal> futuroBalance(Manager<?, ?> manager) {
+    public Map<String, BigDecimal> futuroBalanceAviable(Manager<?, ?> manager) {
         Map<String, BigDecimal> result = new HashMap<>();
-        connector.fGetBalance().forEach((s, amount) -> result.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
+        connector.fGetBalanceAvailable().forEach((s, amount) -> result.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
         return result;
     }
 
     public Map<String, BigDecimal> futuroBalanceTotal(Manager<?, ?> manager) {
         Map<String, BigDecimal> result = new HashMap<>();
-        connector.fGetBalanceTotal().forEach((s, amount) -> result.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
+        connector.fGetBalanceValued().forEach((s, amount) -> result.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
         return result;
     }
 

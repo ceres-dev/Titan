@@ -230,8 +230,8 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
 
         public Balance getBalance() {
             Map<String, BigDecimal> BalanceSpot = connector.sGetBalance();
-            Map<String, BigDecimal> BalanceFuture = connector.fGetBalance();
-            Map<String, BigDecimal> balanceFutureTotal = connector.fGetBalanceTotal();
+            Map<String, BigDecimal> BalanceFuture = connector.fGetBalanceAvailable();
+            Map<String, BigDecimal> balanceFutureTotal = connector.fGetBalanceValued();
             long currentTime = System.currentTimeMillis();
             double total = balanceFutureTotal.values().stream().mapToDouble(BigDecimal::doubleValue).sum();
             List<BinanceConnector.Transaction> transactions = connector.fGetTransaction(currentTime - TimeUnit.DAYS.toMillis(7), currentTime);

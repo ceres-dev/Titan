@@ -40,9 +40,7 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
                 .minOrderGreed(10)
                 .minOrderSafe(10)
                 .leverage(5)
-                .logsEndPoints(false)
                 .sideGrid(SideGrid.LONG)
-                .amountPriceOffset(15)
                 .build();
 
         FundingOnTimeManager.FundingManagerConfig fundingConfigDefault = FundingOnTimeManager.FundingManagerConfig.builder()

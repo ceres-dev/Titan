@@ -10,15 +10,34 @@
     <!--Remote-->
     <link rel="stylesheet" href="/style/titan.css">
 </head>
-<body id="centerScreen">
-<section class="box boxFullScreen">
-    <header>
+<body>
+<main>
+    <header class="box">
         <nav><h1 id="breadcrumb"></h1></nav>
     </header>
-    <div class="box" id="logs" style="overflow: scroll; white-space: nowrap;">
-        <div class="cliLoader"></div>
+    <div class="mainSections">
+        <section class="box">
+            <form class="noneForMaxWidth" id="formTransfer" novalidate>
+                <h2>Transferir</h2>
+                <label>
+                    <input class="inputTransfer" type="text" name="asset" placeholder="Activo" autocomplete="off" required>
+                </label>
+                <label>
+                    <input class="inputTransfer" type="number" name="amount" placeholder="Cantidad" autocomplete="off" required>
+                </label>
+                <label>
+                    <select name="direction">
+                        <option value="SPOT_TO_FUTURE">Spot -> Futuros</option>
+                        <option value="FUTURE_TO_SPOT">Futuros -> Spot</option>
+                    </select>
+                </label>
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <button id="sumitTransfer">Transferir</button>
+                <div id="errorTransfer"></div>
+            </form>
+        </section>
     </div>
-</section>
+</main>
 <div class="rgbEffect"></div>
 <div class="linesEffect"></div>
 </body>

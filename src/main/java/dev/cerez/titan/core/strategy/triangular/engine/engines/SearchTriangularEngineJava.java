@@ -5,6 +5,7 @@ import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,7 +55,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
     /** Grafo inmutable, publicado de forma segura por este campo volatile. */
     private volatile Graph graph;
 
-    public SearchTriangularEngineJava(@NotNull SearchTriangularEngine.EngineConfiguration engineConfig) {
+    public SearchTriangularEngineJava(@NotNull EngineConfiguration engineConfig) {
         super(engineConfig);
     }
 
@@ -533,6 +534,13 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
     public int getActiveCount() {
         Graph g = graph;
         return g == null ? 0 : g.active.size();
+    }
+
+    @Override
+    public @Nullable Opportunity getActiveOpportunity(int triangleId) {
+        Graph g = graph;
+        if (g == null || triangleId < 0 || triangleId >= g.triangles.length) return null;
+        return g.triangles[triangleId].current;
     }
 
     @Override

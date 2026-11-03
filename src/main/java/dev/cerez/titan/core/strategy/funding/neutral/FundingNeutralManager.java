@@ -127,7 +127,7 @@ public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralM
         CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
             Log.info("Cerrando Long...", borrowed);
             connector.fSendOrderToMkt(symbol, SideOrder.SELL, position.quantity(), "lc-" + Utils.uuidToBase36(uuid), true);
-            BigDecimal balance = connector.fGetBalance().get(quoteAsset);
+            BigDecimal balance = connector.fGetBalanceAvailable().get(quoteAsset);
             Log.info("Transfiriendo %s de USDⓈ-M Futures a Spot", balance);
             connector.wTransfer(null, BinanceConnector.Transfer.FUTURE_TO_SPOT, quoteAsset, balance);
         });

@@ -53,6 +53,9 @@ body{
     scrollbar-color: var(--main-color) rgba(255, 0, 0, 0);
     scrollbar-width: thin;
 }
+body:has(main){
+    padding-top: var(--padding);
+}
 body::-webkit-scrollbar {
     width: 5px;
     height: 8px;
@@ -77,7 +80,6 @@ body::-webkit-scrollbar {
     width: 100%;
     grid-gap: var(--gap);
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;"
 }
 @media (max-width: 1000px) {
     .mainSections{
@@ -97,6 +99,15 @@ form, section{
 footer{
     margin-top: auto;
     padding: var(--padding);
+}
+main{
+    width: min(100%, var(--max-width));
+    background: black;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid var(--main-color);
+    gap: var(--gap);
 }
 /* Ventana */
 #desktop{
@@ -321,4 +332,16 @@ th:first-child, td:first-child {
     60%  { transform: translate(-0.5px, 0.6px); }
     80%  { transform: translate(0.8px, -0.3px); }
     100% { transform: translate(0, 0); }
+}
+/* Detalles */
+.importantButton{
+    color: #800000;
+    background-color: #210000;
+    border-color: #800000;
+}
+.importantButton:hover {
+    color: black;
+    background-color: #880000;
+    border-color: #880000;
+    animation: tremble 0.12s infinite;
 }

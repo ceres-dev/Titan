@@ -1,6 +1,7 @@
 package dev.cerez.titan.connector;
 
 import dev.cerez.titan.connector.model.*;
+import dev.cerez.titan.connector.model.order.OrderSpotResult;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.telemtry.TelemetryConnector;
 import dev.cerez.titan.utils.telemtry.Telemetryable;
@@ -22,11 +23,11 @@ public interface Connector extends Switch, AutoCloseable, Telemetryable<Telemetr
 
     @NotNull Map<String, BigDecimal> sGetBalance();
 
-    OrderResult sSendOrderToMkt(@NotNull String symbol,
-                                @NotNull SideOrder sideOrder,
-                                @NotNull BigDecimal amount,
-                                @Nullable String nameOrder,
-                                boolean amountInBaseAsset
+    OrderSpotResult sSendOrderToMkt(@NotNull String symbol,
+                                    @NotNull SideOrder sideOrder,
+                                    @NotNull BigDecimal amount,
+                                    @Nullable String nameOrder,
+                                    boolean amountInBaseAsset
     );
 
     @NotNull Long getTimeSever();

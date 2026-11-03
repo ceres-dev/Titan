@@ -6,9 +6,10 @@ import dev.cerez.titan.connector.exception.exchange.*;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.model.*;
+import dev.cerez.titan.connector.model.order.OrderExecute;
+import dev.cerez.titan.connector.model.order.OrderSpotResult;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
 import dev.cerez.titan.storage.StorageManager;
-import dev.cerez.titan.utils.Order;
 import dev.cerez.titan.utils.Provider;
 import dev.cerez.titan.utils.Utils;
 import lombok.*;
@@ -257,45 +258,53 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     @Override
-    public OrderResult sSendOrderToMkt(@NotNull String symbol,
-                                       @NotNull SideOrder sideOrder,
-                                       @NotNull BigDecimal amount,
-                                       @Nullable String nameOrder,
-                                       boolean amountInBaseAsset
+    public OrderSpotResult sSendOrderToMkt(
+            @NotNull String symbol,
+            @NotNull SideOrder sideOrder,
+            @NotNull BigDecimal amount,
+            @Nullable String nameOrder,
+            boolean amountInBaseAsset
     ) {
+        symbol = symbol.toUpperCase(Locale.US);
+        var symbolInfo = cachedSymbols.getOrCompute().get(symbol);
+
         Map<String, Object> params = new HashMap<>();
-        params.put("symbol", symbol.toUpperCase(Locale.US));
-        params.put("side", sideOrder);
+        params.put("symbol", symbol);
+        params.put("side", sideOrder.name());
         params.put("type", "MARKET");
-        if (amountInBaseAsset) {
-            params.put("quantity", cachedSymbols.getOrCompute().get(symbol).roundBaseQuantity(amount));
-        } else {
-            params.put("quoteOrderQty", cachedSymbols.getOrCompute().get(symbol).roundQuoteQuantity(amount));
-        }
+        params.put("newOrderRespType", "FULL");
+
+        if (amountInBaseAsset) params.put("quantity", symbolInfo.roundBaseQuantity(amount));
+        else params.put("quoteOrderQty", symbolInfo.roundQuoteQuantity(amount));
+
         JsonNode node = sendSignedRequest(Method.POST, "/api/v3/order", params);
-        String id = node.get("orderId").asText();
-        BigDecimal executedQty = new BigDecimal(node.get("baseAssetQty").asText());
+        String orderId = node.get("orderId").asText();
+        BigDecimal executedQty = new BigDecimal(node.get("executedQty").asText());
         BigDecimal cumulativeQuoteQty = new BigDecimal(node.get("cummulativeQuoteQty").asText());
+
+        // BUY recibe el activo base; SELL recibe el activo cotizado.
         BigDecimal receivedQty = sideOrder == SideOrder.BUY ? executedQty : cumulativeQuoteQty;
-        for (JsonNode fills : node.get("fills")){
-            if (fills.get("tradeId").asText().equals(id)){
-                return new OrderResult(
-                        id,
-                        receivedQty.subtract(new BigDecimal(fills.asText())),
-                        cumulativeQuoteQty,
-                        receivedQty.max(BigDecimal.ZERO)
+        String receivedAsset = sideOrder == SideOrder.BUY ? symbolInfo.getBaseAsset() : symbolInfo.getQuoteAsset();
+        BigDecimal totalCommission = BigDecimal.ZERO;
+
+        for (JsonNode fill : node.get("fills")) {
+            String commissionAsset = fill.get("commissionAsset").asText();
+            if (receivedAsset.equals(commissionAsset)) {
+                totalCommission = totalCommission.add(
+                        new BigDecimal(fill.get("commission").asText())
                 );
             }
         }
 
-        return new OrderResult(
-                id,
+        receivedQty = receivedQty.subtract(totalCommission);
+
+        return new OrderSpotResult(
+                orderId,
                 executedQty,
                 cumulativeQuoteQty,
                 receivedQty.max(BigDecimal.ZERO)
         );
     }
-
     @Override
     public @NotNull Long getTimeSever() {
         return sendPublicRequest(Method.GET, "/api/v3/time").get("serverTime").asLong();
@@ -371,7 +380,7 @@ public final class BinanceConnector extends BaseConnector {
             case FUTURE_TO_SPOT, MARGIN_TO_SPOT -> sGetBalance().get(asset);
             case ISOLATED_TO_MARGIN, SPOT_TO_MARGIN -> mcGetBalance(asset).free();
             case MARGIN_TO_ISOLATED -> miGetBalance(symbol).asset(asset).free();
-            case SPOT_TO_FUTURE -> fGetBalance().get(asset);
+            case SPOT_TO_FUTURE -> fGetBalanceAvailable().get(asset);
         };
         sendSignedRequest(Method.POST, "/sapi/v1/asset/transfer", params0);
 //        int attempts = 0;
@@ -414,7 +423,18 @@ public final class BinanceConnector extends BaseConnector {
         JsonNode raw =  sendSignedRequest(Method.GET, "/api/v3/allOrders", params);
         for (JsonNode node : raw){
             if (node.get("clientOrderId").asText().equals(nameOrder)) {
-                return new SpotOrder(new BigDecimal(node.get("baseAssetQty").asText()), new BigDecimal(node.get("cummulativeQuoteQty").asText()));
+                return new SpotOrder(
+                        node.get("symbol").asText(),
+                        Objects.requireNonNullElse(node.get("clientOrderId"), node.get("orderId")).asText(),
+                        new BigDecimal(node.get("price").asText()),
+                        new BigDecimal(node.get("baseAssetQty").asText()),
+                        new BigDecimal(node.get("cummulativeQuoteQty").asText()),
+                        SideOrder.valueOf(node.get("side").asText()),
+                        false,
+                        StatusOrder.parse(node.get("status").asText()),
+                        node.get("time").asLong(),
+                        node.get("updateTime").asLong()
+                );
             }
         }
         return null;
@@ -483,23 +503,36 @@ public final class BinanceConnector extends BaseConnector {
         return BASE_FUTURE_WWS_USERDATA.formatted(listenKey);
     }
 
-    public @NotNull @Unmodifiable Map<String, BigDecimal> fGetBalance() {
+    public @NotNull @Unmodifiable Map<String, BigDecimal> fGetBalanceAvailable() {
         JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/balance");
         Map<String, BigDecimal> result = new HashMap<>();
         for (JsonNode node : raw){
             BigDecimal balance =  new BigDecimal(node.get("maxWithdrawAmount").asText());
             result.put(node.get("asset").asText(), balance);
         }
-        return result;
+        return Map.copyOf(result);
     }
 
-    public @NotNull @Unmodifiable Map<String, BigDecimal> fGetBalanceTotal() {
+    public @NotNull @Unmodifiable Map<String, BigDecimal> fGetBalanceValued() {
         JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/balance");
         Map<String, BigDecimal> result = new HashMap<>();
         for (JsonNode node : raw){
             result.put(node.get("asset").asText(), new BigDecimal(node.get("balance").asText()));
         }
-        return result;
+        return Map.copyOf(result);
+    }
+
+    @Contract(pure = true)
+    public @NotNull BalanceFuture fGetBalance() {
+        JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/balance");
+        Map<String, BigDecimal> valued = new HashMap<>();
+        Map<String, BigDecimal> available = new HashMap<>();
+        for (JsonNode node : raw){
+            String asset = node.get("asset").asText();
+            valued.put(asset, new BigDecimal(node.get("balance").asText()));
+            available.put(asset, new BigDecimal(node.get("maxWithdrawAmount").asText()));
+        }
+        return new BalanceFuture(Map.copyOf(available), Map.copyOf(valued));
     }
 
     public @NotNull @Unmodifiable Map<String, BigDecimal> fGetUnPNL() {
@@ -723,9 +756,7 @@ public final class BinanceConnector extends BaseConnector {
             }
             result1.put(symbol, new FundingRate(
                     symbol,
-                    fundingConfig.min,
-                    fundingConfig.max,
-                    fundingConfig.interval,
+                    fundingConfig,
                     new BigDecimal(node.get("lastFundingRate").asText()),
                     node.get("nextFundingTime").asLong())
             );
@@ -872,14 +903,14 @@ public final class BinanceConnector extends BaseConnector {
         return !node.isEmpty();
     }
 
-    public @Nullable Convert cGetMinMaxConvert(@NotNull String fromAsset, @NotNull String toAsset) {
+    public @Nullable BinanceConnector.ConvertConfig cGetMinMaxConvert(@NotNull String fromAsset, @NotNull String toAsset) {
         Map<String, Object> params = new HashMap<>();
         params.put("fromAsset", fromAsset);
         params.put("toAsset", toAsset);
         JsonNode raw = sendPublicRequest(Method.GET, "/sapi/v1/convert/exchangeInfo", params);
         for (JsonNode node : raw){
             if (node.get("fromAsset").asText().equals(fromAsset) && node.get("toAsset").asText().equals(toAsset)){
-                return new Convert(node.get("fromAssetMinAmount").asDouble(),
+                return new ConvertConfig(node.get("fromAssetMinAmount").asDouble(),
                         node.get("fromAssetMaxAmount").asDouble(),
                         node.get("toAssetMinAmount").asDouble(),
                         node.get("toAssetMaxAmount").asDouble()
@@ -1090,7 +1121,6 @@ public final class BinanceConnector extends BaseConnector {
 
     public record OrderUpdate(String name, String symbol, SideOrder sideOrder, StatusOrder statusOrder) {}
 
-    public record Convert(double fromMin, double fromMax, double toMin, double toMax) {}
 
     public record FuturePosition(@NotNull String symbol, @NotNull BigDecimal quantity, @NotNull BigDecimal entryPriceAvg, @NotNull BigDecimal pnlUnrealize) {
         @Contract(pure = true)
@@ -1122,9 +1152,11 @@ public final class BinanceConnector extends BaseConnector {
         }
     }
 
-    public record FundingRate(String symbol, double min, double max, int interval, BigDecimal nextFundingRate, long nextFundingTime) {
+    public record BalanceFuture(@NotNull @Unmodifiable Map<String, BigDecimal> available, @NotNull @Unmodifiable Map<String, BigDecimal> valued) {}
+
+    public record FundingRate(String symbol, FundingConfig config, BigDecimal nextFundingRate, long nextFundingTime) {
         public @NotNull BigDecimal rate24h(){
-            return nextFundingRate.multiply(BigDecimal.valueOf(24d / interval)) ;
+            return nextFundingRate.multiply(BigDecimal.valueOf(24d / config.interval)) ;
         }
 
         public @NotNull BigDecimal rate24hAbs(){
@@ -1135,10 +1167,6 @@ public final class BinanceConnector extends BaseConnector {
             return nextFundingRate.abs();
         }
     }
-
-    private record FundingConfig(double min, double max, int interval) {}
-
-    public record SpotOrder(@NotNull BigDecimal baseAmount, @NotNull BigDecimal quoteAmount) {}
 
     public record Transaction(@NotNull String symbol, @NotNull IncomeType incomeType, BigDecimal amount, String asset, long date) {}
 
@@ -1170,17 +1198,44 @@ public final class BinanceConnector extends BaseConnector {
 
     @EqualsAndHashCode(callSuper = true)
     @Data
-    public static final class OrderFuture extends Order {
-        private final StatusOrder statusOrder;
-        private final long dateCreate;
-        private final long dateFilled;
+    public static final class SpotOrder extends OrderExecute {
+        private final @NotNull BigDecimal amountQuoteAsset;
 
-        public OrderFuture(String symbol, String nameOrder, BigDecimal price, BigDecimal amountBaseAsset, SideOrder sideOrder, boolean reduceOnly, StatusOrder statusOrder, long dateCreate, long dateFilled) {
-            super(symbol, nameOrder, price, amountBaseAsset, sideOrder, reduceOnly);
-            this.statusOrder = statusOrder;
-            this.dateCreate = dateCreate;
-            this.dateFilled = dateFilled;
+        public SpotOrder(@NotNull String symbol,
+                         @NotNull String nameOrder,
+                         @NotNull BigDecimal price,
+                         @NotNull BigDecimal amountBaseAsset,
+                         @NotNull BigDecimal amountQuoteAsset,
+                         @NotNull SideOrder sideOrder,
+                         boolean reduceOnly,
+                         StatusOrder statusOrder,
+                         long dateCreate,
+                         long dateFilled
+        ) {
+            super(symbol, nameOrder, price, amountBaseAsset, sideOrder, reduceOnly, statusOrder,  dateCreate, dateFilled);
+            this.amountQuoteAsset = amountQuoteAsset;
         }
     }
 
+    @EqualsAndHashCode(callSuper = true)
+    @Data
+    public static final class OrderFuture extends OrderExecute {
+
+        public OrderFuture(String symbol,
+                           String nameOrder,
+                           BigDecimal price,
+                           BigDecimal amountBaseAsset,
+                           SideOrder sideOrder,
+                           boolean reduceOnly,
+                           StatusOrder statusOrder,
+                           long dateCreate,
+                           long dateFilled
+        ) {
+            super(symbol, nameOrder, price, amountBaseAsset, sideOrder, reduceOnly, statusOrder, dateCreate, dateFilled);
+        }
+    }
+
+    public record ConvertConfig(double fromMin, double fromMax, double toMin, double toMax) {}
+
+    public record FundingConfig(double min, double max, int interval) {}
 }

@@ -5,6 +5,7 @@ import dev.cerez.titan.connector.exception.exchange.MarginNotSufficienException;
 import dev.cerez.titan.connector.exception.exchange.PostOnlyRejectException;
 import dev.cerez.titan.connector.exception.exchange.ReduceOnlyRejectException;
 import dev.cerez.titan.connector.exception.exchange.UnknownOrderException;
+import dev.cerez.titan.connector.model.order.Order;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
 import dev.cerez.titan.core.BaseConfig;
@@ -18,7 +19,7 @@ import dev.cerez.titan.core.strategy.grid.attribute.BaseAttribute;
 import dev.cerez.titan.core.strategy.grid.attribute.SideAffected;
 import dev.cerez.titan.core.strategy.grid.attribute.attributes.*;
 import dev.cerez.titan.core.strategy.grid.model.Context;
-import dev.cerez.titan.connector.model.OrderPreview;
+import dev.cerez.titan.connector.model.order.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.log.Log;
@@ -62,7 +63,7 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
 
     @Override
     public @NotNull StatusProfiler.PresenceProfile getPresenceProfile() {
-        BigDecimal balance = connector.fGetBalanceTotal().get(getConfig().quoteAsset);
+        BigDecimal balance = connector.fGetBalanceValued().get(getConfig().quoteAsset);
         BigDecimal unPnl = connector.fGetUnPNL().get(getConfig().quoteAsset);
         String label = "Bal: %.2f PNL: %.4f Sy: %s St: %s".formatted(balance, unPnl, symbol, MarketSession.of(getConfig().getBaseAsset()));
         return new PresenceProfile(
@@ -262,8 +263,6 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         private int minOrderSafe;
         private int minOrderGreed;
         private int leverage;
-        private boolean logsEndPoints;
-        private int amountPriceOffset;
 
         // No Agregar final, ya que el constructor no es llamado y gson ignorara estos campos por el transient
         @Getter(AccessLevel.NONE) @Builder.Default

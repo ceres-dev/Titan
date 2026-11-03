@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.SuperBuilder;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
 import java.util.List;
@@ -47,7 +48,7 @@ public abstract class SearchTriangularEngine implements Configurable<SearchTrian
 
     protected final EngineConfiguration config;
 
-    protected SearchTriangularEngine(@NotNull SearchTriangularEngine.EngineConfiguration config) {
+    protected SearchTriangularEngine(@NotNull EngineConfiguration config) {
         this.config = Objects.requireNonNull(config, "config");
     }
 
@@ -115,6 +116,12 @@ public abstract class SearchTriangularEngine implements Configurable<SearchTrian
     public abstract void forEachActive(@NotNull Consumer<? super Opportunity> consumer);
 
     public abstract int getActiveCount();
+
+    /**
+     * Estado vigente de un triángulo concreto (O(1)), o null si hoy no es rentable / ejecutable.
+     * Útil para un ejecutor: saber si la ventana de lo que está ejecutando sigue abierta sin recorrer listas.
+     */
+    public abstract @Nullable Opportunity getActiveOpportunity(int triangleId);
 
     /**
      * Notificaciones push: abre / actualiza / cierra. Se invocan en el hilo que procesó el tick,

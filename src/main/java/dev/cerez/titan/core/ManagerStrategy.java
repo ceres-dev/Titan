@@ -3,12 +3,9 @@ package dev.cerez.titan.core;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.event.BaseListener;
-import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
 import dev.cerez.titan.core.strategy.TypeManager;
-import dev.cerez.titan.log.Log;
 import dev.cerez.titan.storage.StorageProfiler;
-import dev.cerez.titan.utils.Utils;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
@@ -16,7 +13,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersistent, O extends Connector, L extends BaseListener> extends BaseManager<C, P, O> {
@@ -36,19 +32,19 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
     protected Map<String, BigDecimal> fGetBalance(){
         if (balanceMaxRiskManager == null){
             if (connector instanceof BinanceConnector binanceConnector) {
-                return binanceConnector.fGetBalance();
+                return binanceConnector.fGetBalanceAvailable();
             }else {
                 return Collections.emptyMap();
             }
         }else {
-            return balanceMaxRiskManager.futuroBalance(this);
+            return balanceMaxRiskManager.futuroBalanceAviable(this);
         }
     }
 
     protected Map<String, BigDecimal> fGetBalanceTotal(){
         if (balanceMaxRiskManager == null){
             if (connector instanceof BinanceConnector binanceConnector) {
-                return binanceConnector.fGetBalanceTotal();
+                return binanceConnector.fGetBalanceValued();
             }else {
                 return Collections.emptyMap();
             }

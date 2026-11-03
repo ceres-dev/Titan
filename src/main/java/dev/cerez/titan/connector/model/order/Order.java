@@ -1,4 +1,4 @@
-package dev.cerez.titan.utils;
+package dev.cerez.titan.connector.model.order;
 
 import dev.cerez.titan.connector.model.SideOrder;
 import lombok.AllArgsConstructor;

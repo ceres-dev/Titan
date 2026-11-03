@@ -30,11 +30,6 @@ public class TriangularCommand extends BaseCommand implements ProfilerSetup {
     public void execute(@NotNull List<String> args) {
         Log.info("Starting...");
 
-        ExecutorCycles.ExecutorCyclesConfig configExecutor = ExecutorCycles.ExecutorCyclesConfig.builder()
-                .maxLag(20L)
-                .minProfit(0.1d)
-                .isTest(false)
-                .build();
         TelemetryCollector.TelemetryConfig telemetryConfig = TelemetryCollector.TelemetryConfig.builder()
                 .maxDelaysDeltaComputeNanoTime(500)
                 .stepsAddDelayComputeNanoTime(10)
@@ -54,14 +49,12 @@ public class TriangularCommand extends BaseCommand implements ProfilerSetup {
         StorageManagerJsonLocal storageManagerJsonLocal = new StorageManagerJsonLocal(Utils.getRootId());
         storageManagerJsonLocal.setConfigProfilerName(BaseConnector.ConnectorConfig.class, "testnetSpot");
         Connector connector =           new BinanceConnector(storageManagerJsonLocal);
-        ExecutorCycles executorCycles = new ExecutorCycles(configExecutor, connector);
 
         connector.setTelemetry(telemetry);
         connector.start();
         storageManager.saveIfNotExits(triangularManagerConfig);
         TriangularManager manager = new TriangularManager(storageManager, connector);
         manager.setTelemetry(telemetry);
-        manager.setOnOpportunities(executorCycles::onOpportunities);
         manager.start();
         loader.printLoader(telemetry);
     }

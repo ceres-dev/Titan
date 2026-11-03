@@ -1,8 +1,8 @@
-package dev.cerez.titan.connector.model;
+package dev.cerez.titan.connector.model.order;
 
 import java.math.BigDecimal;
 
-public record OrderResult(
+public record OrderSpotResult(
         String orderId,
         BigDecimal baseAssetQty,
         BigDecimal quoteAssetQty,

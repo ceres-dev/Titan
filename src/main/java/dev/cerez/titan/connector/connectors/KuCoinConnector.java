@@ -3,6 +3,7 @@ package dev.cerez.titan.connector.connectors;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.model.*;
+import dev.cerez.titan.connector.model.order.OrderSpotResult;
 import dev.cerez.titan.utils.Provider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -166,11 +167,11 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
     }
 
     @Override
-    public OrderResult sSendOrderToMkt(@NotNull String symbol,
-                                       @NotNull SideOrder sideOrder,
-                                       @NotNull BigDecimal amount,
-                                       @Nullable String nameOrder,
-                                       boolean amountInBaseAsset
+    public OrderSpotResult sSendOrderToMkt(@NotNull String symbol,
+                                           @NotNull SideOrder sideOrder,
+                                           @NotNull BigDecimal amount,
+                                           @Nullable String nameOrder,
+                                           boolean amountInBaseAsset
     ) {
         throw new UnsupportedOperationException("Not supported yet.");
     }

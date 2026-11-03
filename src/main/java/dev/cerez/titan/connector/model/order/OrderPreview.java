@@ -1,6 +1,6 @@
-package dev.cerez.titan.connector.model;
+package dev.cerez.titan.connector.model.order;
 
-import dev.cerez.titan.utils.Order;
+import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.utils.Utils;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
