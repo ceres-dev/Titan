@@ -5,6 +5,6 @@ import org.springframework.http.HttpStatus;
 public class ConfigMalformatException extends ManagerException {
 
     public ConfigMalformatException() {
-        super("Configurado mal formado", -2, 400);
+        super("Configurado mal formado", 400);
     }
 }

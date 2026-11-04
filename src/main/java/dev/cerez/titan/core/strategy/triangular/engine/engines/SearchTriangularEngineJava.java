@@ -154,8 +154,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
             ArrayList<Integer> nbs = higher.get(a);
             for (int bi = 0; bi < nbs.size(); bi++) {
                 int b = nbs.get(bi);
-                for (int ci = 0; ci < nbs.size(); ci++) {
-                    int c = nbs.get(ci);
+                for (int c : nbs) {
                     if (c == b) continue;
                     ArrayList<LegDef> bcLegs = legsByPair.get(pairKey(b, c));
                     if (bcLegs == null) continue;

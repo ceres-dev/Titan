@@ -29,10 +29,10 @@ public class FundingOnTimeCommand extends BaseCommand implements ProfilerSetup {
 
         connector.wuCreateEventAccountUpdate((jsonNode -> {
             Log.info(jsonNode.toPrettyString());
-        }), null);
+        }));
         connector.wuCreateEventOrderTradeUpdate((a) -> {
             Log.info(a.toString());
-        }, null);
+        });
         FundingOnTimeManager.FundingManagerConfig config = FundingOnTimeManager.FundingManagerConfig.builder()
                 .sendTrade(true)
                 .build();

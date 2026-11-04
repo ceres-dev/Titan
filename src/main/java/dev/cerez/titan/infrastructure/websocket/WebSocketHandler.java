@@ -6,6 +6,7 @@ import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.infrastructure.model.WebSocketContainer;
 import dev.cerez.titan.infrastructure.user.custom.TitanUserDetails;
 import dev.cerez.titan.log.Log;
+import dev.cerez.titan.utils.Revocable;
 import dev.cerez.titan.utils.WebSocketServer;
 import dev.cerez.titan.utils.Utils;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import java.io.IOException;
 import java.security.Principal;
 import java.util.Collection;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -34,7 +36,23 @@ public class WebSocketHandler extends TextWebSocketHandler {
         TitanUserDetails user = Utils.toTitanUser(session);
         if (user != null){
             EnvironmentManager manager = titan.getEnvironmentManager(user.getId());
-            manager.setWebSocketServer(new WebSocketMessenger(session));
+            WebSocketServer webSocketServer = new WebSocketMessenger(session);
+            webSocketServer.onClose(() -> manager.getPort().unsubscribe(null));
+            manager.setWebSocketServer(webSocketServer);
+        }else {
+            session.close(CloseStatus.NOT_ACCEPTABLE);
+        }
+    }
+
+    @Override
+    public void afterConnectionClosed(@NotNull WebSocketSession session, @NotNull CloseStatus status) throws Exception {
+        TitanUserDetails user = Utils.toTitanUser(session);
+        if (user != null){
+            EnvironmentManager manager = titan.getEnvironmentManager(user.getId());
+            if (manager.getWebSocketServer() instanceof WebSocketMessenger webSocketServer) {
+                webSocketServer.callsAfterClose.forEach(Runnable::run);
+                webSocketServer.callsAfterClose.clear();
+            }
         }else {
             session.close(CloseStatus.NOT_ACCEPTABLE);
         }
@@ -60,6 +78,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
         private final WebSocketSession session;
         private final Map<String, AtomicLong> sequences = new ConcurrentHashMap<>();
         private final Executor executor = Executors.newSingleThreadExecutor(Utils.getThreadFactory(this));
+        private final LinkedList<Runnable> callsAfterClose = new LinkedList<>();
 
         @Override
         public synchronized void sendMessage(Object message) {
@@ -85,6 +104,12 @@ public class WebSocketHandler extends TextWebSocketHandler {
                     Log.exception(e);
                 }
             });
+        }
+
+        @Override
+        public @NotNull Revocable onClose(Runnable callback) {
+            callsAfterClose.add(callback);
+            return () -> callsAfterClose.remove(callback);
         }
     }
 }

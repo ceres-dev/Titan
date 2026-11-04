@@ -1,6 +1,7 @@
 package dev.cerez.titan.core.strategy.funding.time;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.core.StatusManager;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
@@ -41,7 +42,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
 
     @Override
     protected void internalStart() {
-        connector.wuCreateEventAccountUpdate((jsonNode -> {
+        subscribeLive.add(connector.wuCreateEventAccountUpdate((jsonNode -> {
             JsonNode node = jsonNode.get("a");
             if (node.get("m").asText().equals("FUNDING_FEE")){
                 JsonNode nodeSymbol = node.get("S");
@@ -51,7 +52,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
                     if (symbolTarget != null) symbolTarget.closePosition();
                 }
             }
-        }), null);
+        })));
         executor.execute(() -> {
             while (running) {
                 Log.info("Starting FundingManger");
@@ -64,7 +65,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
 
     @Override
     protected void internalStop() {
-        connector.wuDeleteEventAccountUpdate(null);
+
     }
 
     private void searchFunding() {
@@ -269,17 +270,18 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
 
         private volatile OrderToClosePosition order;
         private volatile BinanceConnector.BookTick currentBookTick;
+        private volatile BaseConnector.WebSocketSubscribe subscribeBookTick;
 
         public void prepare(){
             Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
             connector.fSetLeverage(target.symbol(), 2);
-            connector.wfCreateBookTicker(bookTick -> this.currentBookTick = bookTick, null, target.symbol());
+            subscribeBookTick = connector.wfCreateBookTicker(bookTick -> this.currentBookTick = bookTick, target.symbol());
             this.currentBookTick = connector.fGetBookTick(target.symbol());
         }
 
         public void finish(){
             executor.schedule(this::closePosition, TimeUnit.SECONDS.toMillis(5), TimeUnit.MILLISECONDS);
-            connector.wfRemoveBookTicker(null, target.symbol());
+            subscribeBookTick.revoke();
         }
 
         public void openPosition() {
@@ -336,7 +338,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
                                             order.symbol()
                                     );
                                     if (status != 200){
-                                        Log.info("Repuesta: %s", jsonNode);
+                                        Log.warning("Repuesta: %s", jsonNode);
                                         Log.info("Enviando orden de emergencia");
                                         connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true);
                                     }
@@ -362,7 +364,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
                 return;
             }
             Log.info("Posición abierta: %s", position);
-            Log.info("Send order close: %s".formatted(target.symbol()));
+            Log.info("Send order close: %s", target.symbol());
             SideOrder sideOrder = Utils.toSide(position.sidePosition()).inverse();
             AtomicBoolean isOk = new AtomicBoolean(false);
             if (config.isSendTrade()) connector.wfSendOrderToMkt(target.symbol(),

@@ -14,30 +14,25 @@ import dev.cerez.titan.core.ManagerStrategy;
 import dev.cerez.titan.core.PersistentNope;
 import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.event.events.EnvironmentManagerListener;
-import dev.cerez.titan.core.exception.ConfigMalformatException;
-import dev.cerez.titan.core.exception.ManagerIsNotFoundException;
+import dev.cerez.titan.core.exception.AlreadySubscribedException;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.infrastructure.model.*;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.storage.storages.StorageManagerJsonLocal;
-import dev.cerez.titan.utils.WebSocketServer;
-import dev.cerez.titan.utils.NoAutoRegister;
-import dev.cerez.titan.utils.Ownership;
-import dev.cerez.titan.utils.Utils;
+import dev.cerez.titan.utils.*;
 import dev.cerez.titan.utils.telemtry.TelemetryCollector;
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
+import lombok.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -53,7 +48,9 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
     private final CommandHander commandHandler;
     private final TelemetryCollector telemetry;
     private final long uptime = System.currentTimeMillis();
-    private WebSocketServer webSocketServer = message -> {};
+    private WebSocketServer webSocketServer = WebSocketServer.empty();
+    private final Set<Subscribable> subscriptions = ConcurrentHashMap.newKeySet();
+    private final Set<Listener> listenersAnyEvents = ConcurrentHashMap.newKeySet();
 
     private EnvironmentManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector binanceConnector, @NotNull UUID idOwner) {
         super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), binanceConnector, TypeManager.ENVIRONMENT);
@@ -73,16 +70,6 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
                 new FundingOnTimeCommand(this)
         );
         discordConnector = new DiscordConnector(storageManager.saveIfNotExits(DiscordConnector.DiscordConfig.builder().build()));
-        connector.wuCreateEventAccountUpdate((update) -> {
-            webSocketServer.sendMessage(getPort().getBalance());
-            webSocketServer.sendMessage(getPort().getPositions());
-        }, this);
-        Log.CONSUMER_APPENDER.addConsumer((log) ->
-                webSocketServer.sendMessage(List.of(new LogRecord(Utils.cleanAnsi(log.getMessage()), log.getThreadName(), log.getLevel().toString(), log.getTimeStamp()))));
-        executor.scheduleAtFixedRate(() -> webSocketServer.sendMessage(getPort().getTelemetry()), 5, 5, TimeUnit.SECONDS);
-        executor.scheduleAtFixedRate(() -> webSocketServer.sendMessage(getPort().getPositions()), 15, 15, TimeUnit.SECONDS);
-        executor.scheduleAtFixedRate(() -> webSocketServer.sendMessage(getPort().getBalance()), 1, 1, TimeUnit.MINUTES);
-
     }
 
     @Contract(pure = true)
@@ -117,6 +104,7 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
         commandHandler.stop();
         managerMap.values().forEach(Manager::stop);
         discordConnector.stop();
+        getPort().unsubscribe(null);
     }
 
     @Override
@@ -129,6 +117,7 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
             if (!this.equals(m.getEnvironmentManager())) m.setEnvironmentManager(this);
             managerMap.put(m.getId(), m);
             Log.info("Manager Registrado: name=%s type=%s".formatted(m.getName(), m.getClass().getSimpleName()));
+            // TODO: Esto debe estar dentro de STRATEGY
             if (m instanceof ManagerStrategy<?, ?, ?, ?> strategy){
                 strategy.registerListener(new Listener() {
                     @Override
@@ -156,16 +145,6 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
 
     public class EnvironmentPort {
 
-        public void removeManager(@NotNull UUID @NotNull... id) throws ManagerIsNotFoundException {
-            for (UUID i : id) {
-                try {
-                    EnvironmentManager.this.managerMap.remove(i).stop();
-                } catch (NullPointerException e) {
-                    throw new ManagerIsNotFoundException();
-                }
-            }
-        }
-
         public void executeCommand(String cmd){
             EnvironmentManager.this.commandHandler.dispatchFromRaw(cmd);
         }
@@ -174,29 +153,12 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
             for (Manager<?, ?> m : manager) EnvironmentManager.this.managerMap.put(m.getId(), m);
         }
 
-        @Deprecated
-        public UUID createManager(@NotNull ManagerBuilder managerBuilder) throws ManagerIsNotFoundException  {
-            UUID uuid = UUID.randomUUID();
-            try {
-                Manager<?, ?> manager = managerBuilder.manager.getConstructor(Object.class, BinanceConnector.class).newInstance(managerBuilder.config, connector);
-                manager.setName(managerBuilder.name);
-                EnvironmentManager.this.managerMap.put(uuid, manager);
-            } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-                throw new ConfigMalformatException();
-            }
-            return uuid;
-        }
-
         public @NotNull List<Strategy> getStrategy() {
             return managerMap.values().stream().filter(m -> m instanceof ManagerStrategy<?,?,?,?>).map(m -> (ManagerStrategy<?,?,?,?>) m).map(m -> new Strategy(m.getId(), m.getTypeManager(), m.getName(), m.getClass().getSimpleName(), m.getStatus())).toList();
         }
 
         public Time getTime(){
             return new Time(System.currentTimeMillis(), connector.getTimeSever());
-        }
-
-        public long getPing(){
-            return connector.fPing();
         }
 
         public List<Position> getPositions() {
@@ -286,6 +248,67 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
             executor.schedule(() -> webSocketServer.sendMessage(getPort().getBalance()), 2, TimeUnit.SECONDS);
         }
 
-        public record ManagerBuilder(Class<? extends Manager<?, ?>> manager, Object config, String name) {}
+        public void subscribe(@NotNull Subscribe subscribe) {
+            if (subscribesLive.contains(subscribe)) {
+                throw new AlreadySubscribedException();
+            }
+            subscribesLive.add(subscribe);
+            subscribe.getSubscribable(EnvironmentManager.this).subscribe();
+        }
+
+        public void unsubscribe(@Nullable Subscribe subscribe) {
+            if (subscribe == null){
+                subscribesLive.forEach(sub -> sub.getSubscribable(EnvironmentManager.this).revoke());
+                subscribesLive.clear();
+            }else {
+                if (subscribesLive.contains(subscribe)) {
+                    subscribe.getSubscribable(EnvironmentManager.this).revoke();
+                    subscribesLive.remove(subscribe);
+                }
+            }
+        }
+
+        private final Set<Subscribe> subscribesLive = new HashSet<>();
+
+        @RequiredArgsConstructor
+        public enum Subscribe {
+            BALANCE(manager -> List.of(
+                    Revocable.from(manager.executor.scheduleAtFixedRate(() -> manager.webSocketServer.sendMessage(manager.getPort().getBalance()), 1, 1, TimeUnit.MINUTES)),
+                    manager.connector.wuCreateEventAccountUpdate((update) -> manager.webSocketServer.sendMessage(manager.getPort().getBalance()))
+            )),
+            POSITIONS(manager -> List.of(
+                    Revocable.from(manager.executor.scheduleAtFixedRate(() -> manager.webSocketServer.sendMessage(manager.getPort().getPositions()), 15, 15, TimeUnit.SECONDS)),
+                    manager.connector.wuCreateEventAccountUpdate((update) -> manager.webSocketServer.sendMessage(manager.getPort().getBalance()))
+            )),
+            TELEMETRY(manager -> List.of(Revocable.from(manager.executor.scheduleAtFixedRate(() -> manager.webSocketServer.sendMessage(manager.getPort().getTelemetry()), 5, 5, TimeUnit.SECONDS)))),
+//            STRATEGY(manager -> manager.managerMap.values().stream().filter(m -> m instanceof ManagerStrategy<?,?,?,?>).map(m -> (ManagerStrategy<?,?,?,?>) m).map(strategy -> strategy.registerListener(new Listener() {
+//                @Override
+//                public void changeStatus() {
+//                    manager.webSocketServer.sendMessage(manager.getPort().getStrategy());
+//                }
+//            })).toList()),
+            LOGS(manager -> List.of(Log.CONSUMER_APPENDER.addConsumer((log) -> manager.webSocketServer.sendMessage(List.of(new LogRecord(Utils.cleanAnsi(log.getMessage()), log.getThreadName(), log.getLevel().toString(), log.getTimeStamp()))))));
+
+            public final Function<EnvironmentManager, List<Revocable>> onSubscribe;
+            public final Map<UUID, Subscribable> subscribes = new HashMap<>();
+
+            @Contract(value = "_ -> new", pure = true)
+            public @NotNull Subscribable getSubscribable(EnvironmentManager env) {
+                return subscribes.computeIfAbsent(env.getIdOwner(), (uuid) -> new Subscribable() {
+                    private final List<Revocable> revocables = new ArrayList<>();
+
+                    @Override
+                    public void revoke() {
+                        revocables.forEach(Revocable::revoke);
+                        revocables.clear();
+                    }
+
+                    @Override
+                    public void subscribe() {
+                        revocables.addAll(onSubscribe.apply(env));
+                    }
+                });
+            }
+        }
     }
 }

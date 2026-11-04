@@ -1,6 +1,7 @@
 async function loadStrategy() {
     try {
         const response = await fetch("/api/strategy");
+        websSocket.subscribe("STRATEGY");
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }

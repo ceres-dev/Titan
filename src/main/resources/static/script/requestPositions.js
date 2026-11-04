@@ -1,6 +1,7 @@
 async function loadPosition() {
     try {
         const response = await fetch("/api/positions");
+        websSocket.subscribe("POSITIONS");
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }

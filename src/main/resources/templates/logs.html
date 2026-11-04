@@ -4,6 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <title>Titan</title>
+
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <meta name="robots" content="noindex">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!--Local (ignorame)-->
@@ -29,10 +32,6 @@
 <script src="/script/requestLogs.js"></script>
 <script src="/script/websocket.js"></script>
 <script src="/script/breadcrumb.js"></script>
-
-<script>
-    startWebSocket(["LogRecord"])
-</script>
 </body>
 <!-- Bastian = Seriedad -->
 </html>

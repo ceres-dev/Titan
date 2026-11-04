@@ -1,4 +1,4 @@
-async function startWebSocket(whiteList = []){
+async function startWebSocket(){
 
     const protocol =
         location.protocol === "https:" ? "wss:" : "ws:";
@@ -27,11 +27,6 @@ async function startWebSocket(whiteList = []){
         }
         requestCount.set(payload.type, payload.count)
 
-        if (whiteList.length !== 0) {
-            if (whiteList.indexOf(payload.type) === -1) {
-                return;
-            }
-        }
         switch (payload.type) {
             case "LogRecord": {
                 addRenderLogs(payload.data);
@@ -84,4 +79,16 @@ async function startWebSocket(whiteList = []){
         socket.send(input.value);
         input.value = "";
     });*/
+}
+async function subscribe(subscription) {
+    const params = new URLSearchParams({
+        subscribe: subscription
+    });
+    await utils.apiFetch(`/api/subscribe?${params}`, {
+        method: "POST",
+    });
+}
+startWebSocket();
+window.websSocket = {
+    subscribe: subscribe,
 }

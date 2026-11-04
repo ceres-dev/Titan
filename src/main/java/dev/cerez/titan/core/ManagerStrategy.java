@@ -6,6 +6,8 @@ import dev.cerez.titan.core.event.BaseListener;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.StorageProfiler;
+import dev.cerez.titan.utils.Revocable;
+import dev.cerez.titan.utils.Subscribable;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
@@ -19,8 +21,8 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
 
 
     @Getter @NotNull private volatile StatusManager status = StatusManager.STOPING;
-
     @Getter @Setter @Nullable protected BalanceMaxRiskManager balanceMaxRiskManager;
+    protected final LinkedList<Revocable> subscribeLive = new LinkedList<>();
 
     public ManagerStrategy(@NotNull StorageProfiler<C, P> storageManager,
                            @NotNull O connector,
@@ -87,6 +89,8 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
     public void stop(){
         setStatus(StatusManager.STOPING);
         super.stop();
+        subscribeLive.forEach(Revocable::revoke);
+        subscribeLive.clear();
         setStatus(StatusManager.STOPPED);
         callEvent(BaseListener::stopped);
     }

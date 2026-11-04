@@ -78,7 +78,7 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         connector.fSetLeverage(symbol, getConfig().leverage);
 
         Log.info("Balance disponible %.4f %s", fGetBalanceAvailable().get(getConfig().quoteAsset), getConfig().quoteAsset);
-        connector.wuCreateEventOrderTradeUpdate(orderUpdate -> {
+        subscribeLive.add(connector.wuCreateEventOrderTradeUpdate(orderUpdate -> {
             if (!orderUpdate.symbol().equals(symbol)) {
                 return;
             }
@@ -93,7 +93,7 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
             // Es para que actualize la caché de binance al momentó de obtener los datos
             LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
             updateGrid();
-        }, null);
+        }));
         updateGrid();
         priceAlarm.start();
         executor.execute(() -> {
@@ -120,7 +120,6 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
     public void internalStop() {
         applyAttributes.clear();
         priceAlarm.stop();
-        connector.wuDeleteEventOrderTradeUpdate(null);
         connector.fCancelOrderAll(symbol);
     }
 

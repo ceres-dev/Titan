@@ -1,5 +1,6 @@
 package dev.cerez.titan.core.strategy.funding.neutral;
 
+import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -7,6 +8,7 @@ import org.jetbrains.annotations.Blocking;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
@@ -26,6 +28,7 @@ public class BlockerForSpread {
     private volatile BigDecimal currentSpreadEntry = BigDecimal.ZERO;
     @Getter
     private volatile BigDecimal currentSpreadExit = BigDecimal.ZERO;
+    private final LinkedList<BaseConnector.WebSocketSubscribe> responsesWebSocket = new LinkedList<>();
 
     @Blocking
     public void waitEntrySpred(BigDecimal target) {
@@ -72,8 +75,8 @@ public class BlockerForSpread {
             /*
              * Es importante crear ambas suscripciones antes de bloquear.
              */
-            connector.wfCreateBookTicker(futuresListener, null, symbol);
-            connector.wsCreateBookTicker(spotListener, null, symbol);
+            responsesWebSocket.add(connector.wfCreateBookTicker(futuresListener, symbol));
+            responsesWebSocket.add(connector.wsCreateBookTicker(spotListener, symbol));
 
             /*
              * Puede que el spread ya cumpla el objetivo antes
@@ -84,8 +87,7 @@ public class BlockerForSpread {
                 LockSupport.park(this);
             }
         } finally {
-            connector.wsRemoveBookTicker(null, symbol);
-            connector.wfRemoveBookTicker(null, symbol);
+            responsesWebSocket.forEach(BaseConnector.WebSocketSubscribe::revoke);
             connector.stop();
         }
     }

@@ -1,5 +1,6 @@
 package dev.cerez.titan.core.strategy.grid;
 
+import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.utils.Switch;
 import lombok.Getter;
@@ -13,10 +14,11 @@ import java.util.*;
 public class PriceAlarm implements Switch {
 
     @Getter
-    private boolean running = false;
+    private volatile boolean running = false;
     private final BinanceConnector connector;
     private final String symbol;
     private final Set<Alarm> alarms = Collections.synchronizedSet(new HashSet<>());
+    private BaseConnector.WebSocketSubscribe subscribe;
 
     public void addAlarm(boolean forBuy, @NotNull BigDecimal price, @NotNull Runnable runnable) {
         synchronized (alarms) {
@@ -32,7 +34,7 @@ public class PriceAlarm implements Switch {
     public void start() {
         if (running) return;
         running = true;
-        connector.wfCreateBookTicker((bookTick -> {
+        subscribe = connector.wfCreateBookTicker((bookTick -> {
             List<Alarm> triggered = new ArrayList<>(12);
             synchronized (alarms) {
                 for (Alarm alarm : alarms) {
@@ -50,14 +52,14 @@ public class PriceAlarm implements Switch {
             for (Alarm alarm : triggered) {
                 alarm.runnable().run();
             }
-        }), null, symbol);
+        }), symbol);
     }
 
     @Override
     public void stop() {
         if (!running) return;
         running = false;
-        connector.wfRemoveBookTicker(null, symbol);
+        subscribe.revoke();
         alarms.clear();
     }
 

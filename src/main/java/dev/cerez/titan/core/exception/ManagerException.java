@@ -5,8 +5,8 @@ import lombok.Getter;
 @Getter
 public abstract class ManagerException extends FrontendException {
 
-    public ManagerException(String message, int codeApi, int status) {
-        super(message, codeApi, status);
+    public ManagerException(String message, int status) {
+        super(message, -1, status);
     }
 
 }

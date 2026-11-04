@@ -1,6 +1,7 @@
 async function loadBalance() {
     try {
         const response = await fetch("/api/balance");
+        websSocket.subscribe("BALANCE");
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }

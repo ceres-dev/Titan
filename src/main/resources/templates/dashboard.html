@@ -4,6 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Titan Dashboard</title>
+
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+
     <meta name="robots" content="noindex">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!--Local (ignorame)-->
@@ -164,6 +168,7 @@
 
 <pre id="output"></pre>
 <script src="/script/utils.js"></script>
+<script src="/script/websocket.js"></script>
 <script src="/script/requestBalance.js"></script>
 <script src="/script/requestStrategy.js"></script>
 <script src="/script/requestTime.js"></script>
@@ -172,13 +177,8 @@
 <script src="/script/requestTelemetry.js"></script>
 <script src="/script/requestAccount.js"></script>
 <script src="/script/transfer.js"></script>
-<script src="/script/websocket.js"></script>
 <script src="/script/breadcrumb.js"></script>
 <script src="/script/window.js"></script>
-
-<script>
-    startWebSocket()
-</script>
 
 </body>
 </html>

@@ -49,6 +49,23 @@ function formatMiliSeconds(ms) {
 
     return resultado.join(' ');
 }
+async function apiFetch(url, options = {}) {
+
+    const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+
+    const headers = new Headers(options.headers || {});
+
+    if (csrfToken && csrfHeader) {
+        headers.set(csrfHeader, csrfToken);
+    }
+    console.log(url)
+    return fetch(url, {
+        ...options,
+        headers,
+        credentials: "same-origin"
+    });
+}
 
 window.utils = {
     trunc: trunc,
@@ -56,4 +73,5 @@ window.utils = {
     pad: pad,
     formatBytes: formatBytes,
     formatMiliSeconds: formatMiliSeconds,
+    apiFetch: apiFetch
 }

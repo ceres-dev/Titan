@@ -66,7 +66,7 @@ public class ApiController {
     }
 
     @PostMapping("/transfer")
-    private ResponseEntity<Void> transfer(@AuthenticationPrincipal TitanUserDetails user,
+    public ResponseEntity<Void> transfer(@AuthenticationPrincipal TitanUserDetails user,
                                           @NotNull @RequestParam String asset,
                                           @NotNull @RequestParam BigDecimal amount,
                                           @NotNull @RequestParam String direction
@@ -89,21 +89,32 @@ public class ApiController {
         return ResponseEntity.ok().build();
     }
 
-//    @PostMapping("/stopAllSrategy")
-//    public ResponseEntity<Void> stopAll(@AuthenticationPrincipal TitanUserDetails user) {
-//        getPort(user).getStrategy().forEach(Switch::stop);
-//        return ResponseEntity.ok().build();
-//    }
-//
-//    @PostMapping("/stopSrategy")
-//    public ResponseEntity<Void> stop(@AuthenticationPrincipal TitanUserDetails user, @RequestParam("id") String id) {
-//        return Utils.findManager(getPort(user), id, Switch::stop);
-//    }
-//
-//    @PostMapping("/startStrategy")
-//    public ResponseEntity<Void> start(@AuthenticationPrincipal TitanUserDetails user, @RequestParam("id") String id) {
-//        return Utils.findManager(getPort(user), id, Switch::start);
-//    }
+    @PostMapping("/subscribe")
+    public ResponseEntity<Void> subscribe(@AuthenticationPrincipal TitanUserDetails user,
+                                          @NotNull @RequestParam String subscribe
+    ){
+        try {
+            EnvironmentManager.EnvironmentPort.Subscribe.valueOf(subscribe);
+        }catch (IllegalArgumentException e){
+            return ResponseEntity.badRequest().build();
+        }
+        getPort(user).subscribe(EnvironmentManager.EnvironmentPort.Subscribe.valueOf(subscribe));
+        return  ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/subscribe")
+    public ResponseEntity<Void> unsubscribe(@AuthenticationPrincipal TitanUserDetails user,
+                                          @NotNull @RequestBody String subscribe
+    ){
+        try {
+            EnvironmentManager.EnvironmentPort.Subscribe.valueOf(subscribe);
+        }catch (IllegalArgumentException e){
+            return ResponseEntity.badRequest().build();
+        }
+        getPort(user).unsubscribe(EnvironmentManager.EnvironmentPort.Subscribe.valueOf(subscribe));
+        return  ResponseEntity.ok().build();
+    }
+
 
     private @NotNull EnvironmentManager.EnvironmentPort getPort(@NotNull TitanUserDetails user) {
         return titan.getEnvironmentManager(user.getId()).getPort();

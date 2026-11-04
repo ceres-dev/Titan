@@ -106,7 +106,7 @@ public final class BinanceConnector extends BaseConnector {
         }else {
             stream = "";
         }
-        String key = wwsURL + (stream.isEmpty() ? "" : "@") + stream;
+        String key = wwsURL + (stream.isEmpty() ? "" : "/") + stream;
 
         Collection<Consumer<JsonNode>> consumerSet = consumerStreamsMap.computeIfAbsent(key, k -> new HashMap<>()).values();
         if (!consumerSet.isEmpty()) {
@@ -119,10 +119,8 @@ public final class BinanceConnector extends BaseConnector {
         }
         // Es una repuesta de una solicitud
         JsonNode nodeId = node.get("id");
-//        System.out.println(nodeId + " -> " + node);
         if (nodeId != null){
             Consumer<JsonNode> consumer = webSockets.get(wwsURL).getPendingResponse().remove(nodeId.asText());
-//            System.out.println("Accept Id: " + nodeId);
             if (consumer != null) consumer.accept(node);
         }
     }
@@ -464,27 +462,26 @@ public final class BinanceConnector extends BaseConnector {
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
     }
 
-    public void wsCreateBookTicker(@NotNull Consumer<BookTick> consumer, @Nullable String id, @NotNull String symbol){
+    public @NotNull BaseConnector.WebSocketSubscribe wsCreateBookTicker(@NotNull Consumer<BookTick> consumer, @NotNull String symbol){
         UUID uuid = UUID.randomUUID();
         String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
-        String defaultName = Utils.getClassNameCallPrevious();
-        if (addConsumerStreams(sGetWWS() + "@" + stream, Objects.requireNonNullElse(id, defaultName), (payload) -> {
+        streams.put(uuid, stream);
+        if (addConsumerStreams(sGetWWS() + "/" + stream, uuid, (payload) -> {
             String[] split = payload.toString().split("\"");
             consumer.accept(new BookTick(new BigDecimal(split[9]), new BigDecimal(split[13]), new BigDecimal(split[17]), new BigDecimal(split[21])));
         }, false))
             sendWebSocket(sGetWWS(), """
                     {"method": "SUBSCRIBE","params": ["%s"],"id": "%s"}
                     """.formatted(stream, uuid.toString().replace("-", "")));
+        return new WebSocketSubscribe(uuid, this::wsRemoveBookTicker);
     }
 
-    public void wsRemoveBookTicker(@Nullable String id, @NotNull String symbol) {
-        UUID uuid = UUID.randomUUID();
-        String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
-        String defaultName = Utils.getClassNameCallPrevious();
-        if (removeConsumerStreams(sGetWWS() + "@" + stream, Objects.requireNonNullElse(id, defaultName)))
+    public void wsRemoveBookTicker(@NotNull UUID id) {
+        String stream = streams.get(id);
+        if (removeConsumerStreams(sGetWWS() + "/" + stream, id))
             sendWebSocket(sGetWWS(), """
                     {"method": "UNSUBSCRIBE","params": ["%s"],"id": "%s"}
-                    """.formatted(stream, uuid.toString().replace("-", "")));
+                    """.formatted(stream, UUID.randomUUID().toString().replace("-", "")));
     }
 
     private @NotNull String fGetHTTPS(){
@@ -503,23 +500,23 @@ public final class BinanceConnector extends BaseConnector {
         return BASE_FUTURE_WWS_USERDATA.formatted(listenKey);
     }
 
-    public @NotNull @Unmodifiable Map<String, BigDecimal> fGetBalanceAvailable() {
+    public @NotNull Map<String, BigDecimal> fGetBalanceAvailable() {
         JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/balance");
         Map<String, BigDecimal> result = new HashMap<>();
         for (JsonNode node : raw){
             BigDecimal balance =  new BigDecimal(node.get("maxWithdrawAmount").asText());
             result.put(node.get("asset").asText(), balance);
         }
-        return Map.copyOf(result);
+        return result;
     }
 
-    public @NotNull @Unmodifiable Map<String, BigDecimal> fGetBalanceValued() {
+    public @NotNull Map<String, BigDecimal> fGetBalanceValued() {
         JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/balance");
         Map<String, BigDecimal> result = new HashMap<>();
         for (JsonNode node : raw){
             result.put(node.get("asset").asText(), new BigDecimal(node.get("balance").asText()));
         }
-        return Map.copyOf(result);
+        return result;
     }
 
     @Contract(pure = true)
@@ -823,27 +820,26 @@ public final class BinanceConnector extends BaseConnector {
         sendSignedRequest(fGetHTTPS(), Method.DELETE, "/fapi/v1/listenKey");
     }
 
-    public void wfCreateBookTicker(@NotNull Consumer<BookTick> consumer, @Nullable String id, @NotNull String symbol) {
+    public @NotNull BaseConnector.WebSocketSubscribe wfCreateBookTicker(@NotNull Consumer<BookTick> consumer, @NotNull String symbol) {
         UUID uuid = UUID.randomUUID();
         String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
-        String defaultName = Utils.getClassNameCallPrevious();
-        if (addConsumerStreams(fGetWWStream() + "@" + stream, Objects.requireNonNullElse(id, defaultName), (payload) -> {
+        streams.put(uuid, stream);
+        if (addConsumerStreams(fGetWWStream() + "/" + stream, uuid, (payload) -> {
             String[] split = payload.toString().split("\"");
             consumer.accept(new BookTick(new BigDecimal(split[17]), new BigDecimal(split[21]), new BigDecimal(split[25]), new BigDecimal(split[29])));
         }, true))
             sendWebSocket(fGetWWStream(), """
                     {"method":"SUBSCRIBE","params":["%s"],"id":"%s"}
                     """.formatted(stream, uuid.toString().replace("-", "")));
+        return new WebSocketSubscribe(uuid, this::wfRemoveBookTicker);
     }
 
-    public void wfRemoveBookTicker(@Nullable String id, @NotNull String symbol) {
-        UUID uuid = UUID.randomUUID();
-        String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
-        String defaultName = Utils.getClassNameCallPrevious();
-        if (removeConsumerStreams(fGetWWStream() + "@" + stream, Objects.requireNonNullElse(id, defaultName)))
+    public void wfRemoveBookTicker(@NotNull UUID id) {
+        String stream = streams.get(id);
+        if (removeConsumerStreams(fGetWWStream() + "/" + stream, id))
             sendWebSocket(fGetWWStream(), """
                     {"method":"UNSUBSCRIBE","params":["%s"],"id":"%s"}
-                    """.formatted(stream, uuid.toString().replace("-", "")));
+                    """.formatted(stream, UUID.randomUUID().toString().replace("-", "")));
     }
 
     public CompletableFuture<JsonNode> wfSendOrderToMkt(@NotNull String symbol, @NotNull SideOrder sideOrder, BigDecimal amountBase, @Nullable String nameOrder, boolean reduceOnly) throws ReduceOnlyRejectException {
@@ -857,10 +853,10 @@ public final class BinanceConnector extends BaseConnector {
         return sendSignedWebSocketRequest(fGetWWS(), "order.place", params);
     }
 
-    public void wuCreateEventOrderTradeUpdate(Consumer<OrderUpdate> consumer, @Nullable Object id){
-        String defaultName = Utils.getClassNameCallPrevious();
+    public @NotNull BaseConnector.WebSocketSubscribe wuCreateEventOrderTradeUpdate(Consumer<OrderUpdate> consumer){
         String type = "ORDER_TRADE_UPDATE";
-        addConsumerStreams(uGetWWS(), Objects.requireNonNullElse(createId(id), defaultName) + "-" + type, (payload) -> {
+        UUID uuid = UUID.randomUUID();
+        addConsumerStreams(uGetWWS(), uuid, (payload) -> {
             if (payload.get("e").asText().equals(type)) {
                 JsonNode node = payload.get("o");
                 StatusOrder statusOrder = StatusOrder.parse(node.get("x").asText());
@@ -871,28 +867,26 @@ public final class BinanceConnector extends BaseConnector {
                 consumer.accept(new OrderUpdate(nameOrder, symbol, sideOrder, statusOrder));
             }
         }, true);
+        return new WebSocketSubscribe(uuid, this::wuDeleteEventOrderTradeUpdate);
     }
 
-    public void wuDeleteEventOrderTradeUpdate(@Nullable Object id) {
-        String defaultName = Utils.getClassNameCallPrevious();
-        String type = "ORDER_TRADE_UPDATE";
-        removeConsumerStreams(uGetWWS(), Objects.requireNonNullElse(createId(id), defaultName) + "-" + type);
+    public void wuDeleteEventOrderTradeUpdate(@NotNull UUID id) {
+        removeConsumerStreams(uGetWWS(), id);
     }
 
-    public void wuCreateEventAccountUpdate(Consumer<JsonNode> consumer, @Nullable Object id){
-        String defaultName = Utils.getClassNameCallPrevious();
-        String type = "ACCOUNT_UPDATE"; //TODO: cambiar el ide
-        addConsumerStreams(uGetWWS(), Objects.requireNonNullElse(createId(id), defaultName) + "-" + type, (payload) -> {
+    public @NotNull BaseConnector.WebSocketSubscribe wuCreateEventAccountUpdate(Consumer<JsonNode> consumer){
+        String type = "ACCOUNT_UPDATE";
+        UUID uuid = UUID.randomUUID();
+        addConsumerStreams(uGetWWS(), uuid, (payload) -> {
             if (payload.get("e").asText().equals(type)) {
                 consumer.accept(payload);
             }
         }, true);
+        return new WebSocketSubscribe(uuid, this::wuDeleteEventAccountUpdate);
     }
 
-    public void wuDeleteEventAccountUpdate(@Nullable Object id) {
-        String defaultName = Utils.getClassNameCallPrevious();
-        String type = "ACCOUNT_UPDATE";
-        removeConsumerStreams(uGetWWS(), Objects.requireNonNullElse(createId(id), defaultName) + "-" + type);
+    public void wuDeleteEventAccountUpdate(@NotNull UUID id) {
+        removeConsumerStreams(uGetWWS(), id);
     }
 
     public boolean cPossibleConvert(@NotNull String fromAsset, @NotNull String toAsset) {
@@ -1156,7 +1150,7 @@ public final class BinanceConnector extends BaseConnector {
 
     public record FundingRate(String symbol, FundingConfig config, BigDecimal nextFundingRate, long nextFundingTime) {
         public @NotNull BigDecimal rate24h(){
-            return nextFundingRate.multiply(BigDecimal.valueOf(24d / config.interval)) ;
+            return nextFundingRate.multiply(BigDecimal.valueOf(24d / config.interval));
         }
 
         public @NotNull BigDecimal rate24hAbs(){

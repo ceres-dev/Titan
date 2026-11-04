@@ -11,10 +11,7 @@ import dev.cerez.titan.connector.exception.NotSetApiKeysException;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.BaseConfig;
-import dev.cerez.titan.utils.Nameable;
-import dev.cerez.titan.utils.Provider;
-import dev.cerez.titan.utils.TemporalRefence;
-import dev.cerez.titan.utils.Utils;
+import dev.cerez.titan.utils.*;
 import dev.cerez.titan.utils.telemtry.TelemetryConnector;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -49,13 +46,14 @@ public abstract class BaseConnector implements Connector {
     @NotNull protected final TemporalRefence<Map<String, Symbol>> cachedSymbols = new TemporalRefence<>(TimeUnit.MINUTES, 5);
     @NotNull protected final ExecutorService executor = Executors.newFixedThreadPool(8, Utils.getThreadFactory(this));
     @NotNull protected final Map<String, WebSocketContainer> webSockets = new HashMap<>();
+    @NotNull protected final ConcurrentMap<UUID, String> streams = new ConcurrentHashMap<>();
     @Getter
     @NotNull protected final ConnectorConfig config;
     @Setter  protected       TelemetryConnector telemetry;
 
     @NotNull private   final Object streamIncomingLock = new Object();
     @NotNull private   final StringBuilder streamIncomingMessage = new StringBuilder();
-    @NotNull protected final Map<String, Map<String, Consumer<JsonNode>>> consumerStreamsMap = new ConcurrentHashMap<>();
+    @NotNull protected final Map<String, Map<UUID, Consumer<JsonNode>>> consumerStreamsMap = new ConcurrentHashMap<>();
     @Getter
     @NotNull protected final RateLimit rateLimitFuture = new RateLimit();
     @Getter
@@ -323,7 +321,6 @@ public abstract class BaseConnector implements Connector {
 
         sendWebSocket(url, request.toString());
         CompletableFuture<JsonNode> future = new CompletableFuture<>();
-//            System.out.println("id: " + id + " Send: " + request);
         webSockets.get(url).getPendingResponse().put(id.toString(), future::complete);
         return future;
     }
@@ -537,8 +534,8 @@ public abstract class BaseConnector implements Connector {
         }
     }
 
-    protected boolean removeConsumerStreams(@NotNull String key, @NotNull String id) {
-        Map<String, Consumer<JsonNode>> consumerMap = consumerStreamsMap.get(key);
+    protected boolean removeConsumerStreams(@NotNull String key, @NotNull UUID id) {
+        Map<UUID, Consumer<JsonNode>> consumerMap = consumerStreamsMap.get(key);
         consumerMap.remove(id);
         if (consumerMap.isEmpty()) {
             consumerStreamsMap.remove(key);
@@ -548,7 +545,7 @@ public abstract class BaseConnector implements Connector {
         }
     }
 
-    protected boolean addConsumerStreams(@NotNull String key, @NotNull String id, @NotNull Consumer<JsonNode> consumer, boolean muliThreading) {
+    protected boolean addConsumerStreams(@NotNull String key, @NotNull UUID id, @NotNull Consumer<JsonNode> consumer, boolean muliThreading) {
         final AtomicBoolean isNew = new AtomicBoolean(false);
         if (muliThreading) {
             consumerStreamsMap.computeIfAbsent(key, k -> {
@@ -562,24 +559,6 @@ public abstract class BaseConnector implements Connector {
             }).put(id, consumer);
         }
         return isNew.get();
-    }
-
-    @Contract(value = "null -> null; !null -> !null")
-    protected String createId(Object o){
-        switch (o) {
-            case null -> {
-                return null;
-            }
-            case String s -> {
-                return s;
-            }
-            case Nameable n -> {
-                return o.getClass().getSimpleName() + ":" + n.getName();
-            }
-            default -> {
-            }
-        }
-        return o.toString();
     }
 
     protected void onResponseHttps(@NotNull String url, @NotNull HttpResponse<String> response) {}
@@ -619,6 +598,18 @@ public abstract class BaseConnector implements Connector {
 
         public boolean isOpen(){
             return !isClosed();
+        }
+    }
+
+    @RequiredArgsConstructor
+    public static class WebSocketSubscribe implements Revocable {
+        @Getter
+        private final UUID id;
+        private final Consumer<UUID> revoke;
+
+        @Override
+        public void revoke(){
+            revoke.accept(id);
         }
     }
 

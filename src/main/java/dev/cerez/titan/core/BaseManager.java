@@ -9,6 +9,7 @@ import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.Storage;
 import dev.cerez.titan.storage.StorageProfiler;
 import dev.cerez.titan.utils.NoAutoRegister;
+import dev.cerez.titan.utils.Revocable;
 import dev.cerez.titan.utils.Utils;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -65,10 +66,11 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
         }
     }
 
-    public void registerListener(@NotNull Listener listener){
+    public Revocable registerListener(@NotNull Listener listener){
         synchronized (listeners){
             listeners.add(listener);
         }
+        return () -> listeners.remove(listener);
     }
 
     @Override

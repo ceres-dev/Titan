@@ -38,7 +38,7 @@ public class TriangularCommand extends BaseCommand implements ProfilerSetup {
                 .maxSymbolsHighVolumen(900)
                 .maxSymbolsLowVolumen(90)
                 .banAssets(Set.of("TRY"))
-                .maxCycleLength(3)
+                .maxCycleLength(4)
                 .minCycleLength(3)
                 .engine(SearchTriangularEngineJava.class)
                 .build();

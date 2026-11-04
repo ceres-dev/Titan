@@ -101,7 +101,7 @@ public class ExecutorCycles implements AutoCloseable {
 
         HashSet<String> tradable = new HashSet<>();
         for (Symbol s : connector.sGetAllSymbols().values()) {
-            if (Boolean.TRUE.equals(s.getIsAllowTrading())) tradable.add(s.name());
+            if (s.getIsAllowTrading()) tradable.add(s.name());
         }
         this.tradableSymbols = Collections.unmodifiableSet(tradable);
 

@@ -1,6 +1,7 @@
 async function loadTelemetry() {
     try {
         const response = await fetch("/api/telemetry");
+        websSocket.subscribe("TELEMETRY");
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }

@@ -255,4 +255,26 @@ public class Utils {
         }
         return null;
     }
+
+    @Contract(value = "null, _ -> null; !null, _ -> !null")
+    public String createId(Object o, String... append){
+        switch (o) {
+            case null -> {
+                return null;
+            }
+            case String s -> {
+                return s;
+            }
+            case Nameable n -> {
+                return o.getClass().getSimpleName() + ":" + n.getName();
+            }
+            default -> {
+            }
+        }
+        if (append != null && append.length > 0) {
+            return o + ":" + String.join("-", append);
+        }else {
+            return o.toString();
+        }
+    }
 }
