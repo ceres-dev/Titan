@@ -7,8 +7,7 @@ import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.BasePersistent;
-import dev.cerez.titan.core.ManagerStrategy;
-import dev.cerez.titan.core.event.events.FundingNeutralManagerListener;
+import dev.cerez.titan.core.StrategyManager;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.storage.StorageManager;
@@ -29,7 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public final class FundingNeutralManager extends ManagerStrategy<FundingNeutralManager.FundingManagerConfiguration, FundingNeutralManager.FundingManagerPersistan, BinanceConnector, FundingNeutralManagerListener> implements StatusProfiler {
+public final class FundingNeutralManager extends StrategyManager<FundingNeutralManager.FundingManagerConfiguration, FundingNeutralManager.FundingManagerPersistan, BinanceConnector> implements StatusProfiler {
 
     @NotNull private final InputUser inputUser = new InputUser();
     @NotNull private final String baseAsset;

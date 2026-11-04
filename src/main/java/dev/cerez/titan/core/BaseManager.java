@@ -1,6 +1,7 @@
 package dev.cerez.titan.core;
 
 import dev.cerez.titan.TitanApplication;
+import dev.cerez.titan.core.event.EventManager;
 import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.log.Log;
@@ -14,6 +15,7 @@ import dev.cerez.titan.utils.Utils;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.experimental.Delegate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,16 +37,31 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
     @Getter @Setter @NotNull protected String name = id.toString();
     @Getter @Setter(value = AccessLevel.NONE) protected volatile boolean running = false;
     @Getter protected final TypeManager typeManager;
-    @Getter @Setter protected EnvironmentManager environmentManager;
-    @Getter @NotNull protected final Set<Listener> listeners;
+    @Getter final private EnvironmentManager environmentManager;
+    @Getter @Delegate final private EventManager eventManager;
 
     protected BaseManager(@NotNull StorageProfiler<C, P> storageProfiler, @NotNull O connector, @NotNull TypeManager typeManager) {
         this.configStorage = storageProfiler.config();
         this.persistenceStorage = storageProfiler.persistent();
         this.connector = connector;
         this.typeManager = typeManager;
-        this.listeners = new HashSet<>();
-        autoRegister();
+        {
+            if (this instanceof NoAutoRegister) {
+                environmentManager = null;
+                eventManager = null;
+                return;
+            }
+
+            UUID uuid = Utils.getUserUUUIDByThread();
+            if (uuid != null) {
+                EnvironmentManager environment = TitanApplication.getInstance().getEnvironmentManager(uuid);
+                if (environment != null) environment.registerManager(this);
+                environmentManager = environment;
+            }else environmentManager = null;
+
+            if (environmentManager != null) eventManager = environmentManager.getEventManager();
+            else eventManager = null;
+        }
     }
 
     @Nullable private volatile C cacheConfig = null;
@@ -66,13 +83,6 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
         }
     }
 
-    public Revocable registerListener(@NotNull Listener listener){
-        synchronized (listeners){
-            listeners.add(listener);
-        }
-        return () -> listeners.remove(listener);
-    }
-
     @Override
     public void start() {
         if (running)return;
@@ -91,27 +101,6 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
         Log.info("<cian>Deteniendo: %s:%s", this.getClass().getSimpleName(), getName());
         CompletableFuture.runAsync(this::internalStop, executor).join();
         Log.info("<green>Detenido: %s:%s %.2fs", this.getClass().getSimpleName(), getName(), (System.currentTimeMillis() - currentTime) / 1000d);
-    }
-
-    @Override
-    public void registerEnvironment(@NotNull EnvironmentManager environment) {
-        this.environmentManager = environment;
-        environment.registerManager(this);
-    }
-
-    private void autoRegister(){
-        if (this instanceof NoAutoRegister) {
-            return;
-        }
-
-        UUID uuid = Utils.getUserUUUIDByThread();
-        if (uuid != null) {
-            try {
-                EnvironmentManager environment = TitanApplication.getInstance().getEnvironmentManager(uuid);
-                if (environment != null) environment.registerManager(this);
-            }catch (Exception ignored){
-            }
-        }
     }
 
     protected abstract void internalStart();

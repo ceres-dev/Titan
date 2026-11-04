@@ -1,8 +1,8 @@
 package dev.cerez.titan.core.strategy.grid.attribute;
 
+import dev.cerez.titan.connector.model.order.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.GridBuilder;
 import dev.cerez.titan.core.strategy.grid.model.Context;
-import dev.cerez.titan.connector.model.order.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
@@ -14,8 +14,8 @@ import java.util.function.Function;
 @RequiredArgsConstructor
 public class ApplyAttributes {
 
-    private final List<BaseAttribute> attributes = new LinkedList<>();
-    private final GridBuilder gridBuilder;
+    @NotNull private final List<BaseAttribute> attributes = new LinkedList<>();
+    @NotNull private final GridBuilder gridBuilder;
 
     @Contract(value = "_ -> this")
     public @NotNull ApplyAttributes add(@NotNull BaseAttribute attribute) {

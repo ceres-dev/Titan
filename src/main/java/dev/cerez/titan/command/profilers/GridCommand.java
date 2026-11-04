@@ -3,7 +3,10 @@ package dev.cerez.titan.command.profilers;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.command.ProfilerSetup;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.core.event.EventHandler;
 import dev.cerez.titan.core.event.Listener;
+import dev.cerez.titan.core.event.events.Event;
+import dev.cerez.titan.core.event.events.manager.funding.time.*;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
@@ -63,26 +66,27 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
 
         discordConnector.setStatusProfiler(gridManager);
 
-        fundingOnTimeManager.registerListener(new Listener() {
-            @Override
-            public void onClosePosition() {
+        //noinspection unused
+        environmentManager.getEventManager().registerEvents(new Listener() {
+            @EventHandler
+            public void onClosePosition(ClosePositionEvent event) {
                 gridManager.start();
             }
-            @Override
-            public void onINeedMoney() {
+            @EventHandler
+            public void onOpenPosition(OpenPositionEvent event) {
+                discordConnector.sendMessage("Posición abierta ya sabes owo");
+            }
+            @EventHandler
+            public void onCollectBalance(CollectBalanceEvent event) {
                 gridManager.stop();
             }
-            @Override
-            public void onAbort() {
+            @EventHandler
+            public void onAbort(AbortEvent event) {
                 gridManager.start();
             }
-            @Override
-            public void onEndWindow(){
+            @EventHandler
+            public void onEndWindow(EndWindowEvent event) {
                 gridManager.start();
-            }
-            @Override
-            public void onOpenPosition() {
-                discordConnector.sendMessage("Posición abierta ya sabes owo");
             }
         });
 

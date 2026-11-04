@@ -3,14 +3,14 @@ package dev.cerez.titan.core.strategy.funding.time;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.core.StatusManager;
+import dev.cerez.titan.core.event.events.manager.funding.time.*;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.BaseConfig;
-import dev.cerez.titan.core.ManagerStrategy;
+import dev.cerez.titan.core.StrategyManager;
 import dev.cerez.titan.core.PersistentNope;
-import dev.cerez.titan.core.event.events.FundingOnTimeManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.Utils;
@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
-public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeManager.FundingManagerConfig, PersistentNope, BinanceConnector, FundingOnTimeManagerListener> {
+public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeManager.FundingManagerConfig, PersistentNope, BinanceConnector> {
 
     private final ConcurrentMap<String, SymbolTarget> symbolsPendingForClose = new ConcurrentHashMap<>();
 
@@ -80,8 +80,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
         setStatus(StatusManager.WAITING);
         LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
         setStatus(StatusManager.PREPARING);
-        callEvent(FundingOnTimeManagerListener::onPrepare);
-
+        callEvent(new EndWindowEvent(this));
         CompletableFuture<Map<String, BinanceConnector.FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
         CompletableFuture<RangeTime> remoteFuture = CompletableFuture.supplyAsync(() -> getDeltaClockRemote(TimeUnit.SECONDS, 20));
         CompletableFuture<Map<String, Symbol>> symbolsFuture = CompletableFuture.supplyAsync(connector::fGetAllSymbols);
@@ -111,18 +110,18 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
 
         if (targetLimited.isEmpty()) {
             Log.info("Abort: No funding rate found");
-            callEvent(FundingOnTimeManagerListener::onAbort);
+            callEvent(new AbortEvent(this));
             return;
         }
 
         if (targetLimited.size() < config.maxCompetition) {
             Log.info("Abort: Mucha competencia %d", targetLimited.size());
-            callEvent(FundingOnTimeManagerListener::onAbort);
+            callEvent(new AbortEvent(this));
             return;
         }
 
         // Preparación para mover fondo o cancelar otras ordenes
-        callEvent(FundingOnTimeManagerListener::onINeedMoney);
+        callEvent(new CollectBalanceEvent(this));
         // Esperar que se actualize la cache
         LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
         Map<String, BigDecimal> balanceAvailable = fGetBalanceAvailable();
@@ -132,7 +131,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
 
         if (config.getMaxQuantityQuote().compareTo(balance) >= 0){
             Log.info("Abort: Insufficient balance");
-            callEvent(FundingOnTimeManagerListener::onAbort);
+            callEvent(new AbortEvent(this));
             return;
         }
 
@@ -149,7 +148,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
 
             waitForFunding(remote, targets);
         } catch (Exception e) {
-            callEvent(FundingOnTimeManagerListener::onAbort);
+            callEvent(new AbortEvent(this));
             Log.warning("Abort: Error: %s", e);
         } finally {
             targets.forEach(SymbolTarget::finish);
@@ -165,9 +164,9 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
         long waitFinal = fundingTimeLocal - config.windowSize;
         long currentTimeFinal = System.currentTimeMillis();
         long deltaWaitFinal = waitFinal - currentTimeFinal;
-        executor.schedule(() -> callEvent(FundingOnTimeManagerListener::onEndWindow), deltaWaitFinal + 5_000, TimeUnit.MILLISECONDS);
+        executor.schedule(() -> callEvent(new EndWindowEvent(this)), deltaWaitFinal + 5_000, TimeUnit.MILLISECONDS);
         if (deltaWaitFinal < 2_000){
-            callEvent(FundingOnTimeManagerListener::onAbort);
+            callEvent(new AbortEvent(this));
             Log.warning("Abort: out window final %dms", deltaWaitFinal);
             return;
         }
@@ -308,12 +307,12 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
 
             if (quantityQuoteMax.compareTo(quantityQuote) <= 0){
                 Log.warning("Abort: max Quantity %.4f > %.4f", quantityQuote, quantityQuoteMax);
-                callEvent(FundingOnTimeManagerListener::onAbort);
+                callEvent(new AbortEvent(FundingOnTimeManager.this));
             }
 
             Log.info("Send order open: %s".formatted(target.symbol()));
             if (config.isSendTrade()) {
-                callEvent(FundingOnTimeManagerListener::onOpenPosition);
+                callEvent(new OpenPositionEvent(FundingOnTimeManager.this));
                 connector.fSendOrderToMkt(target.symbol(), sideOpen, quantityBase, null, false);
                 this.order = new OrderToClosePosition(target.symbol(), quantityBase, sideClose, System.currentTimeMillis());
                 Log.info("Posición Abierta");
@@ -353,7 +352,6 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
                 Log.exception(e);
             }finally {
                 closePositionCheck();
-                callEvent(FundingOnTimeManagerListener::onClosePosition);
             }
         }
 
@@ -361,6 +359,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
             BinanceConnector.FuturePosition position = connector.fGetPosition(target.symbol());
             if (position == null) {
                 Log.info("Cierre de la posición exitoso");
+                callEvent(new ClosePositionEvent(FundingOnTimeManager.this));
                 return;
             }
             Log.info("Posición abierta: %s", position);
@@ -394,6 +393,7 @@ public final class FundingOnTimeManager extends ManagerStrategy<FundingOnTimeMan
             })).join();
             if (isOk.get()) {
                 Log.info("Cierre de la posición exitoso");
+                callEvent(new ClosePositionEvent(FundingOnTimeManager.this));
                 return;
             }
             // Una pequeña espera para que se actualize la cache

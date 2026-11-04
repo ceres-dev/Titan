@@ -10,10 +10,13 @@ import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.ConfigNope;
 import dev.cerez.titan.core.Manager;
-import dev.cerez.titan.core.ManagerStrategy;
+import dev.cerez.titan.core.StrategyManager;
 import dev.cerez.titan.core.PersistentNope;
+import dev.cerez.titan.core.event.EventHandler;
+import dev.cerez.titan.core.event.EventManager;
+import dev.cerez.titan.core.event.EventPriority;
 import dev.cerez.titan.core.event.Listener;
-import dev.cerez.titan.core.event.events.EnvironmentManagerListener;
+import dev.cerez.titan.core.event.events.manager.ChangeStatusEvent;
 import dev.cerez.titan.core.exception.AlreadySubscribedException;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.DiscordConnector;
@@ -30,13 +33,12 @@ import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.function.Function;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public final class EnvironmentManager extends ManagerStrategy<ConfigNope, PersistentNope, BinanceConnector, EnvironmentManagerListener> implements Ownership, NoAutoRegister {
+public final class EnvironmentManager extends StrategyManager<ConfigNope, PersistentNope, BinanceConnector> implements Ownership, NoAutoRegister {
 
     @NotNull
     private final UUID idOwner;
@@ -50,13 +52,13 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
     private final long uptime = System.currentTimeMillis();
     private WebSocketServer webSocketServer = WebSocketServer.empty();
     private final Set<Subscribable> subscriptions = ConcurrentHashMap.newKeySet();
-    private final Set<Listener> listenersAnyEvents = ConcurrentHashMap.newKeySet();
+    private final EventManager eventManager = new EventManager();
 
     private EnvironmentManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector binanceConnector, @NotNull UUID idOwner) {
         super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), binanceConnector, TypeManager.ENVIRONMENT);
         this.storageManager = storageManager;
         this.idOwner = idOwner;
-        this.commandHandler = new CommandHander(this);
+        this.commandHandler = new CommandHander();
         TelemetryCollector.TelemetryConfig config = TelemetryCollector.TelemetryConfig.builder()
                 .maxDelaysDeltaComputeNanoTime(100)
                 .stepsAddDelayComputeNanoTime(5)
@@ -82,13 +84,15 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
                                 .build()
                 )
         );
-        var environment = new EnvironmentManager(
-                storageManager,
-                binanceConnector,
-                idUser
-        );
-        environment.start();
-        return environment;
+        return CompletableFuture.supplyAsync(() -> {
+            var environment = new EnvironmentManager(
+                    storageManager,
+                    binanceConnector,
+                    idUser
+            );
+            environment.start();
+            return environment;
+        }, Executors.newSingleThreadExecutor(Utils.getThreadFactory(new Object(), idUser))).join();
     }
 
     @Override
@@ -107,25 +111,11 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
         getPort().unsubscribe(null);
     }
 
-    @Override
-    public void registerEnvironment(@NotNull EnvironmentManager manager){
-        throw new IllegalStateException();
-    }
-
     public void registerManager(@NotNull Manager<?, ?> @NotNull... manager) {
         for (Manager<?, ?> m : manager) {
-            if (!this.equals(m.getEnvironmentManager())) m.setEnvironmentManager(this);
+            if (this.equals(m.getEnvironmentManager())) return;
             managerMap.put(m.getId(), m);
             Log.info("Manager Registrado: name=%s type=%s".formatted(m.getName(), m.getClass().getSimpleName()));
-            // TODO: Esto debe estar dentro de STRATEGY
-            if (m instanceof ManagerStrategy<?, ?, ?, ?> strategy){
-                strategy.registerListener(new Listener() {
-                    @Override
-                    public void changeStatus() {
-                        webSocketServer.sendMessage(getPort().getStrategy());
-                    }
-                });
-            }
         }
     }
 
@@ -154,7 +144,7 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
         }
 
         public @NotNull List<Strategy> getStrategy() {
-            return managerMap.values().stream().filter(m -> m instanceof ManagerStrategy<?,?,?,?>).map(m -> (ManagerStrategy<?,?,?,?>) m).map(m -> new Strategy(m.getId(), m.getTypeManager(), m.getName(), m.getClass().getSimpleName(), m.getStatus())).toList();
+            return managerMap.values().stream().filter(m -> m instanceof StrategyManager<?,?,?>).map(m -> (StrategyManager<?,?,?>) m).map(m -> new Strategy(m.getId(), m.getTypeManager(), m.getName(), m.getClass().getSimpleName(), m.getStatus())).toList();
         }
 
         public Time getTime(){
@@ -281,12 +271,13 @@ public final class EnvironmentManager extends ManagerStrategy<ConfigNope, Persis
                     manager.connector.wuCreateEventAccountUpdate((update) -> manager.webSocketServer.sendMessage(manager.getPort().getBalance()))
             )),
             TELEMETRY(manager -> List.of(Revocable.from(manager.executor.scheduleAtFixedRate(() -> manager.webSocketServer.sendMessage(manager.getPort().getTelemetry()), 5, 5, TimeUnit.SECONDS)))),
-//            STRATEGY(manager -> manager.managerMap.values().stream().filter(m -> m instanceof ManagerStrategy<?,?,?,?>).map(m -> (ManagerStrategy<?,?,?,?>) m).map(strategy -> strategy.registerListener(new Listener() {
-//                @Override
-//                public void changeStatus() {
-//                    manager.webSocketServer.sendMessage(manager.getPort().getStrategy());
-//                }
-//            })).toList()),
+            STRATEGY(manager -> List.of(manager.getEventManager().registerEvents(new Listener() {
+                @SuppressWarnings("unused")
+                @EventHandler(priority = EventPriority.MONITOR)
+                public void changeStatus(ChangeStatusEvent event) {
+                    manager.webSocketServer.sendMessage(manager.getPort().getStrategy());
+                }
+            }))),
             LOGS(manager -> List.of(Log.CONSUMER_APPENDER.addConsumer((log) -> manager.webSocketServer.sendMessage(List.of(new LogRecord(Utils.cleanAnsi(log.getMessage()), log.getThreadName(), log.getLevel().toString(), log.getTimeStamp()))))));
 
             public final Function<EnvironmentManager, List<Revocable>> onSubscribe;

@@ -5,10 +5,9 @@ import dev.cerez.titan.connector.model.AssetRate;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.connector.model.Volume24H;
-import dev.cerez.titan.core.ManagerStrategy;
+import dev.cerez.titan.core.StrategyManager;
 import dev.cerez.titan.core.PersistentNope;
 import dev.cerez.titan.core.StatusManager;
-import dev.cerez.titan.core.event.events.TriangularManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
 import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularEngineJava;
@@ -27,7 +26,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 
-public final class TriangularManager extends ManagerStrategy<TriangularManager.TriangularManagerConfiguration, PersistentNope, Connector, TriangularManagerListener> implements StatusProfiler {
+public final class TriangularManager extends StrategyManager<TriangularManager.TriangularManagerConfiguration, PersistentNope, Connector> implements StatusProfiler {
 
     @Setter @Nullable private SearchTriangularEngine engine;
     @Setter @Nullable private TelemetryCollector telemetry;

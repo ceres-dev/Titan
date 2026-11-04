@@ -20,10 +20,6 @@ public interface Manager<C extends BaseConfig, P extends BasePersistent> extends
 
     @NotNull TypeManager getTypeManager();
 
-    void registerEnvironment(@NotNull EnvironmentManager environment);
-
     @Contract(pure = true)
     EnvironmentManager getEnvironmentManager();
-
-    void setEnvironmentManager(@NotNull EnvironmentManager environmentManager);
 }

@@ -22,8 +22,8 @@ public class CommandHander implements Switch {
     private final ScheduledExecutorService executor;
     private boolean isPostSetup = false;
 
-    public CommandHander(@NotNull EnvironmentManager environmentManager) {
-        this.executor = Executors.newScheduledThreadPool(4, Utils.getThreadFactory(this, environmentManager));
+    public CommandHander() {
+        this.executor = Executors.newScheduledThreadPool(4, Utils.getThreadFactory(this));
     }
 
     public void dispatch(BaseCommand command, String @NotNull ... args) {

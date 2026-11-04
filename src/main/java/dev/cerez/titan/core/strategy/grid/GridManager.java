@@ -9,10 +9,9 @@ import dev.cerez.titan.connector.model.order.Order;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
 import dev.cerez.titan.core.BaseConfig;
-import dev.cerez.titan.core.ManagerStrategy;
+import dev.cerez.titan.core.StrategyManager;
 import dev.cerez.titan.core.PersistentNope;
 import dev.cerez.titan.core.StatusManager;
-import dev.cerez.titan.core.event.events.GridManagerListener;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.core.strategy.grid.attribute.ApplyAttributes;
 import dev.cerez.titan.core.strategy.grid.attribute.BaseAttribute;
@@ -42,7 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Function;
 
-public final class GridManager extends ManagerStrategy<GridManager.GridManagerConfig, PersistentNope, BinanceConnector, GridManagerListener> implements StatusProfiler {
+public final class GridManager extends StrategyManager<GridManager.GridManagerConfig, PersistentNope, BinanceConnector> implements StatusProfiler {
 
     @Nullable private BinanceConnector.OrderFuture lastOrderFilled = null;
     private volatile Future<?> waitForUpdate = CompletableFuture.runAsync(() -> {});
@@ -52,13 +51,14 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
     @NotNull private final HashSet<String> forOpen = new HashSet<>();
     @NotNull private final PriceAlarm priceAlarm;
     @NotNull private final GridBuilder gridBuilder;
-    @NotNull private final ApplyAttributes applyAttributes = GridProfiler.DEFAULT.getApplyAttributes(this);
+    @NotNull private final ApplyAttributes applyAttributes;
 
     public GridManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
         super(storageManager.createProfilerManager(GridManagerConfig.class, PersistentNope.class), connector, TypeManager.GRID);
         this.symbol = getConfig().baseAsset + getConfig().quoteAsset;
         this.priceAlarm = new PriceAlarm(connector, symbol);
         this.gridBuilder = new GridBuilder(getConfig());
+        this.applyAttributes = GridProfiler.DEFAULT.getApplyAttributes(this);
     }
 
     @Override
@@ -128,7 +128,6 @@ public final class GridManager extends ManagerStrategy<GridManager.GridManagerCo
         waitForUpdate.cancel(false);
         waitForCancel.clear();
         forOpen.clear();
-        callEvent(GridManagerListener::onUpdate);
         BigDecimal currentPrice = connector.fGetPrice(symbol);
         CompletableFuture<BinanceConnector.FuturePosition> positionFuture = CompletableFuture.supplyAsync(() -> connector.fGetPosition(symbol));
         CompletableFuture<List<BinanceConnector.OrderFuture>> ordersFuture = CompletableFuture.supplyAsync(() -> connector.fGetAllOrder(symbol));

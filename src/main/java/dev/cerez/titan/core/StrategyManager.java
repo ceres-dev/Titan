@@ -2,29 +2,29 @@ package dev.cerez.titan.core;
 
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.core.event.BaseListener;
+import dev.cerez.titan.core.event.events.manager.ChangeStatusEvent;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
 import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.StorageProfiler;
 import dev.cerez.titan.utils.Revocable;
-import dev.cerez.titan.utils.Subscribable;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
-import java.util.*;
-import java.util.function.Consumer;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.Map;
 
-public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersistent, O extends Connector, L extends BaseListener> extends BaseManager<C, P, O> {
+public abstract class StrategyManager<C  extends BaseConfig, P extends BasePersistent, O extends Connector> extends BaseManager<C, P, O> {
 
 
     @Getter @NotNull private volatile StatusManager status = StatusManager.STOPING;
     @Getter @Setter @Nullable protected BalanceMaxRiskManager balanceMaxRiskManager;
     protected final LinkedList<Revocable> subscribeLive = new LinkedList<>();
 
-    public ManagerStrategy(@NotNull StorageProfiler<C, P> storageManager,
+    public StrategyManager(@NotNull StorageProfiler<C, P> storageManager,
                            @NotNull O connector,
                            @NotNull TypeManager typeManager
     ) {
@@ -82,7 +82,6 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
         if (this.status == StatusManager.STARTING) {
             setStatus(StatusManager.READY);
         }
-        callEvent(BaseListener::started);
     }
 
     @Override
@@ -92,20 +91,10 @@ public abstract class ManagerStrategy<C  extends BaseConfig, P extends BasePersi
         subscribeLive.forEach(Revocable::revoke);
         subscribeLive.clear();
         setStatus(StatusManager.STOPPED);
-        callEvent(BaseListener::stopped);
     }
 
     protected void setStatus(StatusManager status){
         this.status = status;
-        callEvent(BaseListener::changeStatus);
-    }
-
-    @SuppressWarnings("unchecked")
-    protected void callEvent(Consumer<L> consumer){
-        synchronized (listeners){
-            for (BaseListener listener : listeners) {
-                consumer.accept((L) listener);
-            }
-        }
+        callEvent(new ChangeStatusEvent(this, status));
     }
 }

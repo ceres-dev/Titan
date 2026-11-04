@@ -148,8 +148,8 @@ public class Utils {
         throw new IllegalArgumentException();
     }
 
-    public @NotNull ThreadFactory getThreadFactory(@NotNull Object o, @Nullable EnvironmentManager environment) {
-        UUID uuid = environment != null ? environment.getIdOwner() : getUserUUUIDByThread();
+    public @NotNull ThreadFactory getThreadFactory(@NotNull Object o, @Nullable UUID idOwner) {
+        UUID uuid = idOwner != null ? idOwner : getUserUUUIDByThread();
         if (uuid != null){
             return Thread.ofVirtual()
                     .name("user:" + Utils.uuidToBase64(uuid) + "-" + o.getClass().getSimpleName() + "-", 0)
