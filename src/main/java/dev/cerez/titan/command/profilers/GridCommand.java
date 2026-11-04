@@ -5,7 +5,6 @@ import dev.cerez.titan.command.ProfilerSetup;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.event.EventHandler;
 import dev.cerez.titan.core.event.Listener;
-import dev.cerez.titan.core.event.events.Event;
 import dev.cerez.titan.core.event.events.manager.funding.time.*;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
 import dev.cerez.titan.core.managers.EnvironmentManager;
@@ -20,6 +19,8 @@ import org.jetbrains.annotations.NotNull;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 
 @ToString
 public class GridCommand extends BaseCommand implements ProfilerSetup {

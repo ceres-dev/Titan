@@ -17,6 +17,8 @@ import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
+import java.io.Serial;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -502,6 +504,7 @@ public class ExecutorCycles implements AutoCloseable {
 
     /** {@code fundsAtRisk}: true si quedó (o puede haber quedado) dinero fuera de USDT. */
     private static final class LegFailure extends Exception {
+        @Serial
         private static final long serialVersionUID = 1L;
         final int legIndex;
         final boolean fundsAtRisk;

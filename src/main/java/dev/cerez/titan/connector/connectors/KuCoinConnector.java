@@ -5,11 +5,13 @@ import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.model.*;
 import dev.cerez.titan.connector.model.order.OrderSpotResult;
 import dev.cerez.titan.utils.Provider;
+import dev.cerez.titan.utils.Revocable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 @Deprecated
@@ -32,6 +34,36 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
     @NotNull
     public String sGetWWS() {
         return BASE_WWS;
+    }
+
+    @Override
+    protected CompletableFuture<JsonNode> sendSignedWebSocketRequest(@NotNull String url, @NotNull String method, @NotNull Map<String, Object> params) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    protected CompletableFuture<JsonNode> sendPublicWebSocketRequest(@NotNull String url, @NotNull String method, @NotNull Map<String, Object> params) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    protected @NotNull JsonNode sendSignedRequest(@NotNull String baseUrl, @NotNull Method method, @NotNull String endpoint, @NotNull Map<String, Object> params) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    protected @NotNull JsonNode sendPublicRequest(@NotNull String baseUrl, @NotNull Method method, @NotNull String endpoint, @NotNull Map<String, Object> params) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    protected @NotNull Revocable subscribeStream(String url, Consumer<JsonNode> consumer, String stream) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    protected void unsubscribeStream(@NotNull String url, @NotNull UUID id) {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
@@ -69,11 +101,6 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
         return """
                 {"id": "%d","type": "rangeTime"}
                 """.formatted(random.nextInt());
-    }
-
-    @Override
-    protected @NotNull Set<String> getBlackListEndpointLog() {
-        return Set.of();
     }
 
     public void checkApikey() {
@@ -184,7 +211,7 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
     private final Random random = new Random();
 
     @Override
-    public void wsSubscribeBookTicker(@NotNull Consumer<BookTickDouble> consumer, @NotNull Collection<String> symbols) {
+    public void wsSubscribeBookTickerLegacy(@NotNull Consumer<BookTickDouble> consumer, @NotNull Collection<String> symbols) {
         this.consumerBookTicker = consumer;
         splitStream(symbols, symbol -> {
             String json = """
@@ -199,7 +226,7 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
     }
 
     @Override
-    public void wsUnsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener) {
+    public void wsUnsubscribeBookTickerLegacy(@NotNull Consumer<BookTickDouble> listener) {
 
     }
 

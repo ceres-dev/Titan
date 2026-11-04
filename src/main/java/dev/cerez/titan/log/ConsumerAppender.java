@@ -3,9 +3,6 @@ package dev.cerez.titan.log;
 import ch.qos.logback.core.AppenderBase;
 import dev.cerez.titan.utils.Revocable;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;

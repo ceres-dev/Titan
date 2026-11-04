@@ -2,6 +2,7 @@ package dev.cerez.titan.core.strategy.funding.time;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.connector.BaseConnector;
+import dev.cerez.titan.connector.model.BookTick;
 import dev.cerez.titan.core.StatusManager;
 import dev.cerez.titan.core.event.events.manager.funding.time.*;
 import dev.cerez.titan.log.Log;
@@ -11,7 +12,6 @@ import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.StrategyManager;
 import dev.cerez.titan.core.PersistentNope;
-import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.Utils;
 import lombok.*;
@@ -37,7 +37,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
     private final ConcurrentMap<String, SymbolTarget> symbolsPendingForClose = new ConcurrentHashMap<>();
 
     public FundingOnTimeManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
-        super(storageManager.createProfilerManager(FundingManagerConfig.class, PersistentNope.class), connector, TypeManager.FUNDING_ON_TIME);
+        super(storageManager.createProfilerManager(FundingManagerConfig.class, PersistentNope.class), connector);
     }
 
     @Override
@@ -58,7 +58,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                 Log.info("Starting FundingManger");
                 searchFunding();
                 // Un pequeño margúen de seguridad
-                LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(5));
+                LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(1));
             }
         });
     }
@@ -80,7 +80,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         setStatus(StatusManager.WAITING);
         LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
         setStatus(StatusManager.PREPARING);
-        callEvent(new EndWindowEvent(this));
+        callEvent(new StartWidowEvent(this));
         CompletableFuture<Map<String, BinanceConnector.FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
         CompletableFuture<RangeTime> remoteFuture = CompletableFuture.supplyAsync(() -> getDeltaClockRemote(TimeUnit.SECONDS, 20));
         CompletableFuture<Map<String, Symbol>> symbolsFuture = CompletableFuture.supplyAsync(connector::fGetAllSymbols);
@@ -195,8 +195,6 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         }), 800,  TimeUnit.MILLISECONDS);
     }
 
-
-
     @SuppressWarnings("SameParameterValue")
     private @NotNull RangeTime getDeltaClockRemote(TimeUnit unit, long timeMax) {
         AtomicBoolean running = new AtomicBoolean(true);
@@ -210,11 +208,6 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
             deltaTime.add(serverTime - midpoint);
         }
         return newRange(deltaTime);
-    }
-
-    @Override
-    public @NotNull TypeManager getTypeManager() {
-        return TypeManager.FUNDING_ON_TIME;
     }
 
     private record RangeTime(long max, long min, long avg){}
@@ -268,13 +261,13 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         private final BinanceConnector.FundingRate target;
 
         private volatile OrderToClosePosition order;
-        private volatile BinanceConnector.BookTick currentBookTick;
+        private volatile BookTick currentBookTick;
         private volatile BaseConnector.WebSocketSubscribe subscribeBookTick;
 
         public void prepare(){
             Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
             connector.fSetLeverage(target.symbol(), 2);
-            subscribeBookTick = connector.wfCreateBookTicker(bookTick -> this.currentBookTick = bookTick, target.symbol());
+            subscribeBookTick = connector.wfSubscribeBookTicker(bookTick -> this.currentBookTick = bookTick, target.symbol());
             this.currentBookTick = connector.fGetBookTick(target.symbol());
         }
 

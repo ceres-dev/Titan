@@ -3,7 +3,6 @@ package dev.cerez.titan.command;
 import dev.cerez.titan.command.exception.CommandNameUndefineException;
 import dev.cerez.titan.command.exception.CommandNotFoundException;
 import dev.cerez.titan.command.exception.CommandSetupDispatchPostSetupException;
-import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.Utils;
@@ -11,7 +10,10 @@ import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 public class CommandHander implements Switch {

@@ -2,7 +2,6 @@ package dev.cerez.titan.core;
 
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.core.managers.EnvironmentManager;
-import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.utils.Configurable;
 import dev.cerez.titan.utils.Identifiable;
 import dev.cerez.titan.utils.Nameable;
@@ -17,8 +16,6 @@ public interface Manager<C extends BaseConfig, P extends BasePersistent> extends
     @NotNull Connector getConnector();
 
     @NotNull UUID getId();
-
-    @NotNull TypeManager getTypeManager();
 
     @Contract(pure = true)
     EnvironmentManager getEnvironmentManager();

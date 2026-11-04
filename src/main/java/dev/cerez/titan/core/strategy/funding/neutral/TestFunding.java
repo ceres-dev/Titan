@@ -1,5 +1,6 @@
 package dev.cerez.titan.core.strategy.funding.neutral;
 
+import dev.cerez.titan.connector.model.ConvertConfig;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.Symbol;
@@ -46,7 +47,7 @@ public class TestFunding {
                     }
                 }),
                 new Test("Min Conversion possible", (b, q) -> {
-                    BinanceConnector.ConvertConfig convertConfig = connector.cGetMinMaxConvert(q, b);
+                    ConvertConfig convertConfig = connector.cGetMinMaxConvert(q, b);
                     if (convertConfig == null) {
                         return ResultType.FAIL.toResult("No exits");
                     }

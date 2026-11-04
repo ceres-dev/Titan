@@ -34,7 +34,7 @@ public class PriceAlarm implements Switch {
     public void start() {
         if (running) return;
         running = true;
-        subscribe = connector.wfCreateBookTicker((bookTick -> {
+        subscribe = connector.wfSubscribeBookTicker((bookTick -> {
             List<Alarm> triggered = new ArrayList<>(12);
             synchronized (alarms) {
                 for (Alarm alarm : alarms) {

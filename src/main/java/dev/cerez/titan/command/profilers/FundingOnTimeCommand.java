@@ -30,7 +30,7 @@ public class FundingOnTimeCommand extends BaseCommand implements ProfilerSetup {
         connector.wuCreateEventAccountUpdate((jsonNode -> {
             Log.info(jsonNode.toPrettyString());
         }));
-        connector.wuCreateEventOrderTradeUpdate((a) -> {
+        connector.wuSubscribeEventOrderTradeUpdate((a) -> {
             Log.info(a.toString());
         });
         FundingOnTimeManager.FundingManagerConfig config = FundingOnTimeManager.FundingManagerConfig.builder()

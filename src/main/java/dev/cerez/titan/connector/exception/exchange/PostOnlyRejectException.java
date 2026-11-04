@@ -1,10 +1,8 @@
 package dev.cerez.titan.connector.exception.exchange;
 
-import dev.cerez.titan.connector.exception.BinanceApiException;
-
 import java.net.http.HttpRequest;
 
-public class PostOnlyRejectException extends BinanceApiException {
+public class PostOnlyRejectException extends ExchangeApiException {
     public PostOnlyRejectException(int code, String message, HttpRequest request  ) {
         super(code, message, request);
     }

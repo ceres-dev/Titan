@@ -1,26 +1,35 @@
 package dev.cerez.titan.connector.connectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import dev.cerez.titan.connector.exception.*;
-import dev.cerez.titan.connector.exception.exchange.*;
-import dev.cerez.titan.connector.model.SideOrder;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.cerez.titan.connector.BaseConnector;
+import dev.cerez.titan.connector.exception.ApiException;
+import dev.cerez.titan.connector.exception.DefaultApiException;
+import dev.cerez.titan.connector.exception.NotSetApiKeysException;
+import dev.cerez.titan.connector.exception.exchange.*;
 import dev.cerez.titan.connector.model.*;
-import dev.cerez.titan.connector.model.order.OrderExecute;
+import dev.cerez.titan.connector.model.order.OrderFuture;
 import dev.cerez.titan.connector.model.order.OrderSpotResult;
+import dev.cerez.titan.connector.model.order.SpotOrder;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
+import dev.cerez.titan.log.Log;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.Provider;
-import dev.cerez.titan.utils.Utils;
-import lombok.*;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -100,28 +109,32 @@ public final class BinanceConnector extends BaseConnector {
     @Override
     protected void handleStreamRaw(@NotNull String wwsURL, @NotNull JsonNode node) {
         // Es un Streams
-        String stream;
-        if (node.has("stream")) {
-            stream = node.get("stream").asText();
-        }else {
-            stream = "";
-        }
-        String key = wwsURL + (stream.isEmpty() ? "" : "/") + stream;
-
-        Collection<Consumer<JsonNode>> consumerSet = consumerStreamsMap.computeIfAbsent(key, k -> new HashMap<>()).values();
-        if (!consumerSet.isEmpty()) {
-            if (node.has("data")) {
-                consumerSet.forEach(c -> c.accept(node.get("data")));
+        {
+            String stream;
+            if (node.has("stream")) {
+                stream = node.get("stream").asText();
             } else {
-                consumerSet.forEach(c -> c.accept(node));
+                stream = "";
             }
-            return;
+            String key = wwsURL + (stream.isEmpty() ? "" : "/") + stream;
+
+            Collection<Consumer<JsonNode>> consumerSet = consumerStreamsMap.computeIfAbsent(key, k -> new HashMap<>()).values();
+            if (!consumerSet.isEmpty()) {
+                if (node.has("data")) {
+                    consumerSet.forEach(c -> c.accept(node.get("data")));
+                } else {
+                    consumerSet.forEach(c -> c.accept(node));
+                }
+                return;
+            }
         }
         // Es una repuesta de una solicitud
-        JsonNode nodeId = node.get("id");
-        if (nodeId != null){
-            Consumer<JsonNode> consumer = webSockets.get(wwsURL).getPendingResponse().remove(nodeId.asText());
-            if (consumer != null) consumer.accept(node);
+        {
+            JsonNode nodeId = node.get("id");
+            if (nodeId != null) {
+                Consumer<JsonNode> consumer = webSockets.get(wwsURL).getPendingResponse().remove(nodeId.asText());
+                if (consumer != null) consumer.accept(node);
+            }
         }
     }
 
@@ -153,12 +166,6 @@ public final class BinanceConnector extends BaseConnector {
 //                  "method": "ping"
 //                }
 //                """.formatted(UUID.randomUUID().toString()) : null;
-    }
-
-    @Contract(value = " -> new", pure = true)
-    @Override
-    protected @NotNull @Unmodifiable Set<String> getBlackListEndpointLog() {
-        return Set.of("/api/v3/date");
     }
 
     @SuppressWarnings("DuplicatedCode")
@@ -309,7 +316,7 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     @Override
-    public void wsSubscribeBookTicker(@NotNull Consumer<BookTickDouble> consumer, @NotNull Collection<String> symbols) {
+    public void wsSubscribeBookTickerLegacy(@NotNull Consumer<BookTickDouble> consumer, @NotNull Collection<String> symbols) {
         consumerBookTicker = consumer;
         splitStream(symbols, symbol -> {
             if (symbol.isEmpty()) {
@@ -328,7 +335,7 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     @Override
-    public void wsUnsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener) {
+    public void wsUnsubscribeBookTickerLegacy(@NotNull Consumer<BookTickDouble> listener) {
 
     }
 
@@ -353,9 +360,30 @@ public final class BinanceConnector extends BaseConnector {
                 case -2022 -> throw new ReduceOnlyRejectException(code, msg, request);
                 case -5022 -> throw new PostOnlyRejectException(code, msg, request);
                 case -3045 -> throw new SystemNotEnoughAssetException(code, msg, request);
-                default -> throw new BinanceDefaultApiException(code, msg, request);
+                default -> throw new ExchangeDefaultApiException(code, msg, request);
             }
         }
+    }
+
+    @Override
+    @Contract("_, _, _ -> new")
+    protected synchronized @NotNull WebSocketSubscribe subscribeStream(String url, Consumer<JsonNode> consumer, String stream) {
+        UUID id = UUID.randomUUID();
+        streams.put(id, stream);
+        if (addConsumerStreams(createKey(url, stream), id, consumer))
+            sendWebSocket(url, """
+                    {"method":"SUBSCRIBE","params":["%s"],"id":"%s"}
+                    """.formatted(stream, id.toString().replace("-", "")));
+        return new WebSocketSubscribe(id, url, this::unsubscribeStream);
+    }
+
+    @Override
+    protected synchronized void unsubscribeStream(@NotNull String url, @NotNull UUID id) {
+        String stream = streams.get(id);
+        if (removeConsumerStreams(createKey(url, stream), id))
+            sendWebSocket(url, """
+                    {"method":"UNSUBSCRIBE","params":["%s"],"id":"%s"}
+                    """.formatted(stream, UUID.randomUUID().toString().replace("-", "")));
     }
 
     /////////////////////////////////////////////////////////
@@ -415,7 +443,7 @@ public final class BinanceConnector extends BaseConnector {
         return new BigDecimal(sendPublicRequest(Method.GET, "/api/v3/ticker/price", params).get("price").textValue());
     }
 
-    public @Nullable BinanceConnector.SpotOrder sGetOrder(@NotNull String symbol, @NotNull String nameOrder) {
+    public @Nullable SpotOrder sGetOrder(@NotNull String symbol, @NotNull String nameOrder) {
         HashMap<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
         JsonNode raw =  sendSignedRequest(Method.GET, "/api/v3/allOrders", params);
@@ -439,7 +467,7 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     @Contract("_ -> new")
-    public @NotNull BinanceConnector.BookTick sGetBookTick(@NotNull String symbol) {
+    public @NotNull BookTick sGetBookTick(@NotNull String symbol) {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
         JsonNode node = sendPublicRequest(Method.GET, "/api/v3/depth", params);
@@ -447,7 +475,7 @@ public final class BinanceConnector extends BaseConnector {
         JsonNode ask = node.get("asks").iterator().next();
         BigDecimal bidPrice = new BigDecimal(bid.iterator().next().asText());
         BigDecimal askPrice = new BigDecimal(ask.iterator().next().asText());
-        return new BookTick(bidPrice, BigDecimal.ZERO, askPrice, BigDecimal.ZERO);
+        return new BookTick(symbol.toUpperCase(Locale.US), bidPrice, BigDecimal.ZERO, askPrice, BigDecimal.ZERO);
     }
 
     public long sPing(){
@@ -462,23 +490,18 @@ public final class BinanceConnector extends BaseConnector {
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
     }
 
-    public @NotNull BaseConnector.WebSocketSubscribe wsCreateBookTicker(@NotNull Consumer<BookTick> consumer, @NotNull String symbol){
-        UUID uuid = UUID.randomUUID();
+    @Contract("_, _ -> new")
+    public @NotNull BaseConnector.WebSocketSubscribe wsSubscribeBookTicker(@NotNull Consumer<BookTick> consumer, @NotNull String symbol){
         String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
-        streams.put(uuid, stream);
-        if (addConsumerStreams(sGetWWS() + "/" + stream, uuid, (payload) -> {
+        return subscribeStream(sGetWWS(), (payload) -> {
             String[] split = payload.toString().split("\"");
-            consumer.accept(new BookTick(new BigDecimal(split[9]), new BigDecimal(split[13]), new BigDecimal(split[17]), new BigDecimal(split[21])));
-        }, false))
-            sendWebSocket(sGetWWS(), """
-                    {"method": "SUBSCRIBE","params": ["%s"],"id": "%s"}
-                    """.formatted(stream, uuid.toString().replace("-", "")));
-        return new WebSocketSubscribe(uuid, this::wsRemoveBookTicker);
+            consumer.accept(new BookTick(symbol.toLowerCase(Locale.US), new BigDecimal(split[9]), new BigDecimal(split[13]), new BigDecimal(split[17]), new BigDecimal(split[21])));
+        }, stream);
     }
 
-    public void wsRemoveBookTicker(@NotNull UUID id) {
+    public void wsUnsubscribeBookTicker(@NotNull UUID id) {
         String stream = streams.get(id);
-        if (removeConsumerStreams(sGetWWS() + "/" + stream, id))
+        if (removeConsumerStreams(createKey(sGetWWS(), stream), id))
             sendWebSocket(sGetWWS(), """
                     {"method": "UNSUBSCRIBE","params": ["%s"],"id": "%s"}
                     """.formatted(stream, UUID.randomUUID().toString().replace("-", "")));
@@ -720,7 +743,7 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     @Contract("_ -> new")
-    public @NotNull BinanceConnector.BookTick fGetBookTick(@NotNull String symbol) {
+    public @NotNull BookTick fGetBookTick(@NotNull String symbol) {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
         JsonNode node = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/depth", params);
@@ -728,7 +751,7 @@ public final class BinanceConnector extends BaseConnector {
         JsonNode ask = node.get("asks").iterator().next();
         BigDecimal bidPrice = new BigDecimal(bid.iterator().next().asText());
         BigDecimal askPrice = new BigDecimal(ask.iterator().next().asText());
-        return new BookTick(bidPrice, BigDecimal.ZERO, askPrice, BigDecimal.ZERO);
+        return new BookTick(symbol.toUpperCase(Locale.US), bidPrice, BigDecimal.ZERO, askPrice, BigDecimal.ZERO);
     }
 
     public @NotNull Map<String, FundingRate> fGetFundingRate(){
@@ -766,7 +789,7 @@ public final class BinanceConnector extends BaseConnector {
         params.put("startTime", start);
         params.put("endTime", end);
         params.put("limit", 500);
-        JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v1/income", params);;
+        JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v1/income", params);
         List<Transaction> transactions = new LinkedList<>();
         for (JsonNode node : raw) {
             transactions.add(new Transaction(
@@ -820,29 +843,32 @@ public final class BinanceConnector extends BaseConnector {
         sendSignedRequest(fGetHTTPS(), Method.DELETE, "/fapi/v1/listenKey");
     }
 
-    public @NotNull BaseConnector.WebSocketSubscribe wfCreateBookTicker(@NotNull Consumer<BookTick> consumer, @NotNull String symbol) {
-        UUID uuid = UUID.randomUUID();
+    @Contract("_, _ -> new")
+    public @NotNull BaseConnector.WebSocketSubscribe wfSubscribeBookTicker(@NotNull Consumer<BookTick> consumer, @NotNull String symbol) {
         String stream = symbol.toLowerCase(Locale.US) + "@bookTicker";
-        streams.put(uuid, stream);
-        if (addConsumerStreams(fGetWWStream() + "/" + stream, uuid, (payload) -> {
+        return subscribeStream(fGetWWStream(), (payload -> {
             String[] split = payload.toString().split("\"");
-            consumer.accept(new BookTick(new BigDecimal(split[17]), new BigDecimal(split[21]), new BigDecimal(split[25]), new BigDecimal(split[29])));
-        }, true))
-            sendWebSocket(fGetWWStream(), """
-                    {"method":"SUBSCRIBE","params":["%s"],"id":"%s"}
-                    """.formatted(stream, uuid.toString().replace("-", "")));
-        return new WebSocketSubscribe(uuid, this::wfRemoveBookTicker);
+            consumer.accept(new BookTick(symbol.toLowerCase(Locale.US), new BigDecimal(split[17]), new BigDecimal(split[21]), new BigDecimal(split[25]), new BigDecimal(split[29])));
+        }), stream);
     }
 
-    public void wfRemoveBookTicker(@NotNull UUID id) {
-        String stream = streams.get(id);
-        if (removeConsumerStreams(fGetWWStream() + "/" + stream, id))
-            sendWebSocket(fGetWWStream(), """
-                    {"method":"UNSUBSCRIBE","params":["%s"],"id":"%s"}
-                    """.formatted(stream, UUID.randomUUID().toString().replace("-", "")));
+    @Contract("_, _ -> new")
+    public @NotNull BaseConnector.WebSocketSubscribe wfSubscribeCandle(@NotNull Consumer<Candle> consumer, @NotNull String symbol) {
+        String stream = symbol.toLowerCase(Locale.US) + "@ticker";
+        return subscribeStream(fGetWWStream(), (payload -> {
+            consumer.accept(
+                    new Candle(
+                            payload.get("s").asText(),
+                            new BigDecimal(payload.get("c").asText()),
+                            new BigDecimal(payload.get("o").asText()),
+                            new BigDecimal(payload.get("h").asText()),
+                            new BigDecimal(payload.get("l").asText())
+                    )
+            );
+        }), stream);
     }
 
-    public CompletableFuture<JsonNode> wfSendOrderToMkt(@NotNull String symbol, @NotNull SideOrder sideOrder, BigDecimal amountBase, @Nullable String nameOrder, boolean reduceOnly) throws ReduceOnlyRejectException {
+    public @NotNull CompletableFuture<JsonNode> wfSendOrderToMkt(@NotNull String symbol, @NotNull SideOrder sideOrder, BigDecimal amountBase, @Nullable String nameOrder, boolean reduceOnly) throws ReduceOnlyRejectException {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toLowerCase(Locale.US));
         params.put("side", sideOrder);
@@ -853,10 +879,10 @@ public final class BinanceConnector extends BaseConnector {
         return sendSignedWebSocketRequest(fGetWWS(), "order.place", params);
     }
 
-    public @NotNull BaseConnector.WebSocketSubscribe wuCreateEventOrderTradeUpdate(Consumer<OrderUpdate> consumer){
+    public @NotNull BaseConnector.WebSocketSubscribe wuSubscribeEventOrderTradeUpdate(Consumer<OrderUpdate> consumer){
         String type = "ORDER_TRADE_UPDATE";
-        UUID uuid = UUID.randomUUID();
-        addConsumerStreams(uGetWWS(), uuid, (payload) -> {
+        UUID id = UUID.randomUUID();
+        addConsumerStreams(uGetWWS(), id, (payload) -> {
             if (payload.get("e").asText().equals(type)) {
                 JsonNode node = payload.get("o");
                 StatusOrder statusOrder = StatusOrder.parse(node.get("x").asText());
@@ -866,27 +892,19 @@ public final class BinanceConnector extends BaseConnector {
 
                 consumer.accept(new OrderUpdate(nameOrder, symbol, sideOrder, statusOrder));
             }
-        }, true);
-        return new WebSocketSubscribe(uuid, this::wuDeleteEventOrderTradeUpdate);
-    }
-
-    public void wuDeleteEventOrderTradeUpdate(@NotNull UUID id) {
-        removeConsumerStreams(uGetWWS(), id);
+        });
+        return new WebSocketSubscribe(id, uGetWWS(), this::removeConsumerStreams);
     }
 
     public @NotNull BaseConnector.WebSocketSubscribe wuCreateEventAccountUpdate(Consumer<JsonNode> consumer){
         String type = "ACCOUNT_UPDATE";
-        UUID uuid = UUID.randomUUID();
-        addConsumerStreams(uGetWWS(), uuid, (payload) -> {
+        UUID id = UUID.randomUUID();
+        addConsumerStreams(uGetWWS(), id, (payload) -> {
             if (payload.get("e").asText().equals(type)) {
                 consumer.accept(payload);
             }
-        }, true);
-        return new WebSocketSubscribe(uuid, this::wuDeleteEventAccountUpdate);
-    }
-
-    public void wuDeleteEventAccountUpdate(@NotNull UUID id) {
-        removeConsumerStreams(uGetWWS(), id);
+        });
+        return new WebSocketSubscribe(id, uGetWWS(), this::removeConsumerStreams);
     }
 
     public boolean cPossibleConvert(@NotNull String fromAsset, @NotNull String toAsset) {
@@ -897,7 +915,7 @@ public final class BinanceConnector extends BaseConnector {
         return !node.isEmpty();
     }
 
-    public @Nullable BinanceConnector.ConvertConfig cGetMinMaxConvert(@NotNull String fromAsset, @NotNull String toAsset) {
+    public @Nullable ConvertConfig cGetMinMaxConvert(@NotNull String fromAsset, @NotNull String toAsset) {
         Map<String, Object> params = new HashMap<>();
         params.put("fromAsset", fromAsset);
         params.put("toAsset", toAsset);
@@ -987,7 +1005,7 @@ public final class BinanceConnector extends BaseConnector {
             double amount =  node.get("amount").asDouble();
             double limit = node.get("borrowLimit").asDouble();
             return new BigDecimal(Math.min(limit, amount)); // TODO: Cambiar esto
-        } catch (BinanceApiException e) {
+        } catch (ExchangeApiException e) {
             if (e.getCode() == -3045){
                 return new BigDecimal("-1");
             }else{
@@ -996,7 +1014,8 @@ public final class BinanceConnector extends BaseConnector {
         }
     }
 
-    public BigDecimal mGetMaxAmountBorrowable(@Nullable String symbol, @NotNull String asset) throws SystemNotEnoughAssetException {
+    @Contract("_, _ -> new")
+    public @NotNull BigDecimal mGetMaxAmountBorrowable(@Nullable String symbol, @NotNull String asset) throws SystemNotEnoughAssetException {
         Map<String, Object> params = new HashMap<>();
         if (symbol != null) params.put("isolatedSymbol", symbol.toUpperCase(Locale.US));
         params.put("asset", asset.toUpperCase(Locale.US));
@@ -1103,8 +1122,168 @@ public final class BinanceConnector extends BaseConnector {
                 params
         );
     }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     @Override
-    protected void onResponseHttps(@NotNull String url, @NotNull HttpResponse<String> response) {
+    protected @NotNull CompletableFuture<JsonNode> sendSignedWebSocketRequest(
+            @NotNull String url,
+            @NotNull String method,
+            @NotNull Map<String, Object> params
+    ) {
+        if (config.getSecret() == null || config.getKey() == null || config.getSecret().isBlank() || config.getKey().isBlank()) {
+            throw new NotSetApiKeysException("API Key not set");
+        }
+
+        // Parámetros obligatorios para una request firmada
+        params.put("apiKey", config.getKey());
+        params.put("timestamp", System.currentTimeMillis() + deltaClienteToServer);
+
+        /*
+         * Binance requiere que los parámetros utilizados para la firma
+         * estén ordenados alfabéticamente por nombre.
+         */
+        TreeMap<String, Object> signingParams = new TreeMap<>(params);
+        String queryString = buildQueryString(signingParams);
+
+        try {
+            String signature = hmacSha256(queryString, config.getSecret());
+
+            UUID id = UUID.randomUUID();
+            ObjectNode request = mapper.createObjectNode();
+            request.put("id", id.toString());
+            request.put("method", method);
+            ObjectNode requestParams = mapper.createObjectNode();
+
+            for (Map.Entry<String, Object> entry : params.entrySet()) {
+                requestParams.set(
+                        entry.getKey(),
+                        mapper.valueToTree(entry.getValue())
+                );
+            }
+
+            requestParams.put("signature", signature);
+            request.set("params", requestParams);
+
+            if (config.isLogsRequest()) {
+                Log.info("PR wws=%s", request);
+            }
+
+            sendWebSocket(url, request.toString());
+            CompletableFuture<JsonNode> future = new CompletableFuture<>();
+            webSockets.get(url).getPendingResponse().put(id.toString(), future::complete);
+            return future;
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    protected @NotNull CompletableFuture<JsonNode> sendPublicWebSocketRequest(
+            @NotNull String url,
+            @NotNull String method,
+            @NotNull Map<String, Object> params
+    ) {
+        UUID id = UUID.randomUUID();
+        ObjectNode request = mapper.createObjectNode();
+        request.put("id", id.toString());
+        request.put("method", method);
+        ObjectNode requestParams = mapper.createObjectNode();
+
+        for (Map.Entry<String, Object> entry : params.entrySet()) {
+            requestParams.set(
+                    entry.getKey(),
+                    mapper.valueToTree(entry.getValue())
+            );
+        }
+
+        if (!params.isEmpty()) request.set("params", requestParams);
+        if (config.isLogsRequest()) {
+            Log.info("PU wws=%s", request);
+        }
+
+        sendWebSocket(url, request.toString());
+        CompletableFuture<JsonNode> future = new CompletableFuture<>();
+        webSockets.get(url).getPendingResponse().put(id.toString(), future::complete);
+        return future;
+    }
+
+    @Override
+    protected @NotNull JsonNode sendPublicRequest(
+            @NotNull String baseUrl,
+            @NotNull Method method,
+            @NotNull String endpoint,
+            @NotNull Map<String, Object> params
+    ) {
+        String queryString = buildQueryString(params);
+        String finalUrl = baseUrl + (
+                queryString.isBlank()
+                        ? endpoint
+                        : endpoint + "?" + queryString
+        );
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(finalUrl))
+                .method(method.toString(), HttpRequest.BodyPublishers.noBody())
+                .build();
+        if (config.isLogsRequest()) Log.info( "Pu https=%s %s", method, finalUrl);
+        String jsonRaw = null;
+        if (telemetry != null) telemetry.addRequestConnector(method, finalUrl);
+        try {
+            HttpResponse<String> response = clientHttp.send(request, HttpResponse.BodyHandlers.ofString());
+            onResponseHttps(finalUrl, response);
+            jsonRaw = response.body();
+            JsonNode node = mapper.readTree(jsonRaw);
+            checkResponse(node, request);
+            return node;
+        } catch (IOException | InterruptedException | ApiException e) {
+            Log.error(finalUrl + " @ " + jsonRaw);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    protected @NotNull JsonNode sendSignedRequest(
+            @NotNull String baseUrl,
+            @NotNull Method method,
+            @NotNull String endpoint,
+            @NotNull Map<String, Object> params
+    ) {
+        if (config.getSecret() == null || config.getKey() == null || config.getSecret().isBlank() || config.getKey().isBlank()) {
+            throw new NotSetApiKeysException("API Key not set");
+        }
+        params.put("timestamp", System.currentTimeMillis() + deltaClienteToServer);
+        String queryString = buildQueryString(params);
+        try {
+            final String signature = hmacSha256(queryString, config.getSecret());
+            final String finalUrl = baseUrl + endpoint + "?" + queryString + "&signature=" + signature;
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(finalUrl))
+                    .header("X-MBX-APIKEY", config.getKey())
+                    .method(method.name(), HttpRequest.BodyPublishers.noBody())
+                    .build();
+            if (config.isLogsRequest()) Log.info("Pr https=%s %s", method, finalUrl);
+            JsonNode jsonRaw = null;
+            try {
+                HttpResponse<String> response = clientHttp.send(request, HttpResponse.BodyHandlers.ofString());
+                onResponseHttps(finalUrl, response);
+                checkResponse(jsonRaw = mapper.readTree(response.body()), request);
+                return jsonRaw;
+            } catch (IOException | InterruptedException e) {
+                Log.exception("Error de IO o Interrupción: %s".formatted(e.getMessage()), e);
+                throw new RuntimeException(e);
+            }catch (DefaultApiException e) {
+                Log.error("%s %s -> %s", method.name(), finalUrl, jsonRaw);
+                throw e;
+            }
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void onResponseHttps(@NotNull String url, @NotNull HttpResponse<String> response) {
         if (url.startsWith(fGetHTTPS())) {
             response.headers().firstValueAsLong("X-MBX-USED-WEIGHT-1M").ifPresent(rateLimitFuture::setUse);
         }
@@ -1113,8 +1292,11 @@ public final class BinanceConnector extends BaseConnector {
         }
     }
 
-    public record OrderUpdate(String name, String symbol, SideOrder sideOrder, StatusOrder statusOrder) {}
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    public record OrderUpdate(String name, String symbol, SideOrder sideOrder, StatusOrder statusOrder) {}
 
     public record FuturePosition(@NotNull String symbol, @NotNull BigDecimal quantity, @NotNull BigDecimal entryPriceAvg, @NotNull BigDecimal pnlUnrealize) {
         @Contract(pure = true)
@@ -1123,8 +1305,6 @@ public final class BinanceConnector extends BaseConnector {
             else return SidePosition.SHORT;
         }
     }
-
-    public record BookTick(BigDecimal bidPrice, BigDecimal bidQty, BigDecimal askPrice, BigDecimal askQty){}
 
     public record AssetMargin(String asset, BigDecimal free, BigDecimal borrowed, BigDecimal interest) {
         @Contract(pure = true)
@@ -1150,7 +1330,7 @@ public final class BinanceConnector extends BaseConnector {
 
     public record FundingRate(String symbol, FundingConfig config, BigDecimal nextFundingRate, long nextFundingTime) {
         public @NotNull BigDecimal rate24h(){
-            return nextFundingRate.multiply(BigDecimal.valueOf(24d / config.interval));
+            return nextFundingRate.multiply(BigDecimal.valueOf(24d / config.interval()));
         }
 
         public @NotNull BigDecimal rate24hAbs(){
@@ -1189,47 +1369,4 @@ public final class BinanceConnector extends BaseConnector {
         BFUSD_REWARD,
         SPECIAL_FUNDING_FEE
     }
-
-    @EqualsAndHashCode(callSuper = true)
-    @Data
-    public static final class SpotOrder extends OrderExecute {
-        private final @NotNull BigDecimal amountQuoteAsset;
-
-        public SpotOrder(@NotNull String symbol,
-                         @NotNull String nameOrder,
-                         @NotNull BigDecimal price,
-                         @NotNull BigDecimal amountBaseAsset,
-                         @NotNull BigDecimal amountQuoteAsset,
-                         @NotNull SideOrder sideOrder,
-                         boolean reduceOnly,
-                         StatusOrder statusOrder,
-                         long dateCreate,
-                         long dateFilled
-        ) {
-            super(symbol, nameOrder, price, amountBaseAsset, sideOrder, reduceOnly, statusOrder,  dateCreate, dateFilled);
-            this.amountQuoteAsset = amountQuoteAsset;
-        }
-    }
-
-    @EqualsAndHashCode(callSuper = true)
-    @Data
-    public static final class OrderFuture extends OrderExecute {
-
-        public OrderFuture(String symbol,
-                           String nameOrder,
-                           BigDecimal price,
-                           BigDecimal amountBaseAsset,
-                           SideOrder sideOrder,
-                           boolean reduceOnly,
-                           StatusOrder statusOrder,
-                           long dateCreate,
-                           long dateFilled
-        ) {
-            super(symbol, nameOrder, price, amountBaseAsset, sideOrder, reduceOnly, statusOrder, dateCreate, dateFilled);
-        }
-    }
-
-    public record ConvertConfig(double fromMin, double fromMax, double toMin, double toMax) {}
-
-    public record FundingConfig(double min, double max, int interval) {}
 }

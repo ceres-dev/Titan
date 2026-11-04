@@ -8,7 +8,6 @@ import dev.cerez.titan.connector.model.Volume24H;
 import dev.cerez.titan.core.StrategyManager;
 import dev.cerez.titan.core.PersistentNope;
 import dev.cerez.titan.core.StatusManager;
-import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
 import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularEngineJava;
 import dev.cerez.titan.discord.StatusProfiler;
@@ -37,7 +36,7 @@ public final class TriangularManager extends StrategyManager<TriangularManager.T
 
     @SneakyThrows
     public TriangularManager(@NotNull StorageManager storageManager, @NotNull Connector connector) {
-        super(storageManager.createProfilerManager(TriangularManagerConfiguration.class, PersistentNope.class), connector, TypeManager.FUNDING_TRIANGULAR);
+        super(storageManager.createProfilerManager(TriangularManagerConfiguration.class, PersistentNope.class), connector);
         this.engine = getConfig().getEngine().getConstructor(SearchTriangularEngine.EngineConfiguration.class).newInstance(getConfig());
     }
 
@@ -73,7 +72,7 @@ public final class TriangularManager extends StrategyManager<TriangularManager.T
                     .build();
             executorCycles = new ExecutorCycles(configExecutor, connector, engine);
             Log.info("Starting Api...");
-            connector.wsSubscribeBookTicker(streamListener = this::onBookTickerUpdate, symbolsToSubscribe.keySet());
+            connector.wsSubscribeBookTickerLegacy(streamListener = this::onBookTickerUpdate, symbolsToSubscribe.keySet());
             setStatus(StatusManager.WORKING);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -92,7 +91,7 @@ public final class TriangularManager extends StrategyManager<TriangularManager.T
     protected void internalStop() {
         Consumer<BookTickDouble> listener = streamListener;
         if (listener != null) {
-            connector.wsUnsubscribeBookTicker(listener);
+            connector.wsUnsubscribeBookTickerLegacy(listener);
         }
         streamListener = null;
         allSymbolsMap = null;
@@ -123,7 +122,7 @@ public final class TriangularManager extends StrategyManager<TriangularManager.T
     private @NotNull Set<String> getSymbolsUse(@NotNull Map<String, Symbol> allSymbols,
                                                @NotNull Map<String, BookTickDouble> liveTickers,
                                                @NotNull Map<String, Volume24H> bookTicker24H) {
-        Map<String, List<AssetRate>> conversionGraph = buildAssetConversionGraph(allSymbols, liveTickers);;
+        Map<String, List<AssetRate>> conversionGraph = buildAssetConversionGraph(allSymbols, liveTickers);
         List<SymbolVolume> candidates = new ArrayList<>();
 
         for (Symbol symbol : allSymbols.values()) {

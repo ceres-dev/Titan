@@ -8,7 +8,6 @@ import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.BasePersistent;
 import dev.cerez.titan.core.StrategyManager;
-import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.StatusProfiler;
 import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.Utils;
@@ -37,7 +36,7 @@ public final class FundingNeutralManager extends StrategyManager<FundingNeutralM
     @NotNull @Getter private final String symbol;
 
     public FundingNeutralManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
-        super(storageManager.createProfilerManager(FundingManagerConfiguration.class, FundingManagerPersistan.class), connector, TypeManager.FUNDING_NEUTRAL);
+        super(storageManager.createProfilerManager(FundingManagerConfiguration.class, FundingManagerPersistan.class), connector);
         FundingManagerPersistan persistan = getPersistence();
         this.baseAsset = getConfig().getBaseAsset();
         this.quoteAsset = getConfig().getQuoteAsset();
@@ -231,11 +230,6 @@ public final class FundingNeutralManager extends StrategyManager<FundingNeutralM
                 return new PresenceProfile(OnlineStatus.IDLE, Activity.of(Activity.ActivityType.PLAYING, "Estado desconocido"));
             }
         }
-    }
-
-    @Override
-    public @NotNull TypeManager getTypeManager() {
-        return TypeManager.FUNDING_NEUTRAL;
     }
 
     @Data

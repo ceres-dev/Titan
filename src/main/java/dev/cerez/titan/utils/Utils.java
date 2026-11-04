@@ -1,10 +1,10 @@
 package dev.cerez.titan.utils;
 
 import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.connector.model.order.Order;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
-import dev.cerez.titan.core.managers.EnvironmentManager;
+import dev.cerez.titan.connector.model.order.Order;
+import dev.cerez.titan.connector.model.order.OrderFuture;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.core.strategy.grid.model.SidePosition;
 import dev.cerez.titan.infrastructure.user.custom.TitanUserDetails;
@@ -88,8 +88,7 @@ public class Utils {
         }
 
         // Convertir el BigInteger de vuelta a un array de 16 bytes
-        byte[] bytes = number.toByteArray();
-        return bytes;
+        return number.toByteArray();
     }
 
     private @NotNull BigInteger uuidToBigInteger(@NotNull UUID uuid) {
@@ -190,11 +189,11 @@ public class Utils {
         return null;
     }
 
-    public @NotNull @Unmodifiable List<BinanceConnector.OrderFuture> filterFilled(@NotNull List<BinanceConnector.OrderFuture> orders) {
+    public @NotNull @Unmodifiable List<OrderFuture> filterFilled(@NotNull List<OrderFuture> orders) {
         return orders.stream().filter(o -> o.getStatusOrder() == StatusOrder.FILLED).toList();
     }
 
-    public @NotNull @Unmodifiable List<BinanceConnector.OrderFuture> filterNew(@NotNull List<BinanceConnector.OrderFuture> orders) {
+    public @NotNull @Unmodifiable List<OrderFuture> filterNew(@NotNull List<OrderFuture> orders) {
         return orders.stream().filter(o -> o.getStatusOrder() == StatusOrder.NEW).toList();
     }
 

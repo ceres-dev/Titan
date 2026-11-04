@@ -7,7 +7,7 @@ import java.net.http.HttpRequest;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
-public class ApiException extends RuntimeException {
+public abstract class ApiException extends RuntimeException {
 
     private final HttpRequest request;
 

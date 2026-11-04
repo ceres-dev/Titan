@@ -59,7 +59,6 @@ async function apiFetch(url, options = {}) {
     if (csrfToken && csrfHeader) {
         headers.set(csrfHeader, csrfToken);
     }
-    console.log(url)
     return fetch(url, {
         ...options,
         headers,

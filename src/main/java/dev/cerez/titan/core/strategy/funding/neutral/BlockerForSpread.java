@@ -2,6 +2,7 @@ package dev.cerez.titan.core.strategy.funding.neutral;
 
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.connector.model.BookTick;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Blocking;
@@ -43,11 +44,11 @@ public class BlockerForSpread {
     private void waitSpread(BigDecimal target, boolean entry) {
         final Thread currentThread = Thread.currentThread();
 
-        final AtomicReference<BinanceConnector.BookTick> futuresTick = new AtomicReference<>();
-        final AtomicReference<BinanceConnector.BookTick> spotTick = new AtomicReference<>();
+        final AtomicReference<BookTick> futuresTick = new AtomicReference<>();
+        final AtomicReference<BookTick> spotTick = new AtomicReference<>();
         final AtomicBoolean reached = new AtomicBoolean(false);
 
-        final Consumer<BinanceConnector.BookTick> futuresListener = tick -> {
+        final Consumer<BookTick> futuresListener = tick -> {
             futuresTick.set(tick);
             checkSpread(
                     futuresTick.get(),
@@ -59,7 +60,7 @@ public class BlockerForSpread {
             );
         };
 
-        final Consumer<BinanceConnector.BookTick> spotListener = tick -> {
+        final Consumer<BookTick> spotListener = tick -> {
             spotTick.set(tick);
             checkSpread(
                     futuresTick.get(),
@@ -75,8 +76,8 @@ public class BlockerForSpread {
             /*
              * Es importante crear ambas suscripciones antes de bloquear.
              */
-            responsesWebSocket.add(connector.wfCreateBookTicker(futuresListener, symbol));
-            responsesWebSocket.add(connector.wsCreateBookTicker(spotListener, symbol));
+            responsesWebSocket.add(connector.wfSubscribeBookTicker(futuresListener, symbol));
+            responsesWebSocket.add(connector.wsSubscribeBookTicker(spotListener, symbol));
 
             /*
              * Puede que el spread ya cumpla el objetivo antes
@@ -93,8 +94,8 @@ public class BlockerForSpread {
     }
 
     private void checkSpread(
-            BinanceConnector.BookTick futures,
-            BinanceConnector.BookTick spot,
+            BookTick futures,
+            BookTick spot,
             BigDecimal target,
             boolean entry,
             AtomicBoolean reached,

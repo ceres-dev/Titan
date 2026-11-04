@@ -5,14 +5,15 @@ import dev.cerez.titan.connector.exception.exchange.MarginNotSufficienException;
 import dev.cerez.titan.connector.exception.exchange.PostOnlyRejectException;
 import dev.cerez.titan.connector.exception.exchange.ReduceOnlyRejectException;
 import dev.cerez.titan.connector.exception.exchange.UnknownOrderException;
+import dev.cerez.titan.connector.model.BookTick;
 import dev.cerez.titan.connector.model.order.Order;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.StatusOrder;
+import dev.cerez.titan.connector.model.order.OrderFuture;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.StrategyManager;
 import dev.cerez.titan.core.PersistentNope;
 import dev.cerez.titan.core.StatusManager;
-import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.core.strategy.grid.attribute.ApplyAttributes;
 import dev.cerez.titan.core.strategy.grid.attribute.BaseAttribute;
 import dev.cerez.titan.core.strategy.grid.attribute.SideAffected;
@@ -43,7 +44,7 @@ import java.util.function.Function;
 
 public final class GridManager extends StrategyManager<GridManager.GridManagerConfig, PersistentNope, BinanceConnector> implements StatusProfiler {
 
-    @Nullable private BinanceConnector.OrderFuture lastOrderFilled = null;
+    @Nullable private OrderFuture lastOrderFilled = null;
     private volatile Future<?> waitForUpdate = CompletableFuture.runAsync(() -> {});
 
     @NotNull private final String symbol;
@@ -54,7 +55,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
     @NotNull private final ApplyAttributes applyAttributes;
 
     public GridManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
-        super(storageManager.createProfilerManager(GridManagerConfig.class, PersistentNope.class), connector, TypeManager.GRID);
+        super(storageManager.createProfilerManager(GridManagerConfig.class, PersistentNope.class), connector);
         this.symbol = getConfig().baseAsset + getConfig().quoteAsset;
         this.priceAlarm = new PriceAlarm(connector, symbol);
         this.gridBuilder = new GridBuilder(getConfig());
@@ -78,7 +79,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
         connector.fSetLeverage(symbol, getConfig().leverage);
 
         Log.info("Balance disponible %.4f %s", fGetBalanceAvailable().get(getConfig().quoteAsset), getConfig().quoteAsset);
-        subscribeLive.add(connector.wuCreateEventOrderTradeUpdate(orderUpdate -> {
+        subscribeLive.add(connector.wuSubscribeEventOrderTradeUpdate(orderUpdate -> {
             if (!orderUpdate.symbol().equals(symbol)) {
                 return;
             }
@@ -95,7 +96,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
             updateGrid();
         }));
         updateGrid();
-        priceAlarm.start();
+//        priceAlarm.start();
         executor.execute(() -> {
             while (running) {
                 // Para actualizar la gráfica periódicamente para detectar cambios en el precio
@@ -105,21 +106,9 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
         });
     }
 
-    private int getAmountOrderApprox(@NotNull Context c) {
-        BigDecimal amountOrderApproximate = c.getBalanceUsdt()
-                .divide(c.getCurrentPrice(), 12, RoundingMode.HALF_EVEN)
-                .divide(getConfig().getSizePerOrderBaseAsset(), 12, RoundingMode.HALF_EVEN)
-                // Entre dos ya que lo ideal es que tenga la misma cantidad de órdenes de compra y de venta
-                .divide(BigDecimal.TWO, 12, RoundingMode.HALF_EVEN)
-                .add(BigDecimal.ONE);
-
-        return amountOrderApproximate.intValue();
-    }
-
     @Override
     public void internalStop() {
-        applyAttributes.clear();
-        priceAlarm.stop();
+//        priceAlarm.stop();
         connector.fCancelOrderAll(symbol);
     }
 
@@ -130,22 +119,22 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
         forOpen.clear();
         BigDecimal currentPrice = connector.fGetPrice(symbol);
         CompletableFuture<BinanceConnector.FuturePosition> positionFuture = CompletableFuture.supplyAsync(() -> connector.fGetPosition(symbol));
-        CompletableFuture<List<BinanceConnector.OrderFuture>> ordersFuture = CompletableFuture.supplyAsync(() -> connector.fGetAllOrder(symbol));
+        CompletableFuture<List<OrderFuture>> ordersFuture = CompletableFuture.supplyAsync(() -> connector.fGetAllOrder(symbol));
         CompletableFuture<BigDecimal> balanceFuture = CompletableFuture.supplyAsync(() -> fGetBalanceValued().getOrDefault(getConfig().quoteAsset, BigDecimal.ZERO));
-        CompletableFuture<BinanceConnector.BookTick> bookTickerFuture = CompletableFuture.supplyAsync(() -> connector.fGetBookTick(symbol));
+        CompletableFuture<BookTick> bookTickerFuture = CompletableFuture.supplyAsync(() -> connector.fGetBookTick(symbol));
 
         GridManagerConfig config = getConfig();
 
         BinanceConnector.FuturePosition position = positionFuture.join();
-        List<BinanceConnector.OrderFuture> orders = ordersFuture.join();
+        List<OrderFuture> orders = ordersFuture.join();
         BigDecimal balance = balanceFuture.join();
-        BinanceConnector.BookTick bookTicker = bookTickerFuture.join();
+        BookTick bookTicker = bookTickerFuture.join();
 
-        List<BinanceConnector.OrderFuture> ordersActive = Utils.filterNew(orders);
+        List<OrderFuture> ordersActive = Utils.filterNew(orders);
         lastOrderFilled = orders.stream()
                 .filter(orderFuture -> orderFuture.getSymbol().equals(symbol))
                 .filter(order -> StatusOrder.FILLED.equals(order.getStatusOrder()))
-                .max(Comparator.comparingLong(BinanceConnector.OrderFuture::getDateFilled))
+                .max(Comparator.comparingLong(OrderFuture::getDateFilled))
                 .orElse(null);
 
         BigDecimal balanceUse = position == null
@@ -160,13 +149,13 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
         reconcileOrders(ordersActive, desiredOrders);
     }
 
-    private void reconcileOrders(@NotNull List<BinanceConnector.OrderFuture> currentOrders, @NotNull List<OrderPreview> desiredOrders) {
+    private void reconcileOrders(@NotNull List<OrderFuture> currentOrders, @NotNull List<OrderPreview> desiredOrders) {
         Set<String> keptOrders = new HashSet<>();
-        List<BinanceConnector.OrderFuture> ordersToCancel = new ArrayList<>();
+        List<OrderFuture> ordersToCancel = new ArrayList<>();
         List<OrderPreview> ordersToCreate = new ArrayList<>(desiredOrders);
         for (OrderPreview desired : desiredOrders) {
-            BinanceConnector.OrderFuture matched = null;
-            for (BinanceConnector.OrderFuture current : currentOrders) {
+            OrderFuture matched = null;
+            for (OrderFuture current : currentOrders) {
                 if (keptOrders.contains(current.getNameOrder())) {
                     continue;
                 }
@@ -183,12 +172,12 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
         }
 
         // Cancelar orden
-        for (BinanceConnector.OrderFuture current : currentOrders)
+        for (OrderFuture current : currentOrders)
             if (!keptOrders.contains(current.getNameOrder())) {
                 ordersToCancel.add(current);
             }
-        waitForCancel.addAll(ordersToCancel.stream().map(BinanceConnector.OrderFuture::getNameOrder).toList());
-        for (BinanceConnector.OrderFuture order : ordersToCancel) {
+        waitForCancel.addAll(ordersToCancel.stream().map(OrderFuture::getNameOrder).toList());
+        for (OrderFuture order : ordersToCancel) {
             try {
                 connector.fCancelOrder(symbol, order.getNameOrder());
                 Log.info("Orden Cancelada: %s", order.getNameOrder());
@@ -235,16 +224,22 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
         }
     }
 
-    private boolean sameOrder(@NotNull OrderPreview preview, @NotNull BinanceConnector.OrderFuture order) {
+    private boolean sameOrder(@NotNull OrderPreview preview, @NotNull OrderFuture order) {
         return preview.getSideOrder() == order.getSideOrder() &&
                 preview.getAmountBaseAsset().compareTo(order.getAmountBaseAsset()) == 0 &&
                 preview.getPrice().compareTo(order.getPrice()) == 0 &&
                 preview.isReduceOnly() == order.isReduceOnly();
     }
 
-    @Override
-    public @NotNull TypeManager getTypeManager() {
-        return TypeManager.GRID;
+    private int getAmountOrderApprox(@NotNull Context c) {
+        BigDecimal amountOrderApproximate = c.getBalanceUsdt()
+                .divide(c.getCurrentPrice(), 12, RoundingMode.HALF_EVEN)
+                .divide(getConfig().getSizePerOrderBaseAsset(), 12, RoundingMode.HALF_EVEN)
+                // Entre dos ya que lo ideal es que tenga la misma cantidad de órdenes de compra y de venta
+                .divide(BigDecimal.TWO, 12, RoundingMode.HALF_EVEN)
+                .add(BigDecimal.ONE);
+
+        return amountOrderApproximate.intValue();
     }
 
     @Data

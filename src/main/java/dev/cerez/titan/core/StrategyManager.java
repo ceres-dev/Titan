@@ -4,7 +4,6 @@ import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.event.events.manager.ChangeStatusEvent;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
-import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.StorageProfiler;
 import dev.cerez.titan.utils.Revocable;
 import lombok.Getter;
@@ -23,12 +22,12 @@ public abstract class StrategyManager<C  extends BaseConfig, P extends BasePersi
     @Getter @NotNull private volatile StatusManager status = StatusManager.STOPING;
     @Getter @Setter @Nullable protected BalanceMaxRiskManager balanceMaxRiskManager;
     protected final LinkedList<Revocable> subscribeLive = new LinkedList<>();
+    private final Object lock = new Object();
 
     public StrategyManager(@NotNull StorageProfiler<C, P> storageManager,
-                           @NotNull O connector,
-                           @NotNull TypeManager typeManager
+                           @NotNull O connector
     ) {
-        super(storageManager, connector, typeManager);
+        super(storageManager, connector);
     }
 
     protected @NotNull Map<String, BigDecimal> fGetBalanceAvailable(){
@@ -77,23 +76,27 @@ public abstract class StrategyManager<C  extends BaseConfig, P extends BasePersi
 
     @Override
     public void start(){
-        setStatus(StatusManager.STARTING);
-        super.start();
-        if (this.status == StatusManager.STARTING) {
-            setStatus(StatusManager.READY);
+        synchronized (lock) {
+            setStatus(StatusManager.STARTING);
+            super.start();
+            if (this.status == StatusManager.STARTING) {
+                setStatus(StatusManager.READY);
+            }
         }
     }
 
     @Override
     public void stop(){
-        setStatus(StatusManager.STOPING);
-        super.stop();
-        subscribeLive.forEach(Revocable::revoke);
-        subscribeLive.clear();
-        setStatus(StatusManager.STOPPED);
+        synchronized (lock) {
+            setStatus(StatusManager.STOPING);
+            super.stop();
+            subscribeLive.forEach(Revocable::revoke);
+            subscribeLive.clear();
+            setStatus(StatusManager.STOPPED);
+        }
     }
 
-    protected void setStatus(StatusManager status){
+    protected synchronized void setStatus(StatusManager status){
         this.status = status;
         callEvent(new ChangeStatusEvent(this, status));
     }

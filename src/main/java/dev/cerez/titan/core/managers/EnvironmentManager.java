@@ -18,7 +18,6 @@ import dev.cerez.titan.core.event.EventPriority;
 import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.event.events.manager.ChangeStatusEvent;
 import dev.cerez.titan.core.exception.AlreadySubscribedException;
-import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.infrastructure.model.*;
 import dev.cerez.titan.log.Log;
@@ -55,7 +54,7 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
     private final EventManager eventManager = new EventManager();
 
     private EnvironmentManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector binanceConnector, @NotNull UUID idOwner) {
-        super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), binanceConnector, TypeManager.ENVIRONMENT);
+        super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), binanceConnector);
         this.storageManager = storageManager;
         this.idOwner = idOwner;
         this.commandHandler = new CommandHander();
@@ -128,11 +127,6 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
         return managerMap.get(id);
     }
 
-    @Override
-    public @NotNull TypeManager getTypeManager() {
-        return TypeManager.FUNDING_NEUTRAL;
-    }
-
     public class EnvironmentPort {
 
         public void executeCommand(String cmd){
@@ -144,7 +138,7 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
         }
 
         public @NotNull List<Strategy> getStrategy() {
-            return managerMap.values().stream().filter(m -> m instanceof StrategyManager<?,?,?>).map(m -> (StrategyManager<?,?,?>) m).map(m -> new Strategy(m.getId(), m.getTypeManager(), m.getName(), m.getClass().getSimpleName(), m.getStatus())).toList();
+            return managerMap.values().stream().filter(m -> m instanceof StrategyManager<?,?,?>).map(m -> (StrategyManager<?,?,?>) m).map(m -> new Strategy(m.getId(), m.getName(), m.getClass().getSimpleName(), m.getStatus())).toList();
         }
 
         public Time getTime(){

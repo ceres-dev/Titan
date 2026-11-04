@@ -1,6 +1,8 @@
 package dev.cerez.titan.core.strategy.grid.model;
 
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.connector.model.BookTick;
+import dev.cerez.titan.connector.model.order.OrderFuture;
 import dev.cerez.titan.core.strategy.grid.GridManager;
 import lombok.Data;
 import org.jetbrains.annotations.Contract;
@@ -15,10 +17,10 @@ import java.util.List;
 public final class Context {
     private final @NotNull BigDecimal balanceUsdt;
     private final @NotNull BigDecimal currentPrice;
-    private final BinanceConnector.@NotNull BookTick currentBookTicker;
+    private final @NotNull BookTick currentBookTicker;
     private final GridManager.@NotNull GridManagerConfig config;
     private final BinanceConnector.@Nullable FuturePosition position;
-    private final @NotNull List<BinanceConnector.OrderFuture> orders;
+    private final @NotNull List<OrderFuture> orders;
     private final HashMap<String, Object> attributes = new HashMap<>();
 
     @Contract(pure = true)

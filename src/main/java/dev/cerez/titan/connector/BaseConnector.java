@@ -3,11 +3,9 @@ package dev.cerez.titan.connector;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.exception.ApiException;
 import dev.cerez.titan.connector.exception.DefaultApiException;
-import dev.cerez.titan.connector.exception.NotSetApiKeysException;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.BaseConfig;
@@ -21,12 +19,10 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
@@ -35,6 +31,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public abstract class BaseConnector implements Connector {
@@ -105,7 +102,8 @@ public abstract class BaseConnector implements Connector {
 
     protected void internalStop(){
         for (Map.Entry<String, WebSocketContainer> entry : webSockets.entrySet()) {
-            entry.getValue().getWebSocket().sendClose(0, "The program has ended.");;
+            WebSocket webSocket = entry.getValue().getWebSocket();
+            if (webSocket != null) webSocket.sendClose(0, "The program has ended.");
         }
         webSockets.clear();
         stopLoopers();
@@ -227,104 +225,21 @@ public abstract class BaseConnector implements Connector {
         return sendSignedWebSocketRequest(endpoint, method, new HashMap<>());
     }
 
-    protected CompletableFuture<JsonNode> sendSignedWebSocketRequest(
+    protected abstract CompletableFuture<JsonNode> sendSignedWebSocketRequest(
             @NotNull String url,
             @NotNull String method,
             @NotNull Map<String, Object> params
-    ) {
-        if (config.secret == null
-                || config.key == null
-                || config.secret.isBlank()
-                || config.key.isBlank()) {
-
-            throw new NotSetApiKeysException("API Key not set");
-        }
-
-        // Parámetros obligatorios para una request firmada
-        params.put("apiKey", config.key);
-        params.put("timestamp", System.currentTimeMillis() + deltaClienteToServer);
-
-        /*
-         * Binance requiere que los parámetros utilizados para la firma
-         * estén ordenados alfabéticamente por nombre.
-         */
-        TreeMap<String, Object> signingParams = new TreeMap<>(params);
-        String queryString = buildQueryString(signingParams);
-
-        try {
-            String signature = hmacSha256(queryString, config.secret);
-
-            UUID id = UUID.randomUUID();
-            ObjectNode request = mapper.createObjectNode();
-            request.put("id", id.toString());
-            request.put("method", method);
-            ObjectNode requestParams = mapper.createObjectNode();
-
-            for (Map.Entry<String, Object> entry : params.entrySet()) {
-                requestParams.set(
-                        entry.getKey(),
-                        mapper.valueToTree(entry.getValue())
-                );
-            }
-
-            requestParams.put("signature", signature);
-            request.set("params", requestParams);
-
-            if (config.isLogsRequest()) {
-                Log.info("PR wws=%s", request);
-            }
-
-            sendWebSocket(url, request.toString());
-            CompletableFuture<JsonNode> future = new CompletableFuture<>();
-//            System.out.println("id: " + id + " Send: " + request);
-            webSockets.get(url).getPendingResponse().put(id.toString(), future::complete);
-            return future;
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    );
 
     protected CompletableFuture<JsonNode> sendPublicWebSocketRequest(@NotNull String endpoint, @NotNull String method) {
         return sendPublicWebSocketRequest(endpoint, method, new HashMap<>());
     }
 
-    protected CompletableFuture<JsonNode> sendPublicWebSocketRequest(
+    protected abstract CompletableFuture<JsonNode> sendPublicWebSocketRequest(
             @NotNull String url,
             @NotNull String method,
             @NotNull Map<String, Object> params
-    ) {
-        if (config.secret == null
-                || config.key == null
-                || config.secret.isBlank()
-                || config.key.isBlank()) {
-
-            throw new NotSetApiKeysException("API Key not set");
-        }
-
-        UUID id = UUID.randomUUID();
-        ObjectNode request = mapper.createObjectNode();
-        request.put("id", id.toString());
-        request.put("method", method);
-        ObjectNode requestParams = mapper.createObjectNode();
-
-        for (Map.Entry<String, Object> entry : params.entrySet()) {
-            requestParams.set(
-                    entry.getKey(),
-                    mapper.valueToTree(entry.getValue())
-            );
-        }
-
-        if (!params.isEmpty()) request.set("params", requestParams);
-        if (config.isLogsRequest()) {
-            Log.info("PU wws=%s", request);
-        }
-
-        sendWebSocket(url, request.toString());
-        CompletableFuture<JsonNode> future = new CompletableFuture<>();
-        webSockets.get(url).getPendingResponse().put(id.toString(), future::complete);
-        return future;
-    }
-
+    );
 
     protected @NotNull JsonNode sendSignedRequest(@NotNull Method method,
                                                   @NotNull String endpoint
@@ -346,43 +261,11 @@ public abstract class BaseConnector implements Connector {
         return sendSignedRequest(baseUrl, method, endpoint, new HashMap<>());
     }
 
-    protected @NotNull JsonNode sendSignedRequest(@NotNull String baseUrl,
+    protected abstract @NotNull JsonNode sendSignedRequest(@NotNull String baseUrl,
                                                   @NotNull Method method,
                                                   @NotNull String endpoint,
                                                   @NotNull Map<String, Object> params
-    ) {
-        if (config.secret == null || config.key == null || config.secret.isBlank() || config.key.isBlank()) {
-            throw new NotSetApiKeysException("API Key not set");
-        }
-        params.put("timestamp", System.currentTimeMillis() + deltaClienteToServer);
-        String queryString = buildQueryString(params);
-        try {
-            final String signature = hmacSha256(queryString, config.secret);
-            final String finalUrl = baseUrl + endpoint + "?" + queryString + "&signature=" + signature;
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(finalUrl))
-                    .header("X-MBX-APIKEY", config.key)
-                    .method(method.name(), HttpRequest.BodyPublishers.noBody())
-                    .build();
-            if (config.isLogsRequest() && !getBlackListEndpointLog().contains(endpoint)) Log.info("Pr https=%s %s", method, finalUrl);
-            JsonNode jsonRaw = null;
-            try {
-                HttpResponse<String> response = clientHttp.send(request, HttpResponse.BodyHandlers.ofString());
-                onResponseHttps(finalUrl, response);
-                checkResponse(jsonRaw = mapper.readTree(response.body()), request);
-                return jsonRaw;
-            } catch (IOException | InterruptedException e) {
-                Log.exception("Error de IO o Interrupción: %s".formatted(e.getMessage()), e);
-                throw new RuntimeException(e);
-            }catch (DefaultApiException e) {
-                Log.error("%s %s -> %s", method.name(), finalUrl, jsonRaw);
-                throw e;
-            }
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            throw new RuntimeException(e);
-        }
-
-    }
+    );
 
     @SuppressWarnings("SameParameterValue")
     protected @NotNull JsonNode sendPublicRequest(@NotNull Method method,
@@ -407,37 +290,11 @@ public abstract class BaseConnector implements Connector {
         return sendPublicRequest(baseUrl, method, endpoint, new HashMap<>());
     }
 
-    protected @NotNull JsonNode sendPublicRequest(@NotNull String baseUrl,
+    protected abstract @NotNull JsonNode sendPublicRequest(@NotNull String baseUrl,
                                                   @NotNull Method method,
                                                   @NotNull String endpoint,
                                                   @NotNull Map<String, Object> params
-    ) {
-        String queryString = buildQueryString(params);
-        String finalUrl = baseUrl + (
-                queryString.isBlank()
-                        ? endpoint
-                        : endpoint + "?" + queryString
-        );
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(finalUrl))
-                .method(method.toString(), HttpRequest.BodyPublishers.noBody())
-                .build();
-        if (config.isLogsRequest() && !getBlackListEndpointLog().contains(endpoint)) Log.info( "Pu https=%s %s", method, finalUrl);
-        String jsonRaw = null;
-        if (telemetry != null) telemetry.addRequestConnector(method, finalUrl);
-        try {
-            HttpResponse<String> response = clientHttp.send(request, HttpResponse.BodyHandlers.ofString());
-            onResponseHttps(finalUrl, response);
-            jsonRaw = response.body();
-            JsonNode node = mapper.readTree(jsonRaw);
-            checkResponse(node, request);
-            return node;
-        } catch (IOException | InterruptedException | ApiException e) {
-            Log.error(finalUrl + " @ " + jsonRaw);
-            throw new RuntimeException(e);
-        }
-    }
+    );
 
     protected String buildQueryString(@NotNull Map<String, Object> params) {
         StringJoiner sj = new StringJoiner("&");
@@ -508,7 +365,7 @@ public abstract class BaseConnector implements Connector {
         return integerPart + (double) decimalPart / divisor;
     }
 
-    protected  <T> void splitStream(Collection<T> streams, Consumer<List<T>> consumer){
+    protected <T> void splitStream(Collection<T> streams, Consumer<List<T>> consumer){
         List<T> streamsList = new ArrayList<>(streams);
         for (int i = 0; i < streamsList.size(); i += config.maxStreamsPerSubscribe) {
             int end = Math.min(i + config.maxStreamsPerSubscribe, streamsList.size());
@@ -545,31 +402,29 @@ public abstract class BaseConnector implements Connector {
         }
     }
 
-    protected boolean addConsumerStreams(@NotNull String key, @NotNull UUID id, @NotNull Consumer<JsonNode> consumer, boolean muliThreading) {
+    protected String createKey(String url, String stream) {
+        return url + "/" + stream;
+    }
+
+    protected boolean addConsumerStreams(@NotNull String key, @NotNull UUID id, @NotNull Consumer<JsonNode> consumer) {
         final AtomicBoolean isNew = new AtomicBoolean(false);
-        if (muliThreading) {
-            consumerStreamsMap.computeIfAbsent(key, k -> {
-                isNew.set(true);
-                return new HashMap<>();
-            }).put(id, (json) -> executor.execute(() -> consumer.accept(json)));
-        }else {
-            consumerStreamsMap.computeIfAbsent(key, k -> {
-                isNew.set(true);
-                return new HashMap<>();
-            }).put(id, consumer);
-        }
+        consumerStreamsMap.computeIfAbsent(key, k -> {
+            isNew.set(true);
+            return new HashMap<>();
+        }).put(id, (json) -> executor.execute(() -> consumer.accept(json)));
         return isNew.get();
     }
 
-    protected void onResponseHttps(@NotNull String url, @NotNull HttpResponse<String> response) {}
+    protected abstract @NotNull Revocable subscribeStream(String url, Consumer<JsonNode> consumer, String stream);
+
+    protected abstract void unsubscribeStream(@NotNull String url, @NotNull UUID id);
+
 
     protected abstract void handleStreamRawExpress(@NotNull String wwsURL, @NotNull String contentToParse);
 
     protected abstract void handleStreamRaw(@NotNull String wwsURL, @NotNull JsonNode node);
 
     protected abstract @Nullable String getPingPayload(@NotNull String wwsURL);
-
-    protected abstract @NotNull Set<String> getBlackListEndpointLog();
 
     public abstract @NotNull String sGetHTTPS();
 
@@ -605,11 +460,12 @@ public abstract class BaseConnector implements Connector {
     public static class WebSocketSubscribe implements Revocable {
         @Getter
         private final UUID id;
-        private final Consumer<UUID> revoke;
+        private final String url;
+        private final BiConsumer<String, UUID> revoke;
 
         @Override
         public void revoke(){
-            revoke.accept(id);
+            revoke.accept(url, id);
         }
     }
 

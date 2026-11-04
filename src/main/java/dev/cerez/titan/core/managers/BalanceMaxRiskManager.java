@@ -2,7 +2,6 @@ package dev.cerez.titan.core.managers;
 
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.*;
-import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.StorageManager;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -20,7 +19,7 @@ public class BalanceMaxRiskManager extends BaseManager<BalanceMaxRiskManager.Bal
     private final HashMap<String, BigDecimal> balanceRisk = new HashMap<>();
 
     public BalanceMaxRiskManager(@NotNull StorageManager storageManager, BinanceConnector connector) {
-        super(storageManager.createProfilerManager(BalanceMaxRiskManagerConfig.class, PersistentNope.class), connector, TypeManager.ENVIRONMENT);
+        super(storageManager.createProfilerManager(BalanceMaxRiskManagerConfig.class, PersistentNope.class), connector);
         balanceRisk.putAll(normalize(getConfig().getBalanceDivision()));
     }
 

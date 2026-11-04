@@ -32,9 +32,9 @@ public interface Connector extends Switch, AutoCloseable, Telemetryable<Telemetr
 
     @NotNull Long getTimeSever();
 
-    void wsSubscribeBookTicker(@NotNull Consumer<BookTickDouble> consumer, @NotNull Collection<String> symbols);
+    void wsSubscribeBookTickerLegacy(@NotNull Consumer<BookTickDouble> consumer, @NotNull Collection<String> symbols);
 
-    void wsUnsubscribeBookTicker(@NotNull Consumer<BookTickDouble> listener);
+    void wsUnsubscribeBookTickerLegacy(@NotNull Consumer<BookTickDouble> listener);
 
     default void close(){
         stop();

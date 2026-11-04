@@ -1,16 +1,13 @@
 package dev.cerez.titan.core;
 
 import dev.cerez.titan.TitanApplication;
+import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.core.event.EventManager;
-import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.log.Log;
-import dev.cerez.titan.connector.Connector;
-import dev.cerez.titan.core.strategy.TypeManager;
 import dev.cerez.titan.storage.Storage;
 import dev.cerez.titan.storage.StorageProfiler;
 import dev.cerez.titan.utils.NoAutoRegister;
-import dev.cerez.titan.utils.Revocable;
 import dev.cerez.titan.utils.Utils;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -19,9 +16,7 @@ import lombok.experimental.Delegate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -36,15 +31,13 @@ public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent
     @Getter @NotNull protected final UUID id = UUID.randomUUID();
     @Getter @Setter @NotNull protected String name = id.toString();
     @Getter @Setter(value = AccessLevel.NONE) protected volatile boolean running = false;
-    @Getter protected final TypeManager typeManager;
     @Getter final private EnvironmentManager environmentManager;
     @Getter @Delegate final private EventManager eventManager;
 
-    protected BaseManager(@NotNull StorageProfiler<C, P> storageProfiler, @NotNull O connector, @NotNull TypeManager typeManager) {
+    protected BaseManager(@NotNull StorageProfiler<C, P> storageProfiler, @NotNull O connector) {
         this.configStorage = storageProfiler.config();
         this.persistenceStorage = storageProfiler.persistent();
         this.connector = connector;
-        this.typeManager = typeManager;
         {
             if (this instanceof NoAutoRegister) {
                 environmentManager = null;
