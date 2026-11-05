@@ -52,6 +52,7 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
     private WebSocketServer webSocketServer = WebSocketServer.empty();
     private final Set<Subscribable> subscriptions = ConcurrentHashMap.newKeySet();
     private final EventManager eventManager = new EventManager();
+    private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(8, Utils.getThreadFactory(this));
 
     private EnvironmentManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector binanceConnector, @NotNull UUID idOwner) {
         super(storageManager.getStorageProfiler(ConfigNope.class, PersistentNope.class), binanceConnector);
@@ -265,20 +266,14 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
                     manager.connector.wuCreateEventAccountUpdate((update) -> manager.webSocketServer.sendMessage(manager.getPort().getBalance()))
             )),
             TELEMETRY(manager -> List.of(Revocable.from(manager.executor.scheduleAtFixedRate(() -> manager.webSocketServer.sendMessage(manager.getPort().getTelemetry()), 5, 5, TimeUnit.SECONDS)))),
-            STRATEGY(manager -> List.of(manager.getEventManager().registerListener(new Listener() {
-                @SuppressWarnings("unused")
-                @EventHandler(priority = EventPriority.MONITOR)
-                public void changeStatus(ChangeStatusEvent event) {
-                    manager.webSocketServer.sendMessage(manager.getPort().getStrategy());
-                }
-            }))),
+            STRATEGY(manager -> List.of(manager.getEventManager().registerListener(ChangeStatusEvent.class, (event) -> manager.webSocketServer.sendMessage(manager.getPort().getStrategy()), EventPriority.MONITOR))),
             LOGS(manager -> List.of(Log.CONSUMER_APPENDER.addConsumer((log) -> manager.webSocketServer.sendMessage(List.of(new LogRecord(Utils.cleanAnsi(log.getMessage()), log.getThreadName(), log.getLevel().toString(), log.getTimeStamp()))))));
 
             public final Function<EnvironmentManager, List<Revocable>> onSubscribe;
             public final Map<UUID, Subscribable> subscribes = new HashMap<>();
 
             @Contract(value = "_ -> new", pure = true)
-            public @NotNull Subscribable getSubscribable(EnvironmentManager env) {
+            public @NotNull Subscribable getSubscribable(@NotNull EnvironmentManager env) {
                 return subscribes.computeIfAbsent(env.getIdOwner(), (uuid) -> new Subscribable() {
                     private final List<Revocable> revocables = new ArrayList<>();
 

@@ -71,7 +71,7 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
         environmentManager.getEventManager().registerListener(new Listener() {
             @EventHandler
             public void onClosePosition(ClosePositionEvent event) {
-                gridManager.start();
+                environmentManager.getExecutor().execute(gridManager::start);
             }
             @EventHandler
             public void onOpenPosition(OpenPositionEvent event) {
@@ -79,15 +79,15 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
             }
             @EventHandler
             public void onCollectBalance(CollectBalanceEvent event) {
-                gridManager.stop();
+                environmentManager.getExecutor().execute(gridManager::stop);
             }
             @EventHandler
             public void onAbort(AbortEvent event) {
-                gridManager.start();
+                environmentManager.getExecutor().execute(gridManager::start);
             }
             @EventHandler
             public void onExitWindow(ExitWindowEvent event) {
-                gridManager.start();
+                environmentManager.getExecutor().execute(gridManager::start);
             }
         });
 

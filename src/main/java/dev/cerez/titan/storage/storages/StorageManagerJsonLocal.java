@@ -65,7 +65,6 @@ public class StorageManagerJsonLocal extends LocalStorageManager {
 
         @Override
         public void save(@NotNull O persistence, @NotNull String nameProfiler) {
-            System.out.println(getFullProfilerName(nameProfiler)  + " " + persistence);
             try (FileWriter writer = new FileWriter(path.resolve(persistence.getClass().getSimpleName().concat(SYMBOL_SEPARATOR).concat(getFullProfilerName(nameProfiler)).concat(EXTENSION)).toFile())) {
                 gson.toJson(persistence, writer);
             } catch (IOException e) {

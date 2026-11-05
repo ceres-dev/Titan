@@ -30,11 +30,13 @@ import java.util.concurrent.atomic.AtomicLong;
 public class WebSocketHandler extends TextWebSocketHandler {
 
     private final TitanApplication titan;
+    private volatile boolean isClosed = true;
 
     @Override
     public void afterConnectionEstablished(@NotNull WebSocketSession session) throws Exception {
         TitanUserDetails user = Utils.toTitanUser(session);
         if (user != null){
+            isClosed = false;
             EnvironmentManager manager = titan.getEnvironmentManager(user.getId());
             WebSocketServer webSocketServer = new WebSocketMessenger(session);
             webSocketServer.onClose(() -> manager.getPort().unsubscribe(null));
@@ -48,6 +50,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(@NotNull WebSocketSession session, @NotNull CloseStatus status) throws Exception {
         TitanUserDetails user = Utils.toTitanUser(session);
         if (user != null){
+            isClosed = true;
             EnvironmentManager manager = titan.getEnvironmentManager(user.getId());
             if (manager.getWebSocketServer() instanceof WebSocketMessenger webSocketServer) {
                 webSocketServer.callsAfterClose.forEach(Runnable::run);
@@ -72,7 +75,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
     }
 
     @RequiredArgsConstructor
-    private static class WebSocketMessenger implements WebSocketServer {
+    private class WebSocketMessenger implements WebSocketServer {
 
         private final Gson gson = new Gson();
         private final WebSocketSession session;
@@ -98,10 +101,12 @@ public class WebSocketHandler extends TextWebSocketHandler {
             WebSocketContainer webSocketContainer = new WebSocketContainer(type, message, sequence);
             String payload = gson.toJson(webSocketContainer);
             executor.execute(() -> {
-                try {
-                    if (session.isOpen()) session.sendMessage(new TextMessage(payload));
-                } catch (IOException e) {
-                    Log.exception(e);
+                synchronized (session) {
+                    try {
+                        if (session.isOpen() && !isClosed) session.sendMessage(new TextMessage(payload));
+                    } catch (IOException e) {
+                        Log.exception(e);
+                    }
                 }
             });
         }
