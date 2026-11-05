@@ -45,19 +45,17 @@ import java.util.function.Function;
 public final class GridManager extends StrategyManager<GridManager.GridManagerConfig, PersistentNope, BinanceConnector> implements StatusProfiler {
 
     @Nullable private OrderFuture lastOrderFilled = null;
-    private volatile Future<?> waitForUpdate = CompletableFuture.runAsync(() -> {});
+    @NotNull private volatile Future<?> waitForUpdate = CompletableFuture.runAsync(() -> {});
 
-    @NotNull private final String symbol;
-    @NotNull private final WaitableSet<String> waitForCancel = new WaitableSet<>();
-    @NotNull private final HashSet<String> forOpen = new HashSet<>();
-    @NotNull private final PriceAlarm priceAlarm;
-    @NotNull private final GridBuilder gridBuilder;
-    @NotNull private final ApplyAttributes applyAttributes;
+    private final String symbol;
+    private final WaitableSet<String> waitForCancel = new WaitableSet<>();
+    private final HashSet<String> forOpen = new HashSet<>();
+    private final GridBuilder gridBuilder;
+    private final ApplyAttributes applyAttributes;
 
     public GridManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
-        super(storageManager.createProfilerManager(GridManagerConfig.class, PersistentNope.class), connector);
+        super(storageManager.getStorageProfiler(GridManagerConfig.class, PersistentNope.class), connector);
         this.symbol = getConfig().baseAsset + getConfig().quoteAsset;
-        this.priceAlarm = new PriceAlarm(connector, symbol);
         this.gridBuilder = new GridBuilder(getConfig());
         this.applyAttributes = GridProfiler.DEFAULT.getApplyAttributes(this);
     }
@@ -108,15 +106,14 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
 
     @Override
     public void internalStop() {
-//        priceAlarm.stop();
+        waitForCancel.clear();
+        forOpen.clear();
         connector.fCancelOrderAll(symbol);
     }
 
     public synchronized void updateGrid() {
         if (!running) return;
         waitForUpdate.cancel(false);
-        waitForCancel.clear();
-        forOpen.clear();
         BigDecimal currentPrice = connector.fGetPrice(symbol);
         CompletableFuture<BinanceConnector.FuturePosition> positionFuture = CompletableFuture.supplyAsync(() -> connector.fGetPosition(symbol));
         CompletableFuture<List<OrderFuture>> ordersFuture = CompletableFuture.supplyAsync(() -> connector.fGetAllOrder(symbol));
@@ -149,7 +146,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
         reconcileOrders(ordersActive, desiredOrders);
     }
 
-    private void reconcileOrders(@NotNull List<OrderFuture> currentOrders, @NotNull List<OrderPreview> desiredOrders) {
+    private synchronized void reconcileOrders(@NotNull List<OrderFuture> currentOrders, @NotNull List<OrderPreview> desiredOrders) {
         Set<String> keptOrders = new HashSet<>();
         List<OrderFuture> ordersToCancel = new ArrayList<>();
         List<OrderPreview> ordersToCreate = new ArrayList<>(desiredOrders);
@@ -176,6 +173,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
             if (!keptOrders.contains(current.getNameOrder())) {
                 ordersToCancel.add(current);
             }
+        waitForCancel.clear();
         waitForCancel.addAll(ordersToCancel.stream().map(OrderFuture::getNameOrder).toList());
         for (OrderFuture order : ordersToCancel) {
             try {
@@ -195,6 +193,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
 
         // Enviar orden
         boolean retry = false;
+        forOpen.clear();
         forOpen.addAll(ordersToCreate.stream().map(OrderPreview::getNameOrder).toList());
         for (OrderPreview order : ordersToCreate) {
             try {

@@ -2,24 +2,43 @@ package dev.cerez.titan.storage;
 
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.BasePersistent;
+import dev.cerez.titan.utils.Provider;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 
+import java.util.Set;
 import java.util.UUID;
 
 public interface StorageManager {
 
+    String DEFAULT_PROFILER_NAME = "default";
+    String SYMBOL_SEPARATOR = "-";
+
     UUID getIdUser();
 
-    <C extends BaseConfig> Storage<C> getConfig(@NotNull Class<C> clazz);
+    <C extends BaseConfig> Storage<C> getConfig(@NotNull Class<C> clazz, @NotNull String profilerName);
 
-    <P extends BasePersistent> Storage<P> getPersistent(@NotNull Class<P> clazz);
+    <P extends BasePersistent> Storage<P> getPersistent(@NotNull Class<P> clazz, @NotNull String profilerName);
 
-    <C extends BaseConfig, P extends BasePersistent> StorageProfiler<C, P> createProfilerManager(Class<C> config, Class<P> persistent);
+    @Contract(pure = true, value = "_ -> new")
+    @NotNull StorageManager createSubProfiler(@NotNull String subProfilerName);
 
-    <C extends BaseConfig> void setConfigProfilerName(Class<C> clazz, String profilerName);
+    @Contract(pure = true)
+    @NotNull StorageManager getSuperProfiler();
 
-    <P extends BasePersistent> void setPersistentProfilerName(Class<P> clazz, String profilerName);
+    @Contract(pure = true)
+    @NotNull @Unmodifiable
+    Set<StorageManager> getSubProfiler();
+
+    default <C extends BaseConfig> Storage<C> getConfig(@NotNull Class<C> clazz){
+        return getConfig(clazz, getDefaultProfilerName());
+    }
+
+    default <P extends BasePersistent> Storage<P> getPersistent(@NotNull Class<P> clazz){
+        return getPersistent(clazz, getDefaultProfilerName());
+    }
 
     default <C extends BaseConfig> C loadConfig(Class<C> clazz) {
         return getConfig(clazz).load();
@@ -31,13 +50,23 @@ public interface StorageManager {
 
     @Contract(value = "_ -> this")
     default <C extends BaseConfig> @NotNull StorageManager saveConfig(@NotNull C config) {
-        getConfig(config.getClass()).saveUnsafe(config);
+        return saveConfig(config, getDefaultProfilerName());
+    }
+
+    @Contract(value = "_, _-> this")
+    default <C extends BaseConfig> @NotNull StorageManager saveConfig(@NotNull C config, @NotNull String profilerName) {
+        getConfig(config.getClass(), profilerName).saveUnsafe(config);
         return this;
     }
 
     @Contract(value = "_ -> this")
     default <P extends BasePersistent> @NotNull StorageManager savePersistence(@NotNull P persistent) {
-        getPersistent(persistent.getClass()).saveUnsafe(persistent);
+        return savePersistence(persistent, getDefaultProfilerName());
+    }
+
+    @Contract(value = "_, _ -> this")
+    default <P extends BasePersistent> @NotNull StorageManager savePersistence(@NotNull P persistent, @NotNull String profilerName) {
+        getPersistent(persistent.getClass(), profilerName).saveUnsafe(persistent);
         return this;
     }
 
@@ -76,6 +105,31 @@ public interface StorageManager {
             return persistent;
         }else {
             return p;
+        }
+    }
+
+    default <C extends BaseConfig, P extends BasePersistent> StorageProfiler<C, P> getStorageProfiler(Class<C> config, Class<P> persistent){
+        return getStorageProfiler(config, persistent, getDefaultProfilerName());
+    }
+
+    default <C extends BaseConfig, P extends BasePersistent> StorageProfiler<C, P> getStorageProfiler(Class<C> config, Class<P> persistent, String nameProfiler){
+        return new StorageProfiler<>(getConfig(config, nameProfiler), getPersistent(persistent, nameProfiler));
+    }
+
+    default String getDefaultProfilerName(){
+        return DEFAULT_PROFILER_NAME;
+    }
+
+    default String getBaseNameProfiler(){
+        return "";
+    }
+
+    default String getFullProfilerName(String profilerName){
+        String s = getBaseNameProfiler();
+        if (s.isEmpty()){
+            return profilerName;
+        }else {
+            return s.concat(SYMBOL_SEPARATOR).concat(profilerName);
         }
     }
 }

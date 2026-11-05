@@ -37,7 +37,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
     private final ConcurrentMap<String, SymbolTarget> symbolsPendingForClose = new ConcurrentHashMap<>();
 
     public FundingOnTimeManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
-        super(storageManager.createProfilerManager(FundingManagerConfig.class, PersistentNope.class), connector);
+        super(storageManager.getStorageProfiler(FundingManagerConfig.class, PersistentNope.class), connector);
     }
 
     @Override
@@ -80,7 +80,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         setStatus(StatusManager.WAITING);
         LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
         setStatus(StatusManager.PREPARING);
-        callEvent(new StartWidowEvent(this));
+        callEvent(new EntryWidowEvent(this));
         CompletableFuture<Map<String, BinanceConnector.FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
         CompletableFuture<RangeTime> remoteFuture = CompletableFuture.supplyAsync(() -> getDeltaClockRemote(TimeUnit.SECONDS, 20));
         CompletableFuture<Map<String, Symbol>> symbolsFuture = CompletableFuture.supplyAsync(connector::fGetAllSymbols);
@@ -97,7 +97,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                 .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateMin()) > 0)
                 .toList();
 
-        List<BinanceConnector.FundingRate> targetLimited = targetFiltered.stream()
+        List<BinanceConnector.FundingRate> targetLimited = config.maxSymbolsCandidate == -1 ? targetFiltered : targetFiltered.stream()
                 .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRateAbs).reversed())
                 .limit(config.maxSymbolsCandidate)
                 .toList();
@@ -161,10 +161,10 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         long fundingTimeLocal = symbols.getFirst().target.nextFundingTime() - remote.avg();
         var config = getConfig();
 
-        long waitFinal = fundingTimeLocal - config.windowSize;
+        long waitFinal = fundingTimeLocal - config.offsetOpenPositon;
         long currentTimeFinal = System.currentTimeMillis();
         long deltaWaitFinal = waitFinal - currentTimeFinal;
-        executor.schedule(() -> callEvent(new EndWindowEvent(this)), deltaWaitFinal + 5_000, TimeUnit.MILLISECONDS);
+        executor.schedule(() -> callEvent(new ExitWindowEvent(this)), deltaWaitFinal + 5_000, TimeUnit.MILLISECONDS);
         if (deltaWaitFinal < 2_000){
             callEvent(new AbortEvent(this));
             Log.warning("Abort: out window final %dms", deltaWaitFinal);
@@ -246,7 +246,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         @Builder.Default private BigDecimal maxQuantityQuote = new BigDecimal("6");
         @Builder.Default private BigDecimal fundingRateMin = BigDecimal.valueOf(0.002);
         @Builder.Default private boolean sendTrade = false;
-        @Builder.Default private long windowSize = 1000; // MS
+        @Builder.Default private long offsetOpenPositon = 1000; // MS
         @Builder.Default private int leverage = 1;
         @Builder.Default private int maxCompetition = 3;
         @Builder.Default private int maxSymbolsCandidate = 5;

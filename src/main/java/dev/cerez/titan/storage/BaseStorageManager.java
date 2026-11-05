@@ -1,51 +1,54 @@
 package dev.cerez.titan.storage;
 
-import dev.cerez.titan.core.BaseConfig;
-import dev.cerez.titan.core.BasePersistent;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import dev.cerez.titan.storage.exception.IllegalProfilerNameException;
+import dev.cerez.titan.storage.exception.IsRootProfilerException;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
-@RequiredArgsConstructor
 public abstract class BaseStorageManager implements StorageManager {
 
-    protected final Map<Class<BaseConfig>, Storage<BaseConfig>> config = new HashMap<>();
-    protected final Map<Class<BasePersistent>, Storage<BasePersistent>> persistence = new HashMap<>();
-    @Getter
-    protected final UUID idUser;
+    private static final String REGEX_PROFILER_NAME = "^[a-zA-Z0-9]+$";
+    private String fullProfilerName = "";
+    private final ConcurrentHashMap<String, StorageManager> subProfilers = new ConcurrentHashMap<>();
+    @Nullable
+    private StorageManager superProfiler = null;
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public <C extends BaseConfig> Storage<C> getConfig(@NotNull Class<C> clazz) {
-        return (Storage<C>) config.computeIfAbsent((Class<BaseConfig>) clazz, this::buildConfig);
+    protected void concatBaseNameProfiler(@NotNull String fullProfilerName){
+        this.fullProfilerName = fullProfilerName;
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public <P extends BasePersistent> Storage<P> getPersistent(@NotNull Class<P> clazz) {
-        return (Storage<P>) persistence.computeIfAbsent((Class<BasePersistent>) clazz, this::buildPersistent);
+    public String getBaseNameProfiler() {
+        return fullProfilerName;
     }
 
     @Override
-    public  <C extends BaseConfig, P extends BasePersistent> StorageProfiler<C, P> createProfilerManager(Class<C> config, Class<P> persistent){
-        return new StorageProfiler<>(getConfig(config), getPersistent(persistent));
+    public @NotNull BaseStorageManager createSubProfiler(@NotNull String subProfilerName){
+        if (!subProfilerName.matches(REGEX_PROFILER_NAME)){
+            throw new IllegalProfilerNameException(subProfilerName);
+        }
+        BaseStorageManager manager = copy();
+        manager.concatBaseNameProfiler(getFullProfilerName(subProfilerName));
+        manager.superProfiler = this;
+        subProfilers.putIfAbsent(subProfilerName, manager);
+        return manager;
     }
 
     @Override
-    public <C extends BaseConfig> void setConfigProfilerName(Class<C> clazz, String profilerName){
-        getConfig(clazz).setProfilerName(profilerName);
+    public @NotNull StorageManager getSuperProfiler(){
+        if (superProfiler == null) throw new IsRootProfilerException();
+        return superProfiler;
     }
 
     @Override
-    public <P extends BasePersistent> void setPersistentProfilerName(Class<P> clazz, String profilerName){
-        getPersistent(clazz).setProfilerName(profilerName);
+    public @NotNull Set<StorageManager> getSubProfiler(){
+        return Set.copyOf(subProfilers.values());
     }
 
-    public abstract @NotNull Storage<BaseConfig> buildConfig(Class<BaseConfig> clazz);
-
-    public abstract @NotNull Storage<BasePersistent> buildPersistent(Class<BasePersistent> clazz);
+    @Contract(pure = true, value = "-> new")
+    protected abstract BaseStorageManager copy();
 }

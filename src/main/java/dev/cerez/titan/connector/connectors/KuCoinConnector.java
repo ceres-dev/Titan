@@ -96,13 +96,6 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
 
     }
 
-    @Override
-    protected String getPingPayload(@NotNull String wwsURL) {
-        return """
-                {"id": "%d","type": "rangeTime"}
-                """.formatted(random.nextInt());
-    }
-
     public void checkApikey() {
         throw new UnsupportedOperationException();
     }

@@ -23,9 +23,7 @@ public class FundingOnTimeCommand extends BaseCommand implements ProfilerSetup {
     @Override
     public void execute(@NotNull List<String> args) {
         BinanceConnector connector = this.getEnvironmentManager().getConnector();
-        StorageManager storageReal = new StorageManagerJsonLocal(Utils.getRootId());
         StorageManager storageMemory = new StorageManagerMemory(Utils.getRootId());
-        storageReal.setConfigProfilerName(BaseConnector.ConnectorConfig.class, "testnet");
 
         connector.wuCreateEventAccountUpdate((jsonNode -> {
             Log.info(jsonNode.toPrettyString());

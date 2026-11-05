@@ -6,6 +6,7 @@ import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -237,7 +238,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
      * asset de menor id que tenga conversión directa al preferido (para poder expresar defaultStartAmount).
      * Devuelve null si no hay forma de dimensionar el monto inicial.
      */
-    private static Triangle buildTriangle(int id, LegDef[] cycle, int preferredId, int[] convSymbol, boolean[] convAssetIsBase) {
+    private static @Nullable Triangle buildTriangle(int id, LegDef[] cycle, int preferredId, int[] convSymbol, boolean[] convAssetIsBase) {
         int k = -1;
         for (int i = 0; i < TRIANGLE_SIZE; i++) {
             if (cycle[i].from.id() == preferredId) {
@@ -421,7 +422,7 @@ public class SearchTriangularEngineJava extends SearchTriangularEngine {
      * Devuelve la oportunidad simulada, o null si el triángulo no es rentable / ejecutable.
      * Fase 1: producto de tasas. Fase 2: simulación con step, mínimos, liquidez y descartando dust.
      */
-    private Opportunity compute(Graph g, Triangle t, Opportunity prev, long now) {
+    private @Nullable Opportunity compute(Graph g, Triangle t, Opportunity prev, long now) {
         final Quote q0 = g.quotes.get(t.s0);
         final Quote q1 = g.quotes.get(t.s1);
         final Quote q2 = g.quotes.get(t.s2);

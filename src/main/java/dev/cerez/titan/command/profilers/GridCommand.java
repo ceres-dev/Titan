@@ -19,8 +19,6 @@ import org.jetbrains.annotations.NotNull;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
 
 @ToString
 public class GridCommand extends BaseCommand implements ProfilerSetup {
@@ -49,6 +47,8 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
 
         FundingOnTimeManager.FundingManagerConfig fundingConfigDefault = FundingOnTimeManager.FundingManagerConfig.builder()
                 .sendTrade(true)
+                .leverage(1)
+                .offsetOpenPositon(250)
                 .build();
 
         BalanceMaxRiskManager.BalanceMaxRiskManagerConfig balanceMaxRiskManagerConfigDefault = BalanceMaxRiskManager.BalanceMaxRiskManagerConfig.builder()
@@ -68,7 +68,7 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
         discordConnector.setStatusProfiler(gridManager);
 
         //noinspection unused
-        environmentManager.getEventManager().registerEvents(new Listener() {
+        environmentManager.getEventManager().registerListener(new Listener() {
             @EventHandler
             public void onClosePosition(ClosePositionEvent event) {
                 gridManager.start();
@@ -86,7 +86,7 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
                 gridManager.start();
             }
             @EventHandler
-            public void onEndWindow(EndWindowEvent event) {
+            public void onExitWindow(ExitWindowEvent event) {
                 gridManager.start();
             }
         });

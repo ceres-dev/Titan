@@ -6,14 +6,14 @@ import dev.cerez.titan.log.Log;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.BasePersistent;
 import dev.cerez.titan.storage.BaseStorageManager;
+import dev.cerez.titan.storage.LocalStorageManager;
 import dev.cerez.titan.storage.Storage;
+import dev.cerez.titan.storage.StorageManager;
 import dev.cerez.titan.utils.Nameable;
-import dev.cerez.titan.utils.Utils;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NonNull;
 
 import java.io.File;
 import java.io.FileReader;
@@ -23,7 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
-public class StorageManagerJsonLocal extends BaseStorageManager {
+public class StorageManagerJsonLocal extends LocalStorageManager {
 
     private static final String EXTENSION = ".json";
     private static final String BASE_PATH = "userData";
@@ -41,13 +41,18 @@ public class StorageManagerJsonLocal extends BaseStorageManager {
     }
 
     @Override
-    public @NotNull Storage<BaseConfig> buildConfig(Class<BaseConfig> clazz) {
-        return new StorageJsonLocal<>(clazz);
+    public @NotNull Storage<BaseConfig> buildConfig(@NotNull Class<BaseConfig> clazz, @NotNull String profilerName) {
+        return new StorageJsonLocal<>(clazz, profilerName);
     }
 
     @Override
-    public @NotNull Storage<BasePersistent> buildPersistent(Class<BasePersistent> clazz) {
-        return new StorageJsonLocal<>(clazz);
+    public @NotNull Storage<BasePersistent> buildPersistent(@NotNull Class<BasePersistent> clazz,  @NotNull String profilerName) {
+        return new StorageJsonLocal<>(clazz, profilerName);
+    }
+
+    @Override
+    public BaseStorageManager copy() {
+        return new StorageManagerJsonLocal(getIdUser());
     }
 
     @Getter
@@ -56,11 +61,12 @@ public class StorageManagerJsonLocal extends BaseStorageManager {
     public class StorageJsonLocal<O extends Nameable> implements Storage<O> {
 
         private final Class<O> clazz;
-        private String profilerName = "default";
+        private final String profilerName;
 
         @Override
-        public void save(@NonNull O persistence) {
-            try (FileWriter writer = new FileWriter(path.resolve(persistence.getClass().getSimpleName() + "-" + persistence.getName() + EXTENSION).toFile())) {
+        public void save(@NotNull O persistence, @NotNull String nameProfiler) {
+            System.out.println(getFullProfilerName(nameProfiler)  + " " + persistence);
+            try (FileWriter writer = new FileWriter(path.resolve(persistence.getClass().getSimpleName().concat(SYMBOL_SEPARATOR).concat(getFullProfilerName(nameProfiler)).concat(EXTENSION)).toFile())) {
                 gson.toJson(persistence, writer);
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -68,10 +74,10 @@ public class StorageManagerJsonLocal extends BaseStorageManager {
         }
 
         @Override
-        public O load(@NonNull String name) {
+        public O load(@NotNull String nameProfiler) {
             try (FileReader reader = new FileReader(
                     path.resolve(
-                            clazz.getSimpleName() + "-" + name + EXTENSION
+                            clazz.getSimpleName().concat(SYMBOL_SEPARATOR).concat(getFullProfilerName(nameProfiler)).concat(EXTENSION)
                     ).toFile())
             ) {
                 return gson.fromJson(reader, clazz);

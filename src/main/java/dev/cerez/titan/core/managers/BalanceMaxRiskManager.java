@@ -19,7 +19,7 @@ public class BalanceMaxRiskManager extends BaseManager<BalanceMaxRiskManager.Bal
     private final HashMap<String, BigDecimal> balanceRisk = new HashMap<>();
 
     public BalanceMaxRiskManager(@NotNull StorageManager storageManager, BinanceConnector connector) {
-        super(storageManager.createProfilerManager(BalanceMaxRiskManagerConfig.class, PersistentNope.class), connector);
+        super(storageManager.getStorageProfiler(BalanceMaxRiskManagerConfig.class, PersistentNope.class), connector);
         balanceRisk.putAll(normalize(getConfig().getBalanceDivision()));
     }
 

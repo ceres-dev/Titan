@@ -2,9 +2,9 @@ package dev.cerez.titan.core.strategy.triangular;
 
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.exception.ApiException;
-import dev.cerez.titan.connector.model.order.OrderSpotResult;
 import dev.cerez.titan.connector.model.SideOrder;
 import dev.cerez.titan.connector.model.Symbol;
+import dev.cerez.titan.connector.model.order.OrderSpotResult;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine.Leg;
 import dev.cerez.titan.core.strategy.triangular.engine.SearchTriangularEngine.Opportunity;
@@ -17,15 +17,10 @@ import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.IOException;
 import java.io.Serial;
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;

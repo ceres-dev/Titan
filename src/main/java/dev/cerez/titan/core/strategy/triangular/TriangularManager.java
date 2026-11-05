@@ -36,7 +36,7 @@ public final class TriangularManager extends StrategyManager<TriangularManager.T
 
     @SneakyThrows
     public TriangularManager(@NotNull StorageManager storageManager, @NotNull Connector connector) {
-        super(storageManager.createProfilerManager(TriangularManagerConfiguration.class, PersistentNope.class), connector);
+        super(storageManager.getStorageProfiler(TriangularManagerConfiguration.class, PersistentNope.class), connector);
         this.engine = getConfig().getEngine().getConstructor(SearchTriangularEngine.EngineConfiguration.class).newInstance(getConfig());
     }
 

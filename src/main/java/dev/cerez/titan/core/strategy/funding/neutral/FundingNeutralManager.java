@@ -29,14 +29,14 @@ import java.util.concurrent.CompletableFuture;
 
 public final class FundingNeutralManager extends StrategyManager<FundingNeutralManager.FundingManagerConfiguration, FundingNeutralManager.FundingManagerPersistan, BinanceConnector> implements StatusProfiler {
 
-    @NotNull private final InputUser inputUser = new InputUser();
-    @NotNull private final String baseAsset;
-    @NotNull private final String quoteAsset;
-    @NotNull private final UUID uuid;
-    @NotNull @Getter private final String symbol;
+    private final InputUser inputUser = new InputUser();
+    private final String baseAsset;
+    private final String quoteAsset;
+    private final UUID uuid;
+    @Getter private final String symbol;
 
     public FundingNeutralManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
-        super(storageManager.createProfilerManager(FundingManagerConfiguration.class, FundingManagerPersistan.class), connector);
+        super(storageManager.getStorageProfiler(FundingManagerConfiguration.class, FundingManagerPersistan.class), connector);
         FundingManagerPersistan persistan = getPersistence();
         this.baseAsset = getConfig().getBaseAsset();
         this.quoteAsset = getConfig().getQuoteAsset();

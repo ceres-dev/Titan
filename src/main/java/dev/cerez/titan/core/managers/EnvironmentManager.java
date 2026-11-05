@@ -54,7 +54,7 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
     private final EventManager eventManager = new EventManager();
 
     private EnvironmentManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector binanceConnector, @NotNull UUID idOwner) {
-        super(storageManager.createProfilerManager(ConfigNope.class, PersistentNope.class), binanceConnector);
+        super(storageManager.getStorageProfiler(ConfigNope.class, PersistentNope.class), binanceConnector);
         this.storageManager = storageManager;
         this.idOwner = idOwner;
         this.commandHandler = new CommandHander();
@@ -265,7 +265,7 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
                     manager.connector.wuCreateEventAccountUpdate((update) -> manager.webSocketServer.sendMessage(manager.getPort().getBalance()))
             )),
             TELEMETRY(manager -> List.of(Revocable.from(manager.executor.scheduleAtFixedRate(() -> manager.webSocketServer.sendMessage(manager.getPort().getTelemetry()), 5, 5, TimeUnit.SECONDS)))),
-            STRATEGY(manager -> List.of(manager.getEventManager().registerEvents(new Listener() {
+            STRATEGY(manager -> List.of(manager.getEventManager().registerListener(new Listener() {
                 @SuppressWarnings("unused")
                 @EventHandler(priority = EventPriority.MONITOR)
                 public void changeStatus(ChangeStatusEvent event) {

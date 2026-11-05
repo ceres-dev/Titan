@@ -24,15 +24,15 @@ import java.util.concurrent.ScheduledExecutorService;
 
 public abstract class BaseManager<C extends BaseConfig, P extends BasePersistent, O extends Connector> implements Manager<C, P> {
 
-    @NotNull protected final Storage<C> configStorage;
-    @NotNull protected final Storage<P> persistenceStorage;
-    @NotNull protected final ScheduledExecutorService executor = Executors.newScheduledThreadPool(6, Utils.getThreadFactory(this));
-    @Getter @NotNull protected final O connector;
-    @Getter @NotNull protected final UUID id = UUID.randomUUID();
-    @Getter @Setter @NotNull protected String name = id.toString();
+    protected final Storage<C> configStorage;
+    protected final Storage<P> persistenceStorage;
+    protected final ScheduledExecutorService executor = Executors.newScheduledThreadPool(6, Utils.getThreadFactory(this));
+    @Getter protected final O connector;
+    @Getter protected final UUID id = UUID.randomUUID();
+    @Getter @Setter protected String name = id.toString();
     @Getter @Setter(value = AccessLevel.NONE) protected volatile boolean running = false;
-    @Getter final private EnvironmentManager environmentManager;
-    @Getter @Delegate final private EventManager eventManager;
+    @Getter private final EnvironmentManager environmentManager;
+    @Getter @Delegate private final EventManager eventManager;
 
     protected BaseManager(@NotNull StorageProfiler<C, P> storageProfiler, @NotNull O connector) {
         this.configStorage = storageProfiler.config();

@@ -96,13 +96,6 @@ public final class GateConnector extends BaseConnector implements AutoCloseable 
 
     }
 
-    @Override
-    protected String getPingPayload(@NotNull String wwsURL) {
-        return """
-                {"time":%d,"channel":"spot.rangeTime"}
-                """.formatted(System.currentTimeMillis());
-    }
-
     public void checkApikey() {
         throw new UnsupportedOperationException();
     }

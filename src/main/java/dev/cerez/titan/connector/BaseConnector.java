@@ -38,23 +38,23 @@ public abstract class BaseConnector implements Connector {
 
     protected static final int COOLDOWN_MS = 5_000;
 
-    @NotNull protected final ObjectMapper mapper = new ObjectMapper();
-    @NotNull protected final HttpClient clientHttp = HttpClient.newHttpClient();
-    @NotNull protected final TemporalRefence<Map<String, Symbol>> cachedSymbols = new TemporalRefence<>(TimeUnit.MINUTES, 5);
-    @NotNull protected final ExecutorService executor = Executors.newFixedThreadPool(8, Utils.getThreadFactory(this));
-    @NotNull protected final Map<String, WebSocketContainer> webSockets = new HashMap<>();
-    @NotNull protected final ConcurrentMap<UUID, String> streams = new ConcurrentHashMap<>();
+    protected final ObjectMapper mapper = new ObjectMapper();
+    protected final HttpClient clientHttp = HttpClient.newHttpClient();
+    protected final TemporalRefence<Map<String, Symbol>> cachedSymbols = new TemporalRefence<>(TimeUnit.MINUTES, 5);
+    protected final ExecutorService executor = Executors.newFixedThreadPool(8, Utils.getThreadFactory(this));
+    protected final Map<String, WebSocketContainer> webSockets = new HashMap<>();
+    protected final ConcurrentMap<UUID, String> streams = new ConcurrentHashMap<>();
     @Getter
-    @NotNull protected final ConnectorConfig config;
-    @Setter  protected       TelemetryConnector telemetry;
-
-    @NotNull private   final Object streamIncomingLock = new Object();
-    @NotNull private   final StringBuilder streamIncomingMessage = new StringBuilder();
-    @NotNull protected final Map<String, Map<UUID, Consumer<JsonNode>>> consumerStreamsMap = new ConcurrentHashMap<>();
+    protected final ConnectorConfig config;
+    @Setter
+    protected       TelemetryConnector telemetry;
+    private   final Object streamIncomingLock = new Object();
+    private   final StringBuilder streamIncomingMessage = new StringBuilder();
+    protected final Map<String, Map<UUID, Consumer<JsonNode>>> consumerStreamsMap = new ConcurrentHashMap<>();
     @Getter
-    @NotNull protected final RateLimit rateLimitFuture = new RateLimit();
+    protected final RateLimit rateLimitFuture = new RateLimit();
     @Getter
-    @NotNull protected final RateLimit rateLimitSpot = new RateLimit();
+    protected final RateLimit rateLimitSpot = new RateLimit();
 
     protected volatile boolean waitingForPong = false;
     protected volatile long delayPingPongNanoTime = -1;
@@ -116,7 +116,7 @@ public abstract class BaseConnector implements Connector {
                 wwsForOpen.add(entry.getKey());
             }
         }
-        for  (String wws : wwsForOpen) {
+        for (String wws : wwsForOpen) {
             Log.info("WebSocket reopen: %s", wws);
             initWebSocket(wws);
         }
@@ -130,14 +130,14 @@ public abstract class BaseConnector implements Connector {
         running = true;
         executor.execute(() -> {
             while (running) {
-                LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(60));
-//                syncTimeServer();
+                LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(30));
+                invalidateCache();
             }
         });
         executor.execute(() -> {
             while (running) {
-                LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(30));
-                invalidateCache();
+                LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(60));
+                checkWebSockets();
             }
         });
     }
@@ -191,20 +191,6 @@ public abstract class BaseConnector implements Connector {
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(COOLDOWN_MS));
             sendWebSocket(request);
         }
-        executor.execute(() -> {
-            while (webSockets.containsKey(wwsURL) && webSockets.get(wwsURL).isOpen()) {
-                String ping = getPingPayload(wwsURL);
-                if (ping == null){
-                    return;
-                }
-                if (webSockets.containsKey(wwsURL)) {
-                    sendWebSocket(wwsURL, ping);
-                    waitingForPong = true;
-                    delayPingPongNanoTime = System.nanoTime();
-                }
-                LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(15));
-            }
-        });
     }
 
     public void sendWebSocket(String content) {
@@ -423,8 +409,6 @@ public abstract class BaseConnector implements Connector {
     protected abstract void handleStreamRawExpress(@NotNull String wwsURL, @NotNull String contentToParse);
 
     protected abstract void handleStreamRaw(@NotNull String wwsURL, @NotNull JsonNode node);
-
-    protected abstract @Nullable String getPingPayload(@NotNull String wwsURL);
 
     public abstract @NotNull String sGetHTTPS();
 

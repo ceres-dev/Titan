@@ -2,10 +2,10 @@ package dev.cerez.titan.command.profilers;
 
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.command.ProfilerSetup;
-import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.managers.EnvironmentManager;
+import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
 import dev.cerez.titan.core.strategy.triangular.TriangularManager;
 import dev.cerez.titan.core.strategy.triangular.engine.engines.SearchTriangularEngineJava;
 import dev.cerez.titan.core.strategy.triangular.utils.Loader;
@@ -42,12 +42,11 @@ public class TriangularCommand extends BaseCommand implements ProfilerSetup {
                 .engine(SearchTriangularEngineJava.class)
                 .build();
 
-        TelemetryCollector telemetry =           new TelemetryCollector(telemetryConfig);
+        TelemetryCollector telemetry =  new TelemetryCollector(telemetryConfig);
         Loader loader =                 new Loader();
         StorageManager storageManager = new StorageManagerMemory(Utils.getRootId());
         StorageManagerJsonLocal storageManagerJsonLocal = new StorageManagerJsonLocal(Utils.getRootId());
-        storageManagerJsonLocal.setConfigProfilerName(BaseConnector.ConnectorConfig.class, "testnetSpot");
-        Connector connector =           new BinanceConnector(storageManagerJsonLocal);
+        Connector connector =           new BinanceConnector(storageManagerJsonLocal.createSubProfiler("testnetSpot"));
 
         connector.setTelemetry(telemetry);
         connector.start();

@@ -17,7 +17,7 @@ public class EventManager {
 
     private final Map<Class<? extends Event>, CopyOnWriteArrayList<RegisteredHandler>> handlers = new ConcurrentHashMap<>();
 
-    public Revocable registerEvents(@NotNull Listener listener) {
+    public Revocable registerListener(@NotNull Listener listener) {
         for (Method method : listener.getClass().getDeclaredMethods()) {
             if (!method.isAnnotationPresent(EventHandler.class)) continue;
 

@@ -8,16 +8,18 @@ import java.util.Optional;
 
 public interface Storage<O extends Nameable> {
 
-    void save(@NotNull O object);
+    void save(@NotNull O persistence, @NotNull String nameProfiler);
 
-    O load(@NotNull String name);
+    O load(@NotNull String nameProfiler);
 
     @NotNull String getProfilerName();
 
-    void setProfilerName(@NotNull String name);
-
     default O load(){
         return this.load(getProfilerName());
+    }
+
+    default void save(@NotNull O persistence){
+        save(persistence, getProfilerName());
     }
 
     default Provider<O> getProvider(){
@@ -59,5 +61,4 @@ public interface Storage<O extends Nameable> {
             }
         }
     }
-
 }

@@ -157,17 +157,6 @@ public final class BinanceConnector extends BaseConnector {
         super.internalStop();
     }
 
-    @Override
-    protected @Nullable String getPingPayload(@NotNull String wwsURL) {
-        return null;
-//                BASE_WWS.equals(wwsURL) || BASE_TESTNET_WWS.equals(wwsURL) ? """
-//                {
-//                  "id": "%s",
-//                  "method": "ping"
-//                }
-//                """.formatted(UUID.randomUUID().toString()) : null;
-    }
-
     @SuppressWarnings("DuplicatedCode")
     @Override
     public @NotNull Map<String, Symbol> sGetAllSymbols() {
@@ -1168,7 +1157,7 @@ public final class BinanceConnector extends BaseConnector {
             request.set("params", requestParams);
 
             if (config.isLogsRequest()) {
-                Log.info("PR wws=%s", request);
+                Log.info("Pr wws=%s", request);
             }
 
             sendWebSocket(url, request.toString());
@@ -1201,7 +1190,7 @@ public final class BinanceConnector extends BaseConnector {
 
         if (!params.isEmpty()) request.set("params", requestParams);
         if (config.isLogsRequest()) {
-            Log.info("PU wws=%s", request);
+            Log.info("Pu wws=%s", request);
         }
 
         sendWebSocket(url, request.toString());
