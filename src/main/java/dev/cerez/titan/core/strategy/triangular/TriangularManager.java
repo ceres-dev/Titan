@@ -76,11 +76,6 @@ public final class TriangularManager extends StrategyManager<TriangularManager.T
             Log.info("Starting Api...");
             connector.wsSubscribeBookTickerLegacy(streamListener = this::onBookTickerUpdate, symbolsToSubscribe.keySet());
             setStatus(StatusManager.WORKING);
-            executor.scheduleAtFixedRate(() -> {
-                setStatus(StatusManager.PREPARING);
-                LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(2));
-                setStatus(StatusManager.READY);
-            }, 5, 5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             Log.exception("Error iniciando stream de arbitraje", e);

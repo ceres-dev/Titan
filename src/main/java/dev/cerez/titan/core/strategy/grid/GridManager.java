@@ -52,6 +52,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
     private final HashSet<String> forOpen = new HashSet<>();
     private final GridBuilder gridBuilder;
     private final ApplyAttributes applyAttributes;
+    private boolean gridProfilerIsConfigured = false;
 
     public GridManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
         super(storageManager.getStorageProfiler(GridManagerConfig.class, PersistentNope.class), connector);
@@ -93,6 +94,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
             LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
             updateGrid();
         }));
+
         updateGrid();
 //        priceAlarm.start();
         executor.execute(() -> {
@@ -140,7 +142,11 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                 : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO)).multiply(new BigDecimal(config.getLeverage()));
 
         Context context = new Context(balanceUse, currentPrice, bookTicker, config, position, orders);
-
+        if (!gridProfilerIsConfigured){
+            gridProfilerIsConfigured = true;
+            List<OrderPreview> orderPreviews = gridBuilder.buildGrid(context);
+            applyAttributes.apply(context, orderPreviews);
+        }
         List<OrderPreview> orderPreviews = gridBuilder.buildGrid(context);
         List<OrderPreview> desiredOrders = applyAttributes.apply(context, orderPreviews);
         reconcileOrders(ordersActive, desiredOrders);
@@ -268,10 +274,12 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
 
         @Contract
         public synchronized BigDecimal getStepSize() {
+            return stepSizePriority != null ? stepSizePriority : getNormalStepSize();
+        }
+
+        /** Devuelve el stepSize configurado para la sesión, ignorando cualquier prioridad temporal. */
+        public synchronized BigDecimal getNormalStepSize() {
             if (lastMarketSessionTemporal == null) lastMarketSessionTemporal = new TemporalRefence<>(TimeUnit.MINUTES, 2);
-            if (stepSizePriority != null){
-                return stepSizePriority;
-            }
             MarketSessionState marketSessionStatus = lastMarketSessionTemporal.getOrCompute(() -> MarketSession.of(baseAsset));
             BigDecimal stepSize = switch (marketSessionStatus) {
                 case PRE_MARKET, POST_MARKET -> stepSizeMediumActivity;
@@ -290,105 +298,177 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
     @RequiredArgsConstructor
     @Getter
     public enum GridProfiler{
-        DEFAULT((girdManager) -> List.of(
-                new OffsetOrderSellPrice(new BigDecimal("0.15")),
-                new DontSendOrder(SideAffected.AGAINST, c -> {
-                    //noinspection DataFlowIssue
-                    return c.getPosition().entryPriceAvg();
-                }, false).addCondicion(c -> c.context().getPosition() != null),
-                new MultiplyFirstOrderSize(SideAffected.AGAINST, (orders, c) -> {
-                    // Cantidad APROXIMADA no puede ser que no sea la cantidad real
-                    final int amountOrder = girdManager.getAmountOrderApprox(c);
-                    switch(c.getConfig().getSideGrid()) {
-                        case LONG -> {
-                            return Math.max(amountOrder - Utils.filterBuy(orders).size(), 1);
-                        }
-                        case SHORT -> {
-                            return Math.max(amountOrder - Utils.filterSell(orders).size(), 1);
-                        }
-                        case BOTH -> {
-                            return Math.max(amountOrder - Math.min(Utils.filterSell(orders).size(), Utils.filterBuy(orders).size()), 1);
-                        }
-                    }
-                    return 1;
-                }),
-                new MultiplyFirstOrderSize(SideAffected.FAVOR, (orders, c) -> {
-                    // Cantidad APROXIMADA no puede ser que no sea la cantidad real
-                    final int amountOrder = girdManager.getAmountOrderApprox(c);
-                    switch(c.getConfig().getSideGrid()) {
-                        case LONG -> {
-                            return Math.max(amountOrder/3 - Utils.filterSell(orders).size(), 1);
-                        }
-                        case SHORT -> {
-                            return Math.max(amountOrder/3 - Utils.filterBuy(orders).size(), 1);
-                        }
-                    }
-                    return 1;
-                }),
-                new RemoveIf((order, c) -> {
-                    if (girdManager.lastOrderFilled != null && girdManager.lastOrderFilled.getSideOrder() == order.getSideOrder()){
-                        switch(c.getConfig().getSideGrid()) {
-                            case LONG -> {
-                                if (order.getSideOrder() == SideOrder.BUY){
-                                    return girdManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) <= 0;
-                                }else {
-                                    return false;
-                                }
-                            }
-                            case SHORT -> {
-                                if (order.getSideOrder() == SideOrder.SELL){
-                                    return girdManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) >= 0;
-                                }else {
-                                    return false;
-                                }
-                            }
-                            case BOTH -> {
-                                return girdManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
-                            }
-                        }
-                    }
-                    return false;
-                }).addCondicion(c -> {
-                    long amount = c.ordersResult().stream().filter(o -> !o.isReduceOnly()).count();
-                    return amount <= c.context().getConfig().getMinOrderSafe();
-                }),
-                new RemoveIf((order, c) -> {
-                    if (girdManager.lastOrderFilled != null && girdManager.lastOrderFilled.getSideOrder() == order.getSideOrder()){
-                        return girdManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
-                    }else {
-                        return c.getOrders().stream().filter(Order::isReduceOnly).count() > c.getConfig().getMinOrderGreed() &&
-                                !order.isReduceOnly() &&
-                                (c.getPosition() != null && c.getPosition().entryPriceAvg().compareTo(order.getPrice()) <= 0);
-                    }
-                }),
-                new CallOnUpdate((order, c) -> {
-                    long amount = order.stream().filter(o -> !o.isReduceOnly()).count();
-                    GridManagerConfig config = c.getConfig();
-                    if (amount > config.getMinOrderSafe()) {
-                        if (config.getStepSizePriority() != null) {
-                            config.setStepSizePriority(null);
-                            Log.info("Disminuyendo StepSize=%.4f", config.getStepSize());
-                        }
-                    } else {
-                        if (config.getStepSizePriority() == null) {
-                            BigDecimal stepSize = config.getStepSize().multiply(BigDecimal.TWO);
-                            Log.info("Aúmento De StepSize=%.4f", stepSize);
-                            config.setStepSizePriority(stepSize);
-                        }
-                    }
-                    if (order.stream().allMatch(Order::isReduceOnly)){
-                        girdManager.setStatus(StatusManager.INOPERATIVE);
-                    }else {
-                        girdManager.setStatus(StatusManager.WORKING);
+        DEFAULT(new Function<>() {
+            private boolean estimatingOrders;
+            private GridManager gridManager;
 
-                        if (order.stream().noneMatch(Order::isReduceOnly)) {
-                            girdManager.setStatus(StatusManager.WAITING);
-                        }else {
-                            girdManager.setStatus(StatusManager.WORKING);
-                        }
+            @Override
+            public List<BaseAttribute> apply(@NotNull GridManager gridManager) {
+                this.gridManager = gridManager;
+                return List.of(
+                        new OffsetOrderSellPrice(new BigDecimal("0.15")),
+                        new DontSendOrder(SideAffected.AGAINST, c -> {
+                            //noinspection DataFlowIssue
+                            return c.getPosition().entryPriceAvg();
+                        }, false).addCondicion(c -> c.context().getPosition() != null),
+                        new MultiplyFirstOrderSize(SideAffected.AGAINST, (orders, c) -> {
+                            // Cantidad APROXIMADA no puede ser que no sea la cantidad real
+                            final int amountOrder = gridManager.getAmountOrderApprox(c);
+                            switch (c.getConfig().getSideGrid()) {
+                                case LONG -> {
+                                    return Math.max(amountOrder - Utils.filterBuy(orders).size(), 1);
+                                }
+                                case SHORT -> {
+                                    return Math.max(amountOrder - Utils.filterSell(orders).size(), 1);
+                                }
+                                case BOTH -> {
+                                    return Math.max(amountOrder - Math.min(Utils.filterSell(orders).size(), Utils.filterBuy(orders).size()), 1);
+                                }
+                            }
+                            return 1;
+                        }),
+                        new MultiplyFirstOrderSize(SideAffected.FAVOR, (orders, c) -> {
+                            // Cantidad APROXIMADA no puede ser que no sea la cantidad real
+                            final int amountOrder = gridManager.getAmountOrderApprox(c);
+                            switch (c.getConfig().getSideGrid()) {
+                                case LONG -> {
+                                    return Math.max(amountOrder / 3 - Utils.filterSell(orders).size(), 1);
+                                }
+                                case SHORT -> {
+                                    return Math.max(amountOrder / 3 - Utils.filterBuy(orders).size(), 1);
+                                }
+                            }
+                            return 1;
+                        }),
+                        new RemoveIf((order, c) -> {
+                            if (gridManager.lastOrderFilled != null && gridManager.lastOrderFilled.getSideOrder() == order.getSideOrder()) {
+                                switch (c.getConfig().getSideGrid()) {
+                                    case LONG -> {
+                                        if (order.getSideOrder() == SideOrder.BUY) {
+                                            return gridManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) <= 0;
+                                        } else {
+                                            return false;
+                                        }
+                                    }
+                                    case SHORT -> {
+                                        if (order.getSideOrder() == SideOrder.SELL) {
+                                            return gridManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) >= 0;
+                                        } else {
+                                            return false;
+                                        }
+                                    }
+                                    case BOTH -> {
+                                        return gridManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
+                                    }
+                                }
+                            }
+                            return false;
+                        }).addCondicion(c -> {
+                            long amount = c.ordersResult().stream().filter(o -> !o.isReduceOnly()).count();
+                            return amount <= c.context().getConfig().getMinOrderSafe();
+                        }),
+                        new RemoveIf((order, c) -> {
+                            if (gridManager.lastOrderFilled != null && gridManager.lastOrderFilled.getSideOrder() == order.getSideOrder()) {
+                                return gridManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
+                            } else {
+                                return c.getOrders().stream().filter(Order::isReduceOnly).count() > c.getConfig().getMinOrderGreed() &&
+                                        !order.isReduceOnly() &&
+                                        (c.getPosition() != null && c.getPosition().entryPriceAvg().compareTo(order.getPrice()) <= 0);
+                            }
+                        }),
+                        new CallOnUpdate((order, c) -> {
+                            // La simulación aplica todos los atributos, pero no debe actualizar
+                            // el stepSize/status desde esta llamada anidada.
+                            if (estimatingOrders) return;
+
+                            GridManagerConfig config = c.getConfig();
+                            BigDecimal normalStepSize = config.getNormalStepSize();
+                            BigDecimal increasedStepSize = normalStepSize.multiply(BigDecimal.TWO);
+                            boolean increasedStepSizeActive = config.getStepSizePriority() != null;
+
+                            // La lista actual ya representa uno de los escenarios y pasó por todos
+                            // los atributos. Simulamos únicamente el escenario alternativo.
+                            long currentAmount = order.stream().filter(o -> !o.isReduceOnly()).count();
+                            long normalAmount = currentAmount;
+                            long increasedAmount = currentAmount;
+                            boolean estimateSucceeded = true;
+                            try {
+                                if (increasedStepSizeActive) {
+                                    normalAmount = getAmountOrderForStepSize(c, normalStepSize);
+                                } else {
+                                    increasedAmount = getAmountOrderForStepSize(c, increasedStepSize);
+                                }
+                            } catch (RuntimeException exception) {
+                                // Si falla la simulación, mantenemos el stepSize actual y dejamos
+                                // que la actualización normal de órdenes continúe.
+                                estimateSucceeded = false;
+                                Log.warning("No se pudo estimar la cantidad de órdenes para ajustar StepSize: " + exception.getMessage());
+                            }
+
+                            // La decisión siempre se basa en el escenario NORMAL. Así, si el stepSize
+                            // ampliado genera más órdenes, ese aumento no provoca que volvamos al normal
+                            // en la siguiente actualización.
+                            if (estimateSucceeded) {
+                                boolean shouldIncreaseStepSize = normalAmount <= config.getMinOrderSafe();
+                                if (shouldIncreaseStepSize && !increasedStepSizeActive) {
+                                    config.setStepSizePriority(increasedStepSize);
+                                    Log.info(
+                                            "Aúmento De StepSize=%.4f (órdenes normal=%d, ampliado=%d)",
+                                            increasedStepSize, normalAmount, increasedAmount
+                                    );
+                                } else if (!shouldIncreaseStepSize && increasedStepSizeActive) {
+                                    config.setStepSizePriority(null);
+                                    Log.info(
+                                            "Disminuyendo StepSize=%.4f (órdenes normal=%d, ampliado=%d)",
+                                            normalStepSize, normalAmount, increasedAmount
+                                    );
+                                }
+                            }
+                            if (order.stream().allMatch(Order::isReduceOnly)) {
+                                gridManager.setStatus(StatusManager.INOPERATIVE);
+                            } else {
+                                gridManager.setStatus(StatusManager.WORKING);
+
+                                if (order.stream().noneMatch(Order::isReduceOnly)) {
+                                    gridManager.setStatus(StatusManager.WAITING);
+                                } else {
+                                    gridManager.setStatus(StatusManager.WORKING);
+                                }
+                            }
+                        })
+                );
+            }
+
+            private long getAmountOrderForStepSize(@NotNull Context context, @NotNull BigDecimal stepSize) {
+                GridManagerConfig config = context.getConfig();
+                synchronized (config) {
+                    BigDecimal previousStepSize = config.getStepSizePriority();
+                    boolean wasEstimatingOrders = estimatingOrders;
+                    try {
+                        config.setStepSizePriority(stepSize);
+                        estimatingOrders = true;
+
+                        // Context nuevo para no mezclar los atributos/cachés de la simulación
+                        // con los de la actualización real.
+                        Context estimationContext = new Context(
+                                context.getBalanceUsdt(),
+                                context.getCurrentPrice(),
+                                context.getCurrentBookTicker(),
+                                config,
+                                context.getPosition(),
+                                context.getOrders()
+                        );
+                        List<OrderPreview> previews = gridManager.gridBuilder.buildGrid(estimationContext);
+                        return gridManager.applyAttributes.apply(estimationContext, previews).stream()
+                                .filter(order -> !order.isReduceOnly())
+                                .count();
+                    } finally {
+                        estimatingOrders = wasEstimatingOrders;
+                        config.setStepSizePriority(previousStepSize);
                     }
-                })
-        ));
+                }
+            }
+        });
 
         private final Function<GridManager, List<BaseAttribute>> constructorProfiler;
 
