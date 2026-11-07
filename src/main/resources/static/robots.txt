@@ -1,0 +1,6 @@
+# 0x486920526F626F74732121
+
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /dashboard
