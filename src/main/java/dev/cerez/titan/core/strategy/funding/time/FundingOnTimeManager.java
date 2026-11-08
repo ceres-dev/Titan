@@ -2,13 +2,11 @@ package dev.cerez.titan.core.strategy.funding.time;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.connector.BaseConnector;
-import dev.cerez.titan.connector.model.BookTick;
+import dev.cerez.titan.connector.model.*;
 import dev.cerez.titan.core.StatusManager;
 import dev.cerez.titan.core.event.events.manager.funding.time.*;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.connector.model.SideOrder;
-import dev.cerez.titan.connector.model.Symbol;
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.StrategyManager;
 import dev.cerez.titan.core.PersistentNope;
@@ -47,15 +45,16 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
             if (node.get("m").asText().equals("FUNDING_FEE")){
                 JsonNode nodeSymbol = node.get("S");
                 if (nodeSymbol != null){
-                    Log.info("Cierre Automático de Funding, de: " + nodeSymbol.asText());
                     SymbolTarget symbolTarget = symbolsPendingForClose.remove(nodeSymbol.asText());
-                    if (symbolTarget != null) symbolTarget.closePosition();
+                    if (symbolTarget != null) {
+                        Log.info("Cierre Automático de Funding, de: " + nodeSymbol.asText());
+                        symbolTarget.closePosition();
+                    }
                 }
             }
         })));
         executor.execute(() -> {
             while (running) {
-                Log.info("Starting FundingManger");
                 searchFunding();
                 // Un pequeño margúen de seguridad
                 LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(1));
@@ -97,14 +96,21 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                 .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateMin()) > 0)
                 .toList();
 
-        List<BinanceConnector.FundingRate> targetLimited = config.maxSymbolsCandidate == -1 ? targetFiltered : targetFiltered.stream()
+        Map<String, Volume> volumen = new HashMap<>();
+        for (BinanceConnector.FundingRate f : targetFiltered) {
+            volumen.put(f.symbol(), connector.fGetVolumen(f.symbol(), TimeUnitMarket.ONE_HOUR));
+        }
+
+        List<BinanceConnector.FundingRate> targetLimited = config.maxSymbolsCandidate == -1 ? targetFiltered :
+                targetFiltered.stream()
                 .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRateAbs).reversed())
                 .limit(config.maxSymbolsCandidate)
                 .toList();
 
         Log.info("Symbols Disponible: %s",
                 String.join(", ",
-                        targetFiltered.stream().map(f -> f.symbol() + "@" + f.nextFundingRate()).toList()
+                        targetFiltered.stream().map(f -> "%s@(funding=%.5f, volumen=%.2fUSDT)".formatted(
+                                f.symbol(), f.nextFundingRate(), volumen.get(f.symbol()).quoteVolumen())).toList()
                 )
         );
 
@@ -114,7 +120,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
             return;
         }
 
-        if (targetLimited.size() < config.maxCompetition) {
+        if (config.maxCompetition != -1 && targetLimited.size() < config.maxCompetition) {
             Log.info("Abort: Mucha competencia %d", targetLimited.size());
             callEvent(new AbortEvent(this));
             return;

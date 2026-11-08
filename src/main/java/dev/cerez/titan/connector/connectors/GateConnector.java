@@ -181,15 +181,15 @@ public final class GateConnector extends BaseConnector implements AutoCloseable 
     }
 
     @Override
-    public @NotNull Map<String, Volume24H> sGetVolume24H() {
+    public @NotNull Map<String, Volume> sGetAllVolume() {
         JsonNode response = sendPublicRequest(Method.GET, "/spot/tickers", new TreeMap<>());
-        Map<String, Volume24H> result = new HashMap<>();
+        Map<String, Volume> result = new HashMap<>();
         for (JsonNode node : response) {
             String symbol = node.get("currency_pair").asText();
-            result.put(symbol, new Volume24H(
+            result.put(symbol, new Volume(
                     symbol,
-                    Double.parseDouble(node.get("quote_volume").asText()),
-                    Double.parseDouble(node.get("base_volume").asText()))
+                    new BigDecimal(node.get("quote_volume").asText()),
+                    new BigDecimal(node.get("base_volume").asText()))
             );
         }
         return result;

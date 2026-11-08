@@ -223,18 +223,18 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     @Override
-    public @NotNull Map<String, Volume24H> sGetVolume24H() {
-        Map<String, Volume24H> result = new HashMap<>();
+    public @NotNull Map<String, Volume> sGetAllVolume() {
+        Map<String, Volume> result = new HashMap<>();
         Map<String, Object> params = new HashMap<>();
         params.put("type", "MINI");
         params.put("symbolStatus", "TRADING");
         JsonNode raw = sendPublicRequest(Method.GET, "/api/v3/ticker/24hr", params);
         for (JsonNode node : raw) {
             String s = node.get("symbol").asText();
-            result.put(s, new Volume24H(
+            result.put(s, new Volume(
                     s,
-                    Double.parseDouble(node.get("quoteVolume").asText()),
-                    Double.parseDouble(node.get("volume").asText())
+                    new BigDecimal(node.get("quoteVolume").asText()),
+                    new BigDecimal(node.get("volume").asText())
             ));
         }
         return result;
@@ -721,8 +721,23 @@ public final class BinanceConnector extends BaseConnector {
         return new BigDecimal(sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/premiumIndex", params).get("markPrice").asText());
     }
 
+    @Contract("_, _ -> new")
+    public @NotNull Volume fGetVolumen(@NotNull String symbol, @NotNull TimeUnitMarket timeUnit) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("pair", symbol.toUpperCase(Locale.US));
+        params.put("limit", 1);
+        params.put("interval", timeUnit.getShortName());
+        params.put("contractType", "PERPETUAL");
+        JsonNode node = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v1/continuousKlines", params).iterator().next();
+        return new Volume(
+                symbol.toUpperCase(Locale.US),
+                new BigDecimal(node.get(7).asText()),
+                new BigDecimal(node.get(5).asText())
+        );
+    }
+
     @Contract(" -> new")
-    public @NotNull Map<String, BigDecimal> fGetAllPrice() {
+    public @NotNull Map<String, BigDecimal> fGetAllPrices() {
         JsonNode raw = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/premiumIndex");
         HashMap<String, BigDecimal> priceMap = new HashMap<>();
         for (JsonNode node : raw) {

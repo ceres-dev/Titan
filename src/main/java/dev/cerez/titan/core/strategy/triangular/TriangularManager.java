@@ -4,7 +4,7 @@ import dev.cerez.titan.connector.Connector;
 import dev.cerez.titan.connector.model.AssetRate;
 import dev.cerez.titan.connector.model.BookTickDouble;
 import dev.cerez.titan.connector.model.Symbol;
-import dev.cerez.titan.connector.model.Volume24H;
+import dev.cerez.titan.connector.model.Volume;
 import dev.cerez.titan.core.StrategyManager;
 import dev.cerez.titan.core.PersistentNope;
 import dev.cerez.titan.core.StatusManager;
@@ -19,11 +19,10 @@ import lombok.experimental.SuperBuilder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
 
 
@@ -60,7 +59,7 @@ public final class TriangularManager extends StrategyManager<TriangularManager.T
                 return;
             }
 
-            Map<String, Volume24H> volume24H = connector.sGetVolume24H();
+            Map<String, Volume> volume24H = connector.sGetAllVolume();
             Map<String, Symbol> symbolsToSubscribe = new HashMap<>();
             for (String symbolName : getSymbolsUse(allSymbolsMap, tickersMap, volume24H)) {
                 symbolsToSubscribe.put(symbolName, allSymbolsMap.get(symbolName));
@@ -123,7 +122,7 @@ public final class TriangularManager extends StrategyManager<TriangularManager.T
 
     private @NotNull Set<String> getSymbolsUse(@NotNull Map<String, Symbol> allSymbols,
                                                @NotNull Map<String, BookTickDouble> liveTickers,
-                                               @NotNull Map<String, Volume24H> bookTicker24H) {
+                                               @NotNull Map<String, Volume> bookTicker24H) {
         Map<String, List<AssetRate>> conversionGraph = buildAssetConversionGraph(allSymbols, liveTickers);
         List<SymbolVolume> candidates = new ArrayList<>();
 
@@ -135,20 +134,20 @@ public final class TriangularManager extends StrategyManager<TriangularManager.T
                 continue;
             }
 
-            Volume24H volume24H = bookTicker24H.get(symbol.name());
-            if (volume24H == null) {
+            Volume volume = bookTicker24H.get(symbol.name());
+            if (volume == null) {
                 continue;
             }
 
-            double quoteVolume = volume24H.quoteVolumen() == null ? 0.0 : volume24H.quoteVolumen();
-            double baseVolume = volume24H.baseVolumen() == null ? 0.0 : volume24H.baseVolumen();
+            BigDecimal quoteVolume = volume.quoteVolumen() == null ? BigDecimal.ZERO : volume.quoteVolumen();
+            BigDecimal baseVolume = volume.baseVolumen() == null ? BigDecimal.ZERO : volume.baseVolumen();
             double volumeUsdt = 0.0;
 
-            if (quoteVolume > 0.0) {
-                volumeUsdt = convertAssetAmountToUsdt(symbol.getQuoteAsset(), quoteVolume, conversionGraph);
+            if (quoteVolume.doubleValue() > 0.0) {
+                volumeUsdt = convertAssetAmountToUsdt(symbol.getQuoteAsset(), quoteVolume.doubleValue(), conversionGraph);
             }
-            if (volumeUsdt <= 0.0 && baseVolume > 0.0) {
-                volumeUsdt = convertAssetAmountToUsdt(symbol.getBaseAsset(), baseVolume, conversionGraph);
+            if (volumeUsdt <= 0.0 && baseVolume.doubleValue() > 0.0) {
+                volumeUsdt = convertAssetAmountToUsdt(symbol.getBaseAsset(), baseVolume.doubleValue(), conversionGraph);
             }
 
             candidates.add(new SymbolVolume(symbol.name(), volumeUsdt));

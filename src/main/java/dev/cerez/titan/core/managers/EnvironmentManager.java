@@ -8,10 +8,7 @@ import dev.cerez.titan.command.profilers.TriangularCommand;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.Symbol;
-import dev.cerez.titan.core.ConfigNope;
-import dev.cerez.titan.core.Manager;
-import dev.cerez.titan.core.StrategyManager;
-import dev.cerez.titan.core.PersistentNope;
+import dev.cerez.titan.core.*;
 import dev.cerez.titan.core.event.EventHandler;
 import dev.cerez.titan.core.event.EventManager;
 import dev.cerez.titan.core.event.EventPriority;
@@ -233,6 +230,10 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
             executor.schedule(() -> webSocketServer.sendMessage(getPort().getBalance()), 2, TimeUnit.SECONDS);
         }
 
+        public void conversion(@NotNull String fromAsset, @NotNull String toAsset, BigDecimal amount, boolean fromAmount){
+            connector.cConvert(fromAsset, toAsset, amount, fromAmount);
+        }
+
         public void subscribe(@NotNull Subscribe subscribe) {
             if (subscribesLive.contains(subscribe)) {
                 throw new AlreadySubscribedException();
@@ -242,7 +243,7 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
         }
 
         public void unsubscribe(@Nullable Subscribe subscribe) {
-            if (subscribe == null){
+            if (subscribe == null) {
                 subscribesLive.forEach(sub -> sub.getSubscribable(EnvironmentManager.this).revoke());
                 subscribesLive.clear();
             }else {

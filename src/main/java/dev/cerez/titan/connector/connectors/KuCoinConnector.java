@@ -166,16 +166,16 @@ public final class KuCoinConnector extends BaseConnector implements AutoCloseabl
     }
 
     @Override
-    public @NotNull Map<String, Volume24H> sGetVolume24H() {
+    public @NotNull Map<String, Volume> sGetAllVolume() {
         JsonNode response = sendPublicRequest(Method.GET, "/api/v1/market/allTickers", new TreeMap<>());
-        Map<String, Volume24H> result = new HashMap();
+        Map<String, Volume> result = new HashMap();
         for (JsonNode node : response.get("data").get("ticker")) {
             String symbol = node.get("symbol").asText();
             if (node.get("changePrice").asText().equals("null")) continue;
-            result.put(symbol, new Volume24H(
+            result.put(symbol, new Volume(
                     symbol,
-                    Double.parseDouble(node.get("volValue").asText()),
-                    Double.parseDouble(node.get("vol").asText()))
+                    new BigDecimal(node.get("volValue").asText()),
+                    new BigDecimal(node.get("vol").asText()))
             );
         }
         return result;

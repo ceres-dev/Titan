@@ -10,6 +10,7 @@ import dev.cerez.titan.log.Log;
 import dev.cerez.titan.utils.TemporalRefence;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -86,6 +87,26 @@ public class ApiController {
             return ResponseEntity.internalServerError().build();
         }
         Log.info("User:%s Transfer %s @ %.4f %s", user.getUsername(), asset, amount, direction.toUpperCase());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/conversion")
+    public ResponseEntity<Void> conversion(@AuthenticationPrincipal TitanUserDetails user,
+                                           @NotNull @RequestParam String fromAsset,
+                                           @NotNull @RequestParam String toAsset,
+                                           @Nullable @RequestParam BigDecimal amount,
+                                           @Nullable @RequestParam Boolean fromAmount
+    ){
+        try {
+            getPort(user).conversion(fromAsset, toAsset, amount, Boolean.TRUE.equals(fromAmount));
+        }catch (ApiException e){
+            Log.exception(e);
+            return ResponseEntity.badRequest().build();
+        }catch (Exception e){
+            Log.exception(e);
+            return ResponseEntity.internalServerError().build();
+        }
+        Log.info("User:%s Conversion %s -> %s @ %.4f", user.getUsername(), fromAsset, toAsset, amount);
         return ResponseEntity.ok().build();
     }
 

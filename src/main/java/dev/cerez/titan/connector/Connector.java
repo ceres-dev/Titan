@@ -19,7 +19,7 @@ public interface Connector extends Switch, AutoCloseable, Telemetryable<Telemetr
 
     @NotNull Map<String, BookTickDouble> sGetAllBooks();
 
-    @NotNull Map<String, Volume24H> sGetVolume24H();
+    @NotNull Map<String, Volume> sGetAllVolume();
 
     @NotNull Map<String, BigDecimal> sGetBalance();
 

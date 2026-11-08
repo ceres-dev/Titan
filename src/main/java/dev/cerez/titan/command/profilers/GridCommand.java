@@ -13,6 +13,7 @@ import dev.cerez.titan.core.strategy.grid.GridManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.storage.StorageManager;
+import lombok.Builder;
 import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,9 +36,9 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
         GridManager.GridManagerConfig gridConfigDefault = GridManager.GridManagerConfig.builder()
                 .baseAsset("SPY")
                 .quoteAsset("USDT")
-                .stepSizeHighActivity(new BigDecimal("0.7"))
-                .stepSizeMediumActivity(new BigDecimal("0.5"))
-                .stepSizeLowActivity(new BigDecimal("0.4"))
+                .stepSizeHighActivity(new BigDecimal("3.5"))
+                .stepSizeMediumActivity(new BigDecimal("1"))
+                .stepSizeLowActivity(new BigDecimal("0.6"))
                 .sizePerOrderBaseAsset(new BigDecimal("0.01"))
                 .minOrderGreed(20)
                 .minOrderSafe(20)
@@ -48,7 +49,10 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
         FundingOnTimeManager.FundingManagerConfig fundingConfigDefault = FundingOnTimeManager.FundingManagerConfig.builder()
                 .sendTrade(true)
                 .leverage(1)
-                .offsetOpenPositon(250)
+                .offsetOpenPositon(400)
+                .maxCompetition(5)
+                .fundingRateMin(BigDecimal.valueOf(0.0018))
+                .maxSymbolsCandidate(-1)
                 .build();
 
         BalanceMaxRiskManager.BalanceMaxRiskManagerConfig balanceMaxRiskManagerConfigDefault = BalanceMaxRiskManager.BalanceMaxRiskManagerConfig.builder()

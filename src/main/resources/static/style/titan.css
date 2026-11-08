@@ -155,8 +155,11 @@ main{
     content: 'X';
 }
 /* Texto */
-p h2 h1 h3{
+p h1 h2 h3{
     text-align: center;
+}
+h1 a, h2 a, h3 a {
+    text-decoration: none;
 }
 small{
     opacity: 80%;
@@ -193,7 +196,7 @@ button:active {
 }
 input, select {
     border: var(--main-color);
-    background: transparent;
+    background: black;
     color: var(--main-color-text);
     font-size: 15px;
     padding: 5px 10px;

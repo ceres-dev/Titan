@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <title>Titan</title>
-
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <meta name="robots" content="noindex">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!--Local (ignorame)-->
     <link rel="stylesheet" href="../static/style/titan.css">
@@ -15,10 +15,10 @@
 </head>
 <body>
 <main>
-    <header class="box">
+    <header class="box" style="flex-direction: row">
         <nav><h1 id="breadcrumb"></h1></nav>
     </header>
-    <div class="mainSections">
+    <div class="mainSections" style="grid-template-columns: 1fr 1fr 1fr">
         <form class="box" id="formTransfer" novalidate>
             <h2>Transferir</h2>
             <label>
@@ -37,10 +37,47 @@
             <button id="sumitTransfer">Transferir</button>
             <div id="errorTransfer"></div>
         </form>
+        <section class="box">
+            <h2>Balance</h2>
+            <h3>Futuros USDⓈ-M</h3>
+            <ul>
+                <li>
+                    <strong>Disponible</strong>
+                    <ul class="listSmall" id="futureBalance">
+                        <li>
+                            <span class="cliLoader"></span>
+                        </li>
+                    </ul>
+                </li>
+                <li>
+                    <strong>Valorado</strong>
+                    <ul class="listSmall" id="futureValued">
+                        <li>
+                            <span class="cliLoader"></span>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+            <h3>Spot</h3>
+            <ul class="listSmall" id="spotBalance">
+                <li>
+                    <div class="cliLoader"></div>
+                </li>
+            </ul>
+        </section>
+        <section class="box">
+            <h2>Conversión</h2>
+        </section>
+        <section class="box" style="grid-column: 1/4">
+            <h2>Rendimiento</h2>
+        </section>
     </div>
 </main>
 <div class="rgbEffect"></div>
 <div class="linesEffect"></div>
+<script src="/script/utils.js"></script>
+<script src="/script/websocket.js"></script>
+<script src="/script/requestBalance.js"></script>
 <script src="/script/breadcrumb.js"></script>
 </body>
 </html>

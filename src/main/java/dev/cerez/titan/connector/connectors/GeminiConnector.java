@@ -164,19 +164,19 @@ public final class GeminiConnector extends BaseConnector implements AutoCloseabl
     }
 
     @Override
-    public @NotNull Map<String, Volume24H> sGetVolume24H() {
+    public @NotNull Map<String, Volume> sGetAllVolume() {
         List<String> symbolsNames = getAllSymbolsNames();
-        Map<String, Volume24H> result = new HashMap<>();
+        Map<String, Volume> result = new HashMap<>();
         for (String symbolName : symbolsNames) {
             JsonNode node = sendPublicRequest(Method.GET, "/v1/pubticker/%s".formatted(symbolName), new TreeMap<>());
             JsonNode volume = node.get("volume");
             List<String> fieldNames = new LinkedList<>();
             Iterator<String> fieldNamesIterator = volume.fieldNames();
             while (fieldNamesIterator.hasNext()) fieldNames.add(fieldNamesIterator.next());
-            result.put(symbolName, new Volume24H(
+            result.put(symbolName, new Volume(
                     symbolName,
-                    fastParseDouble(volume.get(fieldNames.get(0)).asText()),
-                    fastParseDouble(volume.get(fieldNames.get(1)).asText())
+                    new BigDecimal(volume.get(fieldNames.get(0)).asText()),
+                    new BigDecimal(volume.get(fieldNames.get(1)).asText())
             ));
             // En caso que el Json: 'xxxyyyy' does not have available data yet
         }
