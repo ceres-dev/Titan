@@ -25,13 +25,13 @@ public class BalanceMaxRiskManager extends BaseManager<BalanceMaxRiskManager.Bal
 
     public @NotNull Map<String, BigDecimal> futuroBalanceAvailable(Manager<?, ?> manager) {
         Map<String, BigDecimal> result = new HashMap<>();
-        connector.fGetBalanceAvailable().forEach((s, amount) -> result.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
+        connector.fGetBalanceAvailable().forEach((s, amount) -> result.put(s, amount.multiply(new BigDecimal("0.99")).multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
         return result;
     }
 
     public @NotNull Map<String, BigDecimal> futuroBalanceValued(Manager<?, ?> manager) {
         Map<String, BigDecimal> result = new HashMap<>();
-        connector.fGetBalanceValued().forEach((s, amount) -> result.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
+        connector.fGetBalanceValued().forEach((s, amount) -> result.put(s, amount.multiply(new BigDecimal("0.99")).multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
         return result;
     }
 
@@ -39,14 +39,14 @@ public class BalanceMaxRiskManager extends BaseManager<BalanceMaxRiskManager.Bal
         Map<String, BigDecimal> available = new HashMap<>();
         Map<String, BigDecimal> valued = new HashMap<>();
         BinanceConnector.BalanceFuture balance = connector.fGetBalance();
-        balance.available().forEach((s, amount) -> available.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
-        balance.valued().forEach((s, amount) -> valued.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
+        balance.available().forEach((s, amount) -> available.put(s, amount.multiply(new BigDecimal("0.99")).multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
+        balance.valued().forEach((s, amount) -> valued.put(s, amount.multiply(new BigDecimal("0.99")).multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
         return new BinanceConnector.BalanceFuture(available, valued);
     }
 
     public Map<String, BigDecimal> spotBalance(Manager<?, ?> manager) {
         Map<String, BigDecimal> result = new HashMap<>();
-        connector.sGetBalance().forEach((s, amount) -> result.put(s, amount.multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
+        connector.sGetBalance().forEach((s, amount) -> result.put(s, amount.multiply(new BigDecimal("0.99")).multiply(balanceRisk.getOrDefault(manager.getName(), BigDecimal.ZERO))));
         return result;
     }
 

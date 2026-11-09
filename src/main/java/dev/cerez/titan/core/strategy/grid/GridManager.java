@@ -37,6 +37,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
@@ -49,7 +50,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
 
     private final String symbol;
     private final WaitableSet<String> waitForCancel = new WaitableSet<>();
-    private final HashSet<String> forOpen = new HashSet<>();
+    private final Set<String> forOpen = ConcurrentHashMap.newKeySet();
     private final GridBuilder gridBuilder;
     private final ApplyAttributes applyAttributes;
     private boolean gridProfilerIsConfigured = false;
@@ -88,6 +89,9 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                 }
                 case NEW -> {
                     if (forOpen.remove(orderUpdate.name())) return;
+                }
+                default -> {
+                    return;
                 }
             }
             // Es para que actualize la caché de binance al momentó de obtener los datos
@@ -212,16 +216,15 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                 );
                 // Puede fallar si justo hay movimiento brusco en el precio
                 // para evitar eso se vuelve a recalcular en el nuevo precio
+                Log.info(
+                        "Orden enviada %s<reset> @ %.4f qty: %.4f %s reduceOnly=%s",
+                        order.getSideOrder() == SideOrder.BUY ? "<green>BUY" : "<red>SELL",
+                        order.getPrice(), order.getAmountBaseAsset(), order.getNameOrder(), order.isReduceOnly()
+                );
             } catch (PostOnlyRejectException | ReduceOnlyRejectException | MarginNotSufficienException e) {
                 Log.warning("Error al crear la orden: " + e.getMessage());
                 retry = true;
             }
-
-            Log.info(
-                    "Orden enviada %s<reset> @ %.4f qty: %.4f %s reduceOnly=%s",
-                    order.getSideOrder() == SideOrder.BUY ? "<green>BUY" : "<red>SELL",
-                    order.getPrice(), order.getAmountBaseAsset(), order.getNameOrder(), order.isReduceOnly()
-            );
         }
         // Se vuelve a intentar
         if (retry && (waitForUpdate.isCancelled() || waitForUpdate.isDone())) {
@@ -340,6 +343,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                             }
                             return 1;
                         }),
+                        // Elimina si la orden tiene un precio mayor (En Long)/Menor (En Short) comparado con la última orden ejecutada
                         new RemoveIf((order, c) -> {
                             if (gridManager.lastOrderFilled != null && gridManager.lastOrderFilled.getSideOrder() == order.getSideOrder()) {
                                 switch (c.getConfig().getSideGrid()) {
@@ -364,6 +368,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                             }
                             return false;
                         }).addCondicion(c -> {
+                            // Solo se activa cuando hay pocos órdenes de crecimiento
                             long amount = c.ordersResult().stream().filter(o -> !o.isReduceOnly()).count();
                             return amount <= c.context().getConfig().getMinOrderSafe();
                         }),
@@ -371,6 +376,8 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                             if (gridManager.lastOrderFilled != null && gridManager.lastOrderFilled.getSideOrder() == order.getSideOrder()) {
                                 return gridManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
                             } else {
+                                // Si la cantidad de órdenes de reduceOnly es mayor que la configurada elimina las órdenes de crecimiento
+                                // por encima (Long)/pordebajo (Short) del entryPriceAvg
                                 return c.getOrders().stream().filter(Order::isReduceOnly).count() > c.getConfig().getMinOrderGreed() &&
                                         !order.isReduceOnly() &&
                                         (c.getPosition() != null && c.getPosition().entryPriceAvg().compareTo(order.getPrice()) <= 0);

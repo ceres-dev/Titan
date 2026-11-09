@@ -194,7 +194,8 @@ public final class BinanceConnector extends BaseConnector {
                     stepPrice,
                     stepsize,
                     minNotionalQuote,
-                    minNotionalBase
+                    minNotionalBase,
+                    ContractType.SPOT
             ));
         }
         cachedSymbols.set(symbols);
@@ -672,7 +673,8 @@ public final class BinanceConnector extends BaseConnector {
                     stepPrice,
                     stepsize,
                     minNotionalQuote,
-                    minNotionalBase
+                    minNotionalBase,
+                    ContractType.valueOf(node.get("contractType").asText())
             ));
         }
         fCachedSymbols.clear();
@@ -727,7 +729,7 @@ public final class BinanceConnector extends BaseConnector {
         params.put("pair", symbol.toUpperCase(Locale.US));
         params.put("limit", 1);
         params.put("interval", timeUnit.getShortName());
-        params.put("contractType", "PERPETUAL");
+        params.put("contractType", fGetAllSymbols().get(symbol).getContractType());
         JsonNode node = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v1/continuousKlines", params).iterator().next();
         return new Volume(
                 symbol.toUpperCase(Locale.US),

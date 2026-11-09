@@ -18,6 +18,7 @@ public class Symbol {
     @NotNull @Getter private final BigDecimal quantityStepSize; // La precision en la compra o venta dela base
     @NotNull @Getter private final BigDecimal minNotionalQuote;
     @NotNull @Getter private final BigDecimal minNotionalBase;
+    @NotNull @Getter private final ContractType contractType;
 
 
     public Symbol(@NotNull String symbol,
@@ -28,7 +29,8 @@ public class Symbol {
                   @NotNull BigDecimal priceStepSize,
                   @NotNull BigDecimal quantityStepSize,
                   @NotNull BigDecimal minNotionalQuote,
-                  @NotNull BigDecimal minNotionalBase
+                  @NotNull BigDecimal minNotionalBase,
+                  @NotNull ContractType contractType
     ) {
         this.symbol = symbol;
         this.quotePrecision = quotePrecision;
@@ -39,6 +41,7 @@ public class Symbol {
         this.quantityStepSize = quantityStepSize;
         this.minNotionalQuote = minNotionalQuote;
         this.minNotionalBase = minNotionalBase;
+        this.contractType = contractType;
     }
 
     public @NotNull String name() {

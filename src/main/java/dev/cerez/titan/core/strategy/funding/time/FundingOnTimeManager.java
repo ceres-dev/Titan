@@ -19,6 +19,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -90,29 +91,36 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
 
         long current = System.currentTimeMillis();
 
-        List<BinanceConnector.FundingRate> targetFiltered = funding.values().stream()
+        List<String> targetFiltered = funding.values().stream()
                 .filter(f -> (f.nextFundingTime() - current) < TimeUnit.HOURS.toMillis(1))
                 .filter(f -> f.symbol().endsWith("USDT"))
                 .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateMin()) > 0)
+                .map(BinanceConnector.FundingRate::symbol)
                 .toList();
 
         Map<String, Volume> volumen = new HashMap<>();
-        for (BinanceConnector.FundingRate f : targetFiltered) {
-            volumen.put(f.symbol(), connector.fGetVolumen(f.symbol(), TimeUnitMarket.ONE_HOUR));
-        }
+        for (String s : targetFiltered) volumen.put(s, connector.fGetVolumen(s, TimeUnitMarket.ONE_HOUR));
 
-        List<BinanceConnector.FundingRate> targetLimited = config.maxSymbolsCandidate == -1 ? targetFiltered :
-                targetFiltered.stream()
-                .sorted(Comparator.comparing(BinanceConnector.FundingRate::nextFundingRateAbs).reversed())
-                .limit(config.maxSymbolsCandidate)
-                .toList();
+        DecimalFormat decimal = new DecimalFormat("###,###,###.##");
 
         Log.info("Symbols Disponible: %s",
                 String.join(", ",
-                        targetFiltered.stream().map(f -> "%s@(funding=%.5f, volumen=%.2fUSDT)".formatted(
-                                f.symbol(), f.nextFundingRate(), volumen.get(f.symbol()).quoteVolumen())).toList()
+                        targetFiltered.stream().map(funding::get).map(f -> "%s@(funding=%.5f, volumen=%sUSDT)".formatted(
+                                f.symbol(), f.nextFundingRate(), decimal.format(volumen.get(f.symbol()).quoteVolumen()))).toList()
                 )
         );
+
+        if (config.maxCompetition != -1 && targetFiltered.size() < config.maxCompetition) {
+            Log.info("Abort: Mucha competencia %d", targetFiltered.size());
+            callEvent(new AbortEvent(this));
+            return;
+        }
+
+        List<String> targetLimited = config.maxSymbolsCandidate == -1 ? targetFiltered :
+                targetFiltered.stream()
+                        .sorted(Comparator.comparing((s) -> volumen.get(s).quoteVolumen()))
+                        .limit(config.maxSymbolsCandidate)
+                        .toList();
 
         if (targetLimited.isEmpty()) {
             Log.info("Abort: No funding rate found");
@@ -120,11 +128,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
             return;
         }
 
-        if (config.maxCompetition != -1 && targetLimited.size() < config.maxCompetition) {
-            Log.info("Abort: Mucha competencia %d", targetLimited.size());
-            callEvent(new AbortEvent(this));
-            return;
-        }
+
 
         // Preparación para mover fondo o cancelar otras ordenes
         callEvent(new CollectBalanceEvent(this));
@@ -143,14 +147,20 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
 
         List<SymbolTarget> targets = List.of(
                 targetLimited.stream()
-                .map(fundingRate -> new SymbolTarget(config, symbols.get(fundingRate.symbol()), fundingRate))
+                .map(fundingSymbol -> new SymbolTarget(config, symbols.get(fundingSymbol), funding.get(fundingSymbol), false))
                 .toList()
                 .getLast()
+        );
+        Log.info("Symbols Aplicados: %s",
+                String.join(", ",
+                        targets.stream().map(f -> funding.get(f.symbol.name())).map(f -> "%s@(funding=%.5f, volumen=%sUSDT)".formatted(
+                                f.symbol(), f.nextFundingRate(), decimal.format(volumen.get(f.symbol()).quoteVolumen()))).toList()
+                )
         );
         try {
             Log.info("Delta temporal: Avg: %dms, Max: %dms, Min: %dms", remote.avg(), remote.max(), remote.min());
             symbolsPendingForClose.clear();
-            targetLimited.forEach(target -> connector.fSetLeverage(target.symbol(), config.leverage));
+            targetLimited.forEach(target -> connector.fSetLeverage(target, config.leverage));
 
             waitForFunding(remote, targets);
         } catch (Exception e) {
@@ -265,6 +275,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         private final FundingManagerConfig config;
         private final Symbol symbol;
         private final BinanceConnector.FundingRate target;
+        private final boolean inverse;
 
         private volatile OrderToClosePosition order;
         private volatile BookTick currentBookTick;
