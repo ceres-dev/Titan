@@ -5,9 +5,11 @@ import dev.cerez.titan.core.strategy.grid.attribute.BaseAttribute;
 import dev.cerez.titan.core.strategy.grid.attribute.SideAffected;
 import dev.cerez.titan.core.strategy.grid.model.Context;
 import dev.cerez.titan.connector.model.order.OrderPreview;
+import dev.cerez.titan.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
 public class RemoveIf extends BaseAttribute {

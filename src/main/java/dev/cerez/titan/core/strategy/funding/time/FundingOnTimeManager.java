@@ -61,9 +61,10 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                 try {
                     searchFunding();
                     // Un pequeño margúen de seguridad
-                    LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(1));
                 }catch (Exception e) {
                     Log.exception(e);
+                }finally {
+                    LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(1));
                 }
             }
         });
@@ -359,10 +360,9 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
             }
             Log.info("Posición abierta: %s", position);
             Log.info("Send order close: %s", target.symbol());
-            SideOrder sideOrder = Utils.toSide(position.sidePosition()).inverse();
             AtomicBoolean isOk = new AtomicBoolean(false);
             try {
-                if (manager.getConfig().isSendTrade()) manager.connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true);
+                if (manager.getConfig().isSendTrade()) manager.connector.fSendOrderToMkt(position.symbol(), Utils.toSide(position.sidePosition().inverse()), position.quantity().abs(), null, true);
             }catch (ReduceOnlyRejectException e){
                 isOk.set(true);
             }catch (Exception e){
@@ -393,6 +393,12 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                 List<String> symbolsFiltered = funding.values().stream()
                         .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateMin()) > 0)
                         .filter(f -> {
+                            DecimalFormat df = new DecimalFormat("###,###,##0.00");
+                            Log.info("symbol=%s volumen=%s funding=%.5f %",
+                                    f.symbol(),
+                                    df.format(volume.get(f.symbol()).quoteVolumen()),
+                                    f.nextFundingRate().multiply(new BigDecimal(100))
+                            );
                             Volume v = connector.fGetVolumen(f.symbol(), TimeUnitMarket.ONE_HOUR);
                             volume.put(f.symbol(), v);
                             return v.quoteVolumen().compareTo(new BigDecimal(config.getMinVolumenQute())) > 0;
@@ -400,9 +406,9 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                         .filter(f -> {
                             BookTickMultyLayer book = connector.fGetBookTick(f.symbol(), 4);
                             DecimalFormat df = new DecimalFormat("###,###,##0.00");
-                            Log.info("Symbol=%s volumen=%s bid=%s ask=%s",
+                            Log.info("symbol=%s volumen=%s bid=%s ask=%s",
                                     f.symbol(),
-                                    df.format(volume.get(f.symbol())),
+                                    df.format(volume.get(f.symbol()).quoteVolumen()),
                                     df.format(book.totalAmountQuoteBid()),
                                     df.format(book.totalAmountQuoteAsk())
                             );

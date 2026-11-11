@@ -2,8 +2,11 @@ package dev.cerez.titan.core.strategy.grid.attribute;
 
 import dev.cerez.titan.connector.model.order.OrderPreview;
 import dev.cerez.titan.core.strategy.grid.GridBuilder;
+import dev.cerez.titan.core.strategy.grid.attribute.attributes.CallOnUpdate;
 import dev.cerez.titan.core.strategy.grid.model.Context;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
+import dev.cerez.titan.log.Log;
+import dev.cerez.titan.utils.Utils;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -29,9 +32,12 @@ public class ApplyAttributes {
         return this;
     }
 
-    public @NotNull List<OrderPreview> apply(Context context, List<OrderPreview> originalOrderPreviews) {
-        List<OrderPreview> orders = new LinkedList<>(originalOrderPreviews);
+    public @NotNull List<OrderPreview> apply(@NotNull Context context, boolean computeOrderOnly) {
+        List<OrderPreview> orders = new LinkedList<>(context.getPreviewOrders());
         for (BaseAttribute attribute : attributes) {
+            if (attribute instanceof CallOnUpdate && computeOrderOnly){
+                continue;
+            }
             Function<AttributeContext, Boolean> condition = attribute.getCondition();
             List<OrderPreview> buys = orders.stream().filter(OrderPreview::isBuy).sorted(Comparator.comparing(OrderPreview::getPrice).reversed()).toList();
             List<OrderPreview> sells = orders.stream().filter(OrderPreview::isSell).sorted(Comparator.comparing(OrderPreview::getPrice)).toList();
@@ -72,8 +78,13 @@ public class ApplyAttributes {
                 }
             }
             // Set para evitar duplicado
-            Set<OrderPreview> result = new HashSet<>(attribute.apply(attributeContext));
-            orders = gridBuilder.validateGrid(context, result.stream().toList());
+            try {
+                Set<OrderPreview> result = new HashSet<>(attribute.apply(attributeContext));
+                orders = gridBuilder.validateGrid(context, result.stream().toList());
+            }catch (Exception e){
+                Log.exception(e);
+                return List.of();
+            }
         }
         return orders;
     }

@@ -118,14 +118,12 @@ public final class BinanceConnector extends BaseConnector {
             }
             String key = wwsURL + (stream.isEmpty() ? "" : "/") + stream;
 
-            Collection<Consumer<JsonNode>> consumerSet = consumerStreamsMap.computeIfAbsent(key, k -> new HashMap<>()).values();
+            Collection<Consumer<JsonNode>> consumerSet = consumerStreamsMap.computeIfAbsent(key, k -> new ConcurrentHashMap<>()).values();
             if (!consumerSet.isEmpty()) {
-                synchronized (consumerSet) {
-                    if (node.has("data")) {
-                        consumerSet.forEach(c -> c.accept(node.get("data")));
-                    } else {
-                        consumerSet.forEach(c -> c.accept(node));
-                    }
+                if (node.has("data")) {
+                    consumerSet.forEach(c -> c.accept(node.get("data")));
+                } else {
+                    consumerSet.forEach(c -> c.accept(node));
                 }
                 return;
             }
@@ -606,6 +604,9 @@ public final class BinanceConnector extends BaseConnector {
         params.put("symbol", symbol.toUpperCase(Locale.US));
         JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/positionRisk", params);
         for (JsonNode node : raw) {
+            if (new BigDecimal(node.get("positionAmt").asText()).compareTo(BigDecimal.ZERO) == 0) {
+                continue;
+            }
             String s = node.get("symbol").asText();
             if (s.equals(symbol.toUpperCase(Locale.US))) {
                 return new FuturePosition(
@@ -623,6 +624,9 @@ public final class BinanceConnector extends BaseConnector {
         List<BinanceConnector.FuturePosition> result = new ArrayList<>();
         JsonNode raw = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v3/positionRisk");
         for (JsonNode node : raw) {
+            if (new BigDecimal(node.get("positionAmt").asText()).compareTo(BigDecimal.ZERO) == 0) {
+                continue;
+            }
             result.add(new FuturePosition(
                     node.get("symbol").asText(),
                     new BigDecimal(node.get("positionAmt").asText()),
@@ -941,7 +945,6 @@ public final class BinanceConnector extends BaseConnector {
                 String nameOrder = node.get("c").asText();
                 String symbol = node.get("s").asText();
                 SideOrder sideOrder = SideOrder.valueOf(node.get("S").asText());
-
                 consumer.accept(new OrderUpdate(nameOrder, symbol, sideOrder, statusOrder));
             }
         });

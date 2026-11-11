@@ -6,6 +6,7 @@ public enum StatusOrder {
     NEW,
     FILLED,
     CANCELED,
+    MODIFIED,
     OTHER;
 
     public static StatusOrder parse(@NotNull String value) {
@@ -13,6 +14,7 @@ public enum StatusOrder {
             case "NEW" -> StatusOrder.NEW;
             case "FILLED" -> StatusOrder.FILLED;
             case "CANCELED" -> StatusOrder.CANCELED;
+            case "AMENDMENT" -> StatusOrder.MODIFIED;
             default -> StatusOrder.OTHER;
         };
     }

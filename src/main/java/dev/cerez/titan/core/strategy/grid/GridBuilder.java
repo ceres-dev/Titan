@@ -19,7 +19,7 @@ import java.util.List;
 
 public class GridBuilder {
 
-    private static final BigDecimal MARGEN = new BigDecimal("0.9");
+    private static final BigDecimal MARGEN = new BigDecimal("0.99");
 
     private final GridManager.GridManagerConfig config;
     private final SideGrid grid;

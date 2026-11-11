@@ -92,6 +92,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                 case NEW -> {
                     if (forOpen.remove(orderUpdate.name())) return;
                 }
+                case MODIFIED, FILLED -> {}
                 default -> {
                     return;
                 }
@@ -142,19 +143,18 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                 .max(Comparator.comparingLong(OrderFuture::getDateFilled))
                 .orElse(null);
 
-        BigDecimal balanceUse = position == null
-                ? balance
+        BigDecimal balanceUse =
+                position == null
+                ? balance.multiply(new BigDecimal(config.getLeverage()))
                 // En caso de que tenga una posición con PNL negativo se descuenta del margen usable
                 : balance.add(position.pnlUnrealize().min(BigDecimal.ZERO)).multiply(new BigDecimal(config.getLeverage()));
-
-        Context context = new Context(balanceUse, currentPrice, bookTicker, config, position, orders);
+        Context context = new Context(balanceUse, currentPrice, bookTicker, config, position, orders, List.of());
         if (!gridProfilerIsConfigured){
             gridProfilerIsConfigured = true;
-            List<OrderPreview> orderPreviews = gridBuilder.buildGrid(context);
-            applyAttributes.apply(context, orderPreviews);
+            applyAttributes.apply(context.appendOrderPreview(gridBuilder.buildGrid(context)), false);
         }
-        List<OrderPreview> orderPreviews = gridBuilder.buildGrid(context);
-        List<OrderPreview> desiredOrders = applyAttributes.apply(context, orderPreviews);
+
+        List<OrderPreview> desiredOrders = applyAttributes.apply(context.appendOrderPreview(gridBuilder.buildGrid(context)), false);
         reconcileOrders(ordersActive, desiredOrders);
     }
 
@@ -324,26 +324,30 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                             final int amountOrder = gridManager.getAmountOrderApprox(c);
                             switch (c.getConfig().getSideGrid()) {
                                 case LONG -> {
-                                    return Math.max(amountOrder - Utils.filterBuy(c.getOrders()).size(), 1);
+                                    return Math.max(amountOrder - Utils.filterBuy(c.getPreviewOrders()).size(), 1);
                                 }
                                 case SHORT -> {
-                                    return Math.max(amountOrder - Utils.filterSell(c.getOrders()).size(), 1);
+                                    return Math.max(amountOrder - Utils.filterSell(c.getPreviewOrders()).size(), 1);
                                 }
                                 case BOTH -> {
-                                    return Math.max(amountOrder - Math.min(Utils.filterSell(c.getOrders()).size(), Utils.filterBuy(c.getOrders()).size()), 1);
+                                    return Math.max(amountOrder - Math.min(Utils.filterSell(c.getPreviewOrders()).size(), Utils.filterBuy(c.getPreviewOrders()).size()), 1);
                                 }
                             }
                             return 1;
                         }),
+                        // Si hay muy pocos reduceOnly aúmentara la primera orde de crecimiento, pero solo la primera orden
+                        // que este por debajo(Long)/ encima(Short) de la posición, esto se debe a que si la orden está en precio no
+                        // favorable será eliminada y no habrá una orden aúmentada el resultado final, esto lo determina los dos
+                        // próximos RemoveIf
                         new MultiplyFirstOrderSize(SideAffected.FAVOR, (c) -> {
                             // Cantidad APROXIMADA no puede ser que no sea la cantidad real
                             final int amountOrder = gridManager.getAmountOrderApprox(c);
                             switch (c.getConfig().getSideGrid()) {
                                 case LONG -> {
-                                    return Math.max((amountOrder / 3) - Utils.filterSell(c.getOrders()).size(), 1);
+                                    return Math.max((amountOrder / 2) - Utils.filterSell(c.getPreviewOrders()).size(), 1);
                                 }
                                 case SHORT -> {
-                                    return Math.max((amountOrder / 3) - Utils.filterBuy(c.getOrders()).size(), 1);
+                                    return Math.max((amountOrder / 2) - Utils.filterBuy(c.getPreviewOrders()).size(), 1);
                                 }
                             }
                             return 1;
@@ -386,7 +390,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                         new RemoveIf((order, c) -> {
                             // Si la cantidad de órdenes de reduceOnly es mayor que la configurada elimina las órdenes de crecimiento
                             // por encima (Long)/pordebajo (Short) del entryPriceAvg
-                            if (c.getOrders().stream().filter(Order::isReduceOnly).count() > c.getConfig().getMinOrderGreed()){
+                            if (c.getPreviewOrders().stream().filter(Order::isReduceOnly).count() > c.getConfig().getMinOrderGreed()){
                                 return false;
                             }
                             if (!order.isReduceOnly()) {
@@ -405,10 +409,25 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                                 return false;
                             }
                         }),
+                        // Si hay muy pocos reduceOnly aúmentara la primera orde de crecimiento sin importar si está
+                        // por encima del evenPrice de la posición
+                        new MultiplyFirstOrderSize(SideAffected.FAVOR, (c) -> {
+                            switch (c.getConfig().getSideGrid()) {
+                                case LONG -> {
+                                    final int amountOrder = Utils.filterBuy(c.getPreviewOrders()).size();
+                                    return Math.max((amountOrder / 4) - Utils.filterSell(c.getPreviewOrders()).size(), 1);
+                                }
+                                case SHORT -> {
+                                    final int amountOrder = Utils.filterSell(c.getPreviewOrders()).size();
+                                    return Math.max((amountOrder / 4) - Utils.filterBuy(c.getPreviewOrders()).size(), 1);
+                                }
+                            }
+                            return 1;
+                            // Si la orden ya fue aumenta no lo vuelva a aúmentar
+                        }).addCondicion(c -> c.orderUse().getFirst().getAmountBaseAsset().compareTo(c.context().getConfig().getSizePerOrderBaseAsset()) <= 0),
                         new CallOnUpdate((order, c) -> {
                             // La simulación aplica todos los atributos, pero no debe actualizar
                             // el stepSize/status desde esta llamada anidada.
-                            if (estimatingOrders) return;
 
                             GridManagerConfig config = c.getConfig();
                             BigDecimal normalStepSize = config.getNormalStepSize();
@@ -475,8 +494,6 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                     boolean wasEstimatingOrders = estimatingOrders;
                     try {
                         config.setStepSizePriority(stepSize);
-                        estimatingOrders = true;
-
                         // Context nuevo para no mezclar los atributos/cachés de la simulación
                         // con los de la actualización real.
                         Context estimationContext = new Context(
@@ -485,10 +502,11 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                                 context.getCurrentBookTicker(),
                                 config,
                                 context.getPosition(),
-                                context.getOrders()
+                                context.getAllOrders(),
+                                context.getPreviewOrders()
                         );
                         List<OrderPreview> previews = gridManager.gridBuilder.buildGrid(estimationContext);
-                        return gridManager.applyAttributes.apply(estimationContext, previews).stream()
+                        return gridManager.applyAttributes.apply(estimationContext.appendOrderPreview(previews), true).stream()
                                 .filter(order -> !order.isReduceOnly())
                                 .count();
                     } finally {
