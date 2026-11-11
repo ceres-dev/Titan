@@ -10,11 +10,12 @@ import org.jetbrains.annotations.NotNull;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 public class MultiplyFirstOrderSize extends AttributeMultiplySize {
 
-    private final BiFunction<List<OrderPreview>, Context, Integer> multiply;
-    public MultiplyFirstOrderSize(SideAffected sideAffected, BiFunction<List<OrderPreview>, Context, Integer> multiplier) {
+    private final Function<Context, Integer> multiply;
+    public MultiplyFirstOrderSize(SideAffected sideAffected, Function<Context, Integer> multiplier) {
         super(sideAffected);
         this.multiply = multiplier;
     }
@@ -23,7 +24,7 @@ public class MultiplyFirstOrderSize extends AttributeMultiplySize {
     public @NotNull List<OrderPreview> apply(@NotNull AttributeContext context) {
         if (!context.orderUse().isEmpty()) {
             OrderPreview order = context.orderUse().getFirst();
-            order.setAmountBaseAsset(order.getAmountBaseAsset().multiply(new BigDecimal(multiply.apply(context.ordersResult(), context.context()))));
+            order.setAmountBaseAsset(order.getAmountBaseAsset().multiply(new BigDecimal(multiply.apply(context.context()))));
         }
         return context.ordersResult();
 

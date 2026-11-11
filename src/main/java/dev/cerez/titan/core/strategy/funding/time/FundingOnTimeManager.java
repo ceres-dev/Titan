@@ -2,6 +2,7 @@ package dev.cerez.titan.core.strategy.funding.time;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.connector.BaseConnector;
+import dev.cerez.titan.connector.exception.exchange.ReduceOnlyRejectException;
 import dev.cerez.titan.connector.model.*;
 import dev.cerez.titan.core.StatusManager;
 import dev.cerez.titan.core.event.events.manager.funding.time.*;
@@ -30,6 +31,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
+import java.util.stream.Stream;
 
 public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeManager.FundingManagerConfig, PersistentNope, BinanceConnector> {
 
@@ -43,6 +45,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
     protected void internalStart() {
         subscribeLive.add(connector.wuCreateEventAccountUpdate((jsonNode -> {
             JsonNode node = jsonNode.get("a");
+            // TODO: Hacer una opción que sea express para ahorra un ms
             if (node.get("m").asText().equals("FUNDING_FEE")){
                 JsonNode nodeSymbol = node.get("S");
                 if (nodeSymbol != null){
@@ -56,9 +59,13 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         })));
         executor.execute(() -> {
             while (running) {
-                searchFunding();
-                // Un pequeño margúen de seguridad
-                LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(1));
+                try {
+                    searchFunding();
+                    // Un pequeño margúen de seguridad
+                    LockSupport.parkNanos(TimeUnit.MINUTES.toNanos(1));
+                }catch (Exception e) {
+                    Log.exception(e);
+                }
             }
         });
     }
@@ -75,60 +82,33 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                 .truncatedTo(ChronoUnit.HOURS)
                 .plus(1, ChronoUnit.HOURS);
         Duration remaining = Duration.between(now, nextHour);
-
         Log.info("Espera del Financiación: %ds", remaining.toSeconds());
         setStatus(StatusManager.WAITING);
-        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
+//        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
         setStatus(StatusManager.PREPARING);
         callEvent(new EntryWidowEvent(this));
         CompletableFuture<Map<String, BinanceConnector.FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
-        CompletableFuture<RangeTime> remoteFuture = CompletableFuture.supplyAsync(() -> getDeltaClockRemote(TimeUnit.SECONDS, 20));
+        CompletableFuture<RangeTime> remoteFuture = CompletableFuture.supplyAsync(() -> getDeltaClockRemote(TimeUnit.SECONDS, 5));
         CompletableFuture<Map<String, Symbol>> symbolsFuture = CompletableFuture.supplyAsync(connector::fGetAllSymbols);
 
         Map<String, BinanceConnector.FundingRate> funding = fundingFuture.join();
         RangeTime remote = remoteFuture.join();
+
         Map<String, Symbol> symbols = symbolsFuture.join();
-
-        long current = System.currentTimeMillis();
-
-        List<String> targetFiltered = funding.values().stream()
-                .filter(f -> (f.nextFundingTime() - current) < TimeUnit.HOURS.toMillis(1))
-                .filter(f -> f.symbol().endsWith("USDT"))
-                .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateMin()) > 0)
-                .map(BinanceConnector.FundingRate::symbol)
-                .toList();
-
-        Map<String, Volume> volumen = new HashMap<>();
-        for (String s : targetFiltered) volumen.put(s, connector.fGetVolumen(s, TimeUnitMarket.ONE_HOUR));
-
-        DecimalFormat decimal = new DecimalFormat("###,###,###.##");
-
-        Log.info("Symbols Disponible: %s",
-                String.join(", ",
-                        targetFiltered.stream().map(funding::get).map(f -> "%s@(funding=%.5f, volumen=%sUSDT)".formatted(
-                                f.symbol(), f.nextFundingRate(), decimal.format(volumen.get(f.symbol()).quoteVolumen()))).toList()
-                )
-        );
-
-        if (config.maxCompetition != -1 && targetFiltered.size() < config.maxCompetition) {
-            Log.info("Abort: Mucha competencia %d", targetFiltered.size());
-            callEvent(new AbortEvent(this));
-            return;
-        }
-
-        List<String> targetLimited = config.maxSymbolsCandidate == -1 ? targetFiltered :
-                targetFiltered.stream()
-                        .sorted(Comparator.comparing((s) -> volumen.get(s).quoteVolumen()))
-                        .limit(config.maxSymbolsCandidate)
-                        .toList();
-
-        if (targetLimited.isEmpty()) {
+        Set<SymbolTarget> targets = getTargets(funding, symbols);
+        if (targets.isEmpty()) {
             Log.info("Abort: No funding rate found");
             callEvent(new AbortEvent(this));
             return;
         }
 
-
+        Log.info("Symbols Aplicados: %s",
+                String.join(", ",
+                        targets.stream().map(f -> "%s@funding=%.5f".formatted(
+                                f.getSymbol(), f.getTarget().nextFundingRate())).toList()
+                )
+        );
+        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
 
         // Preparación para mover fondo o cancelar otras ordenes
         callEvent(new CollectBalanceEvent(this));
@@ -145,22 +125,10 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
             return;
         }
 
-        List<SymbolTarget> targets = List.of(
-                targetLimited.stream()
-                .map(fundingSymbol -> new SymbolTarget(config, symbols.get(fundingSymbol), funding.get(fundingSymbol), false))
-                .toList()
-                .getLast()
-        );
-        Log.info("Symbols Aplicados: %s",
-                String.join(", ",
-                        targets.stream().map(f -> funding.get(f.symbol.name())).map(f -> "%s@(funding=%.5f, volumen=%sUSDT)".formatted(
-                                f.symbol(), f.nextFundingRate(), decimal.format(volumen.get(f.symbol()).quoteVolumen()))).toList()
-                )
-        );
         try {
             Log.info("Delta temporal: Avg: %dms, Max: %dms, Min: %dms", remote.avg(), remote.max(), remote.min());
             symbolsPendingForClose.clear();
-            targetLimited.forEach(target -> connector.fSetLeverage(target, config.leverage));
+            targets.forEach(target -> connector.fSetLeverage(target.getSymbol().name(), config.leverage));
 
             waitForFunding(remote, targets);
         } catch (Exception e) {
@@ -171,10 +139,24 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         }
     }
 
-    private void waitForFunding(@NotNull RangeTime remote,
-                                @NotNull List<SymbolTarget> symbols) {
+    private @NotNull Set<SymbolTarget> getTargets(@NotNull Map<String, BinanceConnector.FundingRate> funding, @NotNull Map<String, Symbol> symbols) {
+        long current = System.currentTimeMillis();
+        Map<String, BinanceConnector.FundingRate> fundingRateMap = new HashMap<>();
+        funding.values().stream()
+                .filter(f -> (f.nextFundingTime() - current) < TimeUnit.HOURS.toMillis(1))
+                .filter(f -> f.symbol().endsWith("USDT"))
+                .forEach(fundingRate -> fundingRateMap.put(fundingRate.symbol(), fundingRate));
+        Set<SymbolTarget> result = new HashSet<>();
+        for (FiltersFunding filters : FiltersFunding.values()) {
+            result.addAll(filters.getTargets(fundingRateMap, symbols, this));
+        }
+        return result;
+    }
 
-        long fundingTimeLocal = symbols.getFirst().target.nextFundingTime() - remote.avg();
+    private void waitForFunding(@NotNull RangeTime remote,
+                                @NotNull Set<SymbolTarget> symbols) {
+
+        long fundingTimeLocal = symbols.stream().findAny().orElseThrow().target.nextFundingTime() - remote.avg();
         var config = getConfig();
 
         long waitFinal = fundingTimeLocal - config.offsetOpenPositon;
@@ -208,7 +190,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                 Log.exception(e);
                 return false;
             }
-        }), 800,  TimeUnit.MILLISECONDS);
+        }), config.offsetClosePositon,  TimeUnit.MILLISECONDS);
     }
 
     @SuppressWarnings("SameParameterValue")
@@ -261,18 +243,23 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
     public static class FundingManagerConfig extends BaseConfig {
         @Builder.Default private BigDecimal maxQuantityQuote = new BigDecimal("6");
         @Builder.Default private BigDecimal fundingRateMin = BigDecimal.valueOf(0.002);
+        @Builder.Default private BigDecimal fundingRateMax = BigDecimal.valueOf(0.01);
+        @Builder.Default private BigDecimal fundingRateByPass = BigDecimal.valueOf(0.018);
         @Builder.Default private boolean sendTrade = false;
         @Builder.Default private long offsetOpenPositon = 1000; // MS
+        @Builder.Default private long offsetClosePositon = 800;
         @Builder.Default private int leverage = 1;
-        @Builder.Default private int maxCompetition = 3;
-        @Builder.Default private int maxSymbolsCandidate = 5;
+        @Builder.Default private int minAvailableSymbols = 3;
+        @Builder.Default private long minVolumenQute = 50_000; // UUSDT
+        @Builder.Default private int maxLimitSymbolsCandidate = 5;
     }
 
     @Getter
     @RequiredArgsConstructor
-    public class SymbolTarget {
+    @EqualsAndHashCode
+    public static class SymbolTarget {
 
-        private final FundingManagerConfig config;
+        private final FundingOnTimeManager manager;
         private final Symbol symbol;
         private final BinanceConnector.FundingRate target;
         private final boolean inverse;
@@ -282,19 +269,19 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         private volatile BaseConnector.WebSocketSubscribe subscribeBookTick;
 
         public void prepare(){
-            Log.info("Symbol: %s @ %.4f%%", target.symbol(), target.nextFundingRate().multiply(new BigDecimal(100)));
-            connector.fSetLeverage(target.symbol(), 2);
-            subscribeBookTick = connector.wfSubscribeBookTicker(bookTick -> this.currentBookTick = bookTick, target.symbol());
-            this.currentBookTick = connector.fGetBookTick(target.symbol());
+            manager.connector.fSetLeverage(target.symbol(), 2);
+            subscribeBookTick = manager.connector.wfSubscribeBookTicker(bookTick -> this.currentBookTick = bookTick, target.symbol());
+            this.currentBookTick = manager.connector.fGetBookTick(target.symbol());
         }
 
         public void finish(){
-            executor.schedule(this::closePosition, TimeUnit.SECONDS.toMillis(5), TimeUnit.MILLISECONDS);
             subscribeBookTick.revoke();
         }
 
         public void openPosition() {
-            SideOrder sideOpen = target.nextFundingRate().signum() > 0 ? SideOrder.SELL : SideOrder.BUY;
+            FundingManagerConfig config = manager.getConfig();
+            SideOrder sideOriginal = target.nextFundingRate().signum() > 0 ? SideOrder.SELL : SideOrder.BUY;
+            SideOrder sideOpen = inverse ? sideOriginal.inverse() : sideOriginal;
             SideOrder sideClose = sideOpen.inverse();
             BigDecimal quantityQuoteMax = config.getMaxQuantityQuote();
             BigDecimal quantityBase =(sideOpen.isBuy()
@@ -317,13 +304,13 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
 
             if (quantityQuoteMax.compareTo(quantityQuote) <= 0){
                 Log.warning("Abort: max Quantity %.4f > %.4f", quantityQuote, quantityQuoteMax);
-                callEvent(new AbortEvent(FundingOnTimeManager.this));
+                manager.callEvent(new AbortEvent(manager));
             }
 
             Log.info("Send order open: %s".formatted(target.symbol()));
             if (config.isSendTrade()) {
-                callEvent(new OpenPositionEvent(FundingOnTimeManager.this));
-                connector.fSendOrderToMkt(target.symbol(), sideOpen, quantityBase, null, false);
+                manager.callEvent(new OpenPositionEvent(manager));
+                manager.connector.fSendOrderToMkt(target.symbol(), sideOpen, quantityBase, null, false);
                 this.order = new OrderToClosePosition(target.symbol(), quantityBase, sideClose, System.currentTimeMillis());
                 Log.info("Posición Abierta");
             }
@@ -334,8 +321,8 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
             Log.info("Send order close: %s", order.symbol());
             long startTime = System.nanoTime();
             try {
-                if (config.isSendTrade())
-                    connector.wfSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true)
+                if (manager.getConfig().isSendTrade())
+                    manager.connector.wfSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true)
                             .thenAccept((jsonNode -> {
                                 int status = jsonNode.get("status").asInt();
                                 try {
@@ -349,13 +336,13 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                                     if (status != 200){
                                         Log.warning("Repuesta: %s", jsonNode);
                                         Log.info("Enviando orden de emergencia");
-                                        connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true);
+                                        manager.connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true);
                                     }
                                     order = null;
                                 }catch (Exception e) {
                                     Log.exception(e);
                                 }finally {
-                                    connector.checkWebSockets();
+                                    manager.connector.checkWebSockets();
                                 }
                             }));
             }catch (Exception e){
@@ -366,44 +353,27 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         }
 
         private void closePositionCheck(){
-            BinanceConnector.FuturePosition position = connector.fGetPosition(target.symbol());
+            BinanceConnector.FuturePosition position = manager.connector.fGetPosition(target.symbol());
             if (position == null) {
                 Log.info("Cierre de la posición exitoso");
-                callEvent(new ClosePositionEvent(FundingOnTimeManager.this));
+                manager.callEvent(new ClosePositionEvent(manager));
                 return;
             }
             Log.info("Posición abierta: %s", position);
             Log.info("Send order close: %s", target.symbol());
             SideOrder sideOrder = Utils.toSide(position.sidePosition()).inverse();
             AtomicBoolean isOk = new AtomicBoolean(false);
-            if (config.isSendTrade()) connector.wfSendOrderToMkt(target.symbol(),
-                    sideOrder,
-                    position.quantity().abs(),
-                    "close-" + Utils.uuidToBase36(UUID.randomUUID()),
-                    true
-            ).thenAccept((jsonNode -> {
-                try {
-                    int status = jsonNode.get("status").asInt();
-                    if (status != 200){
-                        Log.warning("Repuesta: %s", jsonNode);
-                        // Si es: ReduceOnly Order is rejected. Esta bien.
-                        int code = jsonNode.get("error").get("code").asInt();
-                        if (code == -2022){
-                            isOk.set(true);
-                            return;
-                        }
-                        Log.info("Enviando orden de emergencia");
-                        connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true);
-                    }else isOk.set(true);
-                } catch (Exception e) {
-                    Log.exception(e);
-                } finally {
-                    connector.checkWebSockets();
-                }
-            })).join();
+            try {
+                if (manager.getConfig().isSendTrade()) manager.connector.fSendOrderToMkt(order.symbol(), order.sideOrderToClose(), order.quantity().abs(), null, true);
+            }catch (ReduceOnlyRejectException e){
+                isOk.set(true);
+            }catch (Exception e){
+                Log.exception(e);
+            }
+
             if (isOk.get()) {
                 Log.info("Cierre de la posición exitoso");
-                callEvent(new ClosePositionEvent(FundingOnTimeManager.this));
+                manager.callEvent(new ClosePositionEvent(manager));
                 return;
             }
             // Una pequeña espera para que se actualize la cache
@@ -413,5 +383,52 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
     }
 
     private record OrderToClosePosition(String symbol, BigDecimal quantity, SideOrder sideOrderToClose, long openDate){}
+
+    private enum FiltersFunding{
+        NORMAL {
+            @Override
+            public List<SymbolTarget> getTargets(Map<String, BinanceConnector.FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager) {
+                var config = manager.getConfig();
+                Map<String, Volume> volume = new HashMap<>();
+                List<String> symbolsFiltered = funding.values().stream()
+                        .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateMin()) > 0)
+                        .filter(s -> {
+                            Volume v = manager.connector.fGetVolumen(s.symbol(), TimeUnitMarket.ONE_HOUR);
+                            volume.put(s.symbol(), v);
+                            return v.quoteVolumen().compareTo(new BigDecimal(config.getMinVolumenQute())) > 0;
+                        })
+                        .map(BinanceConnector.FundingRate::symbol)
+                        .toList();
+                if (symbolsFiltered.size() < config.getMinAvailableSymbols()){
+                    return List.of();
+                }
+                return List.of(
+                        symbolsFiltered.stream()
+                                .sorted(Comparator.comparing((s) -> volume.get(s).quoteVolumen()))
+                                .limit(config.maxLimitSymbolsCandidate)
+                                .map(fundingSymbol -> {
+                                    Symbol symbol = symbols.get(fundingSymbol);
+                                    return new SymbolTarget(manager, symbol, funding.get(fundingSymbol), false);
+                                })
+                                .toList().getLast());
+            }
+        },
+        BYPASS {
+            @Override
+            public List<SymbolTarget> getTargets(Map<String, BinanceConnector.FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager) {
+                var config = manager.getConfig();
+                return funding.values().stream()
+                        .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateByPass()) >= 0)
+                        .map(BinanceConnector.FundingRate::symbol)
+                        .map(fundingSymbol -> {
+                            Symbol symbol = symbols.get(fundingSymbol);
+                            return new SymbolTarget(manager, symbol, funding.get(fundingSymbol), false);
+                        })
+                        .toList();
+            }
+        },;
+
+        public abstract List<SymbolTarget> getTargets(Map<String, BinanceConnector.FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager);
+    }
 
 }

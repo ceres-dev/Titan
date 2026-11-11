@@ -43,6 +43,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Function;
 
+import static dev.cerez.titan.core.strategy.grid.model.SideGrid.LONG;
+import static dev.cerez.titan.core.strategy.grid.model.SideGrid.SHORT;
+
 public final class GridManager extends StrategyManager<GridManager.GridManagerConfig, PersistentNope, BinanceConnector> implements StatusProfiler {
 
     @Nullable private OrderFuture lastOrderFilled = null;
@@ -314,31 +317,31 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                             //noinspection DataFlowIssue
                             return c.getPosition().entryPriceAvg();
                         }, false).addCondicion(c -> c.context().getPosition() != null),
-                        new MultiplyFirstOrderSize(SideAffected.AGAINST, (orders, c) -> {
+                        new MultiplyFirstOrderSize(SideAffected.AGAINST, (c) -> {
                             // Cantidad APROXIMADA no puede ser que no sea la cantidad real
                             final int amountOrder = gridManager.getAmountOrderApprox(c);
                             switch (c.getConfig().getSideGrid()) {
                                 case LONG -> {
-                                    return Math.max(amountOrder - Utils.filterBuy(orders).size(), 1);
+                                    return Math.max(amountOrder - Utils.filterBuy(c.getOrders()).size(), 1);
                                 }
                                 case SHORT -> {
-                                    return Math.max(amountOrder - Utils.filterSell(orders).size(), 1);
+                                    return Math.max(amountOrder - Utils.filterSell(c.getOrders()).size(), 1);
                                 }
                                 case BOTH -> {
-                                    return Math.max(amountOrder - Math.min(Utils.filterSell(orders).size(), Utils.filterBuy(orders).size()), 1);
+                                    return Math.max(amountOrder - Math.min(Utils.filterSell(c.getOrders()).size(), Utils.filterBuy(c.getOrders()).size()), 1);
                                 }
                             }
                             return 1;
                         }),
-                        new MultiplyFirstOrderSize(SideAffected.FAVOR, (orders, c) -> {
+                        new MultiplyFirstOrderSize(SideAffected.FAVOR, (c) -> {
                             // Cantidad APROXIMADA no puede ser que no sea la cantidad real
                             final int amountOrder = gridManager.getAmountOrderApprox(c);
                             switch (c.getConfig().getSideGrid()) {
                                 case LONG -> {
-                                    return Math.max(amountOrder / 3 - Utils.filterSell(orders).size(), 1);
+                                    return Math.max(amountOrder / 2 - Utils.filterSell(c.getOrders()).size(), 1);
                                 }
                                 case SHORT -> {
-                                    return Math.max(amountOrder / 3 - Utils.filterBuy(orders).size(), 1);
+                                    return Math.max(amountOrder / 2 - Utils.filterBuy(c.getOrders()).size(), 1);
                                 }
                             }
                             return 1;

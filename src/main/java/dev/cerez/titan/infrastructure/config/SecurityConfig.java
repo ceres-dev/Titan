@@ -19,7 +19,7 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/style/**", "/script/**", "/assets/**").permitAll()
-                        .requestMatchers("/login", "/auth/login", "/about", "/robots.txt", "/").permitAll()
+                        .requestMatchers("/login", "/auth/login", "/about", "/robots.txt", "/", "/xapi/**").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .requestMatchers("/dashboard/**").authenticated()
                         .requestMatchers("/ws/**").authenticated()

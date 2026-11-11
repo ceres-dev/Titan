@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-public class ApiController {
+public class PrivateApiController {
 
     public final TitanApplication titan;
 

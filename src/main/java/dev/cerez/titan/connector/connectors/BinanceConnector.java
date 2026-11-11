@@ -120,10 +120,12 @@ public final class BinanceConnector extends BaseConnector {
 
             Collection<Consumer<JsonNode>> consumerSet = consumerStreamsMap.computeIfAbsent(key, k -> new HashMap<>()).values();
             if (!consumerSet.isEmpty()) {
-                if (node.has("data")) {
-                    consumerSet.forEach(c -> c.accept(node.get("data")));
-                } else {
-                    consumerSet.forEach(c -> c.accept(node));
+                synchronized (consumerSet) {
+                    if (node.has("data")) {
+                        consumerSet.forEach(c -> c.accept(node.get("data")));
+                    } else {
+                        consumerSet.forEach(c -> c.accept(node));
+                    }
                 }
                 return;
             }

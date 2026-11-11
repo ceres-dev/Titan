@@ -41,7 +41,7 @@ public abstract class BaseConnector implements Connector {
     protected final ObjectMapper mapper = new ObjectMapper();
     protected final HttpClient clientHttp = HttpClient.newHttpClient();
     protected final TemporalRefence<Map<String, Symbol>> cachedSymbols = new TemporalRefence<>(TimeUnit.MINUTES, 5);
-    protected final ExecutorService executor = Executors.newFixedThreadPool(8, Utils.getThreadFactory(this));
+    protected final ScheduledExecutorService executor = Executors.newScheduledThreadPool(8, Utils.getThreadFactory(this));
     protected final Map<String, WebSocketContainer> webSockets = new HashMap<>();
     protected final ConcurrentMap<UUID, String> streams = new ConcurrentHashMap<>();
     @Getter
@@ -134,12 +134,6 @@ public abstract class BaseConnector implements Connector {
                 invalidateCache();
             }
         });
-        executor.execute(() -> {
-            while (running) {
-                LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(60));
-                checkWebSockets();
-            }
-        });
     }
 
     public void stopLoopers(){
@@ -166,8 +160,9 @@ public abstract class BaseConnector implements Connector {
                             handleStreamRawExpress(wwsURL, contentToParse);
                             try {
                                 handleStreamRaw(wwsURL, mapper.readTree(contentToParse));
-                            } catch (JsonProcessingException ignored) {
+                            } catch (JsonProcessingException e) {
                                 Log.warning("JSON Parsing failed: " + contentToParse);
+                                Log.exception(e);
                             }
                         }
                         webSocket.request(1);
@@ -183,7 +178,8 @@ public abstract class BaseConnector implements Connector {
 
                     @Override
                     public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-                        Log.error("WebSocket@%s closed: Code=%d Reason=%s LastRequest=%s".formatted(wwsURL, statusCode, reason, lastRequestWebSocker));
+                        Log.error("WebSocket@%s closed: code=%d reason=%s LastRequest=%s".formatted(wwsURL, statusCode, reason, lastRequestWebSocker));
+                        executor.schedule(() -> checkWebSockets(), 1, TimeUnit.SECONDS);
                         return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
                     }
                 }).join());
@@ -394,17 +390,25 @@ public abstract class BaseConnector implements Connector {
 
     protected boolean addConsumerStreams(@NotNull String key, @NotNull UUID id, @NotNull Consumer<JsonNode> consumer) {
         final AtomicBoolean isNew = new AtomicBoolean(false);
-        consumerStreamsMap.computeIfAbsent(key, k -> {
+        var map = consumerStreamsMap.computeIfAbsent(key, k -> {
             isNew.set(true);
             return new HashMap<>();
-        }).put(id, (json) -> executor.execute(() -> consumer.accept(json)));
+        });
+        synchronized (map) {
+            map.put(id, (json) -> executor.execute(() -> {
+                try {
+                    consumer.accept(json);
+                }catch (Exception e) {
+                    Log.exception("Excepción key=%s".formatted(key), e);
+                }
+            }));
+        }
         return isNew.get();
     }
 
     protected abstract @NotNull Revocable subscribeStream(String url, Consumer<JsonNode> consumer, String stream);
 
     protected abstract void unsubscribeStream(@NotNull String url, @NotNull UUID id);
-
 
     protected abstract void handleStreamRawExpress(@NotNull String wwsURL, @NotNull String contentToParse);
 
