@@ -43,8 +43,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Function;
 
-import static dev.cerez.titan.core.strategy.grid.model.SideGrid.LONG;
-import static dev.cerez.titan.core.strategy.grid.model.SideGrid.SHORT;
+import static dev.cerez.titan.core.strategy.grid.model.SideGrid.*;
 
 public final class GridManager extends StrategyManager<GridManager.GridManagerConfig, PersistentNope, BinanceConnector> implements StatusProfiler {
 
@@ -312,6 +311,9 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
             public List<BaseAttribute> apply(@NotNull GridManager gridManager) {
                 this.gridManager = gridManager;
                 return List.of(
+                        new CallOnUpdate((order, c) -> {
+                            if (c.getConfig().sideGrid == BOTH) throw new UnsupportedOperationException("El modo Both no esta soportado");
+                        }),
                         new OffsetOrderSellPrice(new BigDecimal("0.15")),
                         new DontSendOrder(SideAffected.AGAINST, c -> {
                             //noinspection DataFlowIssue
@@ -338,10 +340,10 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                             final int amountOrder = gridManager.getAmountOrderApprox(c);
                             switch (c.getConfig().getSideGrid()) {
                                 case LONG -> {
-                                    return Math.max(amountOrder / 2 - Utils.filterSell(c.getOrders()).size(), 1);
+                                    return Math.max((amountOrder / 3) - Utils.filterSell(c.getOrders()).size(), 1);
                                 }
                                 case SHORT -> {
-                                    return Math.max(amountOrder / 2 - Utils.filterBuy(c.getOrders()).size(), 1);
+                                    return Math.max((amountOrder / 3) - Utils.filterBuy(c.getOrders()).size(), 1);
                                 }
                             }
                             return 1;
@@ -376,14 +378,31 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                             return amount <= c.context().getConfig().getMinOrderSafe();
                         }),
                         new RemoveIf((order, c) -> {
-                            if (gridManager.lastOrderFilled != null && gridManager.lastOrderFilled.getSideOrder() == order.getSideOrder()) {
-                                return gridManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
-                            } else {
-                                // Si la cantidad de órdenes de reduceOnly es mayor que la configurada elimina las órdenes de crecimiento
-                                // por encima (Long)/pordebajo (Short) del entryPriceAvg
-                                return c.getOrders().stream().filter(Order::isReduceOnly).count() > c.getConfig().getMinOrderGreed() &&
-                                        !order.isReduceOnly() &&
-                                        (c.getPosition() != null && c.getPosition().entryPriceAvg().compareTo(order.getPrice()) <= 0);
+                            // La orden es la misma que la ultima ejecutada la elimina
+                            return gridManager.lastOrderFilled != null &&
+                                    gridManager.lastOrderFilled.getSideOrder() == order.getSideOrder() &&
+                                    gridManager.lastOrderFilled.getPrice().compareTo(order.getPrice()) == 0;
+                        }),
+                        new RemoveIf((order, c) -> {
+                            // Si la cantidad de órdenes de reduceOnly es mayor que la configurada elimina las órdenes de crecimiento
+                            // por encima (Long)/pordebajo (Short) del entryPriceAvg
+                            if (c.getOrders().stream().filter(Order::isReduceOnly).count() > c.getConfig().getMinOrderGreed()){
+                                return false;
+                            }
+                            if (!order.isReduceOnly()) {
+                                switch (c.getConfig().getSideGrid()) {
+                                    case LONG -> {
+                                        return (c.getPosition() != null && c.getPosition().entryPriceAvg().compareTo(order.getPrice()) <= 0);
+                                    }
+                                    case SHORT -> {
+                                        return (c.getPosition() != null && c.getPosition().entryPriceAvg().compareTo(order.getPrice()) >= 0);
+                                    }
+                                    default -> {
+                                        return false;
+                                    }
+                                }
+                            }else {
+                                return false;
                             }
                         }),
                         new CallOnUpdate((order, c) -> {

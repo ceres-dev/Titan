@@ -31,7 +31,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
-import java.util.stream.Stream;
 
 public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeManager.FundingManagerConfig, PersistentNope, BinanceConnector> {
 
@@ -84,7 +83,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         Duration remaining = Duration.between(now, nextHour);
         Log.info("Espera del Financiación: %ds", remaining.toSeconds());
         setStatus(StatusManager.WAITING);
-//        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
+        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
         setStatus(StatusManager.PREPARING);
         callEvent(new EntryWidowEvent(this));
         CompletableFuture<Map<String, BinanceConnector.FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
@@ -108,7 +107,6 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                                 f.getSymbol(), f.getTarget().nextFundingRate())).toList()
                 )
         );
-        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
 
         // Preparación para mover fondo o cancelar otras ordenes
         callEvent(new CollectBalanceEvent(this));
@@ -389,28 +387,44 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
             @Override
             public List<SymbolTarget> getTargets(Map<String, BinanceConnector.FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager) {
                 var config = manager.getConfig();
+                var connector = manager.connector;
+
                 Map<String, Volume> volume = new HashMap<>();
                 List<String> symbolsFiltered = funding.values().stream()
                         .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateMin()) > 0)
-                        .filter(s -> {
-                            Volume v = manager.connector.fGetVolumen(s.symbol(), TimeUnitMarket.ONE_HOUR);
-                            volume.put(s.symbol(), v);
+                        .filter(f -> {
+                            Volume v = connector.fGetVolumen(f.symbol(), TimeUnitMarket.ONE_HOUR);
+                            volume.put(f.symbol(), v);
                             return v.quoteVolumen().compareTo(new BigDecimal(config.getMinVolumenQute())) > 0;
+                        })
+                        .filter(f -> {
+                            BookTickMultyLayer book = connector.fGetBookTick(f.symbol(), 4);
+                            DecimalFormat df = new DecimalFormat("###,###,##0.00");
+                            Log.info("Symbol=%s volumen=%s bid=%s ask=%s",
+                                    f.symbol(),
+                                    df.format(volume.get(f.symbol())),
+                                    df.format(book.totalAmountQuoteBid()),
+                                    df.format(book.totalAmountQuoteAsk())
+                            );
+                            if (f.nextFundingRate().signum() > 0){
+                                return book.totalAmountQuoteBid().compareTo(new BigDecimal(300)) > 0;
+                            }else {
+                                return book.totalAmountQuoteAsk().compareTo(new BigDecimal(300)) > 0;
+                            }
                         })
                         .map(BinanceConnector.FundingRate::symbol)
                         .toList();
                 if (symbolsFiltered.size() < config.getMinAvailableSymbols()){
                     return List.of();
                 }
-                return List.of(
-                        symbolsFiltered.stream()
-                                .sorted(Comparator.comparing((s) -> volume.get(s).quoteVolumen()))
-                                .limit(config.maxLimitSymbolsCandidate)
-                                .map(fundingSymbol -> {
-                                    Symbol symbol = symbols.get(fundingSymbol);
-                                    return new SymbolTarget(manager, symbol, funding.get(fundingSymbol), false);
-                                })
-                                .toList().getLast());
+                return symbolsFiltered.stream()
+                        .sorted(Comparator.comparing((s) -> volume.get(s).quoteVolumen()))
+                        .limit(config.maxLimitSymbolsCandidate)
+                        .map(fundingSymbol -> {
+                            Symbol symbol = symbols.get(fundingSymbol);
+                            return new SymbolTarget(manager, symbol, funding.get(fundingSymbol), false);
+                        })
+                        .toList();
             }
         },
         BYPASS {

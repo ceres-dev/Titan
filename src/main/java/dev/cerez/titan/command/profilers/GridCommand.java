@@ -39,7 +39,7 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
                 .stepSizeMediumActivity(new BigDecimal("1"))
                 .stepSizeLowActivity(new BigDecimal("0.6"))
                 .sizePerOrderBaseAsset(new BigDecimal("0.01"))
-                .minOrderGreed(20)
+                .minOrderGreed(15)
                 .minOrderSafe(20)
                 .leverage(5)
                 .sideGrid(SideGrid.LONG)

@@ -60,7 +60,7 @@ public final class BinanceConnector extends BaseConnector {
 
     private String listenKey = null;
 
-    public BinanceConnector(StorageManager storageManager) {
+    public BinanceConnector(@NotNull StorageManager storageManager) {
         super(storageManager.getConfig(ConnectorConfig.class).getProvider());
     }
 
@@ -754,13 +754,57 @@ public final class BinanceConnector extends BaseConnector {
     public @NotNull BookTick fGetBookTick(@NotNull String symbol) {
         Map<String, Object> params = new HashMap<>();
         params.put("symbol", symbol.toUpperCase(Locale.US));
+        params.put("limit", 5);
         JsonNode node = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/depth", params);
         JsonNode bid = node.get("bids").iterator().next();
         JsonNode ask = node.get("asks").iterator().next();
-        BigDecimal bidPrice = new BigDecimal(bid.iterator().next().asText());
-        BigDecimal askPrice = new BigDecimal(ask.iterator().next().asText());
-        return new BookTick(symbol.toUpperCase(Locale.US), bidPrice, BigDecimal.ZERO, askPrice, BigDecimal.ZERO);
+        BigDecimal bidPrice = new BigDecimal(bid.get(0).asText());
+        BigDecimal askPrice = new BigDecimal(ask.get(0).asText());
+        BigDecimal bidAmount = new BigDecimal(bid.get(1).asText());
+        BigDecimal askAmount = new BigDecimal(ask.get(1).asText());
+        return new BookTick(symbol.toUpperCase(Locale.US), bidPrice, bidAmount, askPrice, askAmount);
     }
+
+    @Contract("_, _ -> new")
+    public @NotNull BookTickMultyLayer fGetBookTick(@NotNull String symbol, int layer) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("symbol", symbol.toUpperCase(Locale.US));
+        int limit;
+        if (layer <= 5) {
+            limit = 5;
+        }else if (layer <= 10) {
+            limit = 10;
+        }else if (layer <= 20) {
+            limit = 20;
+        }else if (layer <= 50) {
+            limit = 50;
+        }else if (layer <= 100) {
+            limit = 100;
+        }else if (layer <= 500) {
+            limit = 500;
+        }else  {
+            limit = 1000;
+        }
+        params.put("limit", limit);
+        JsonNode node = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/depth", params);
+        ArrayList<BookTickMultyLayer.Layer> bids = new ArrayList<>(layer);
+        ArrayList<BookTickMultyLayer.Layer> asks = new ArrayList<>(layer);
+        for (int i = 0; i < layer; i++) {
+            JsonNode bidsNode = node.get("bids").get(i);
+            bids.add(new BookTickMultyLayer.Layer(
+                    new BigDecimal(bidsNode.get(0).asText()),
+                    new BigDecimal(bidsNode.get(1).asText())
+            ));
+            JsonNode asksNode = node.get("asks").get(i);
+            asks.add(new BookTickMultyLayer.Layer(
+                    new BigDecimal(asksNode.get(0).asText()),
+                    new BigDecimal(asksNode.get(1).asText())
+            ));
+        }
+
+        return new BookTickMultyLayer(symbol.toUpperCase(Locale.US), bids, asks);
+    }
+
 
     public @NotNull Map<String, FundingRate> fGetFundingRate(){
         JsonNode raw0 = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/fundingInfo");
