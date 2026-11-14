@@ -223,9 +223,11 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                         order.getSideOrder() == SideOrder.BUY ? "<green>BUY" : "<red>SELL",
                         order.getPrice(), order.getAmountBaseAsset(), order.getNameOrder(), order.isReduceOnly()
                 );
-            } catch (PostOnlyRejectException | ReduceOnlyRejectException | MarginNotSufficienException e) {
+            } catch (PostOnlyRejectException | ReduceOnlyRejectException e) {
                 Log.warning("Error al crear la orden: " + e.getMessage());
                 retry = true;
+            }catch (MarginNotSufficienException e){
+                Log.warning("Error al crear la orden: " + e.getMessage());
             }
         }
         // Se vuelve a intentar
@@ -390,7 +392,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                         new RemoveIf((order, c) -> {
                             // Si la cantidad de órdenes de reduceOnly es mayor que la configurada elimina las órdenes de crecimiento
                             // por encima (Long)/pordebajo (Short) del entryPriceAvg
-                            if (c.getPreviewOrders().stream().filter(Order::isReduceOnly).count() > c.getConfig().getMinOrderGreed()){
+                            if (c.getPreviewOrders().stream().filter(Order::isReduceOnly).count() < c.getConfig().getMinOrderGreed()){
                                 return false;
                             }
                             if (!order.isReduceOnly()) {

@@ -19,7 +19,7 @@ import java.util.Map;
 public abstract class StrategyManager<C  extends BaseConfig, P extends BasePersistent, O extends Connector> extends BaseManager<C, P, O> {
 
 
-    @Getter @NotNull private volatile StatusManager status = StatusManager.STOPING;
+    @Getter @NotNull private volatile StatusManager status = StatusManager.STOPPED;
     @Getter @Setter @Nullable protected BalanceMaxRiskManager balanceMaxRiskManager;
     protected final LinkedList<Revocable> subscribeLive = new LinkedList<>();
     private final Object lock = new Object();

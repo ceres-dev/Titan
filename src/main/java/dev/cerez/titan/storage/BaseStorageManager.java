@@ -13,9 +13,9 @@ public abstract class BaseStorageManager implements StorageManager {
 
     private static final String REGEX_PROFILER_NAME = "^[a-zA-Z0-9]+$";
     private String fullProfilerName = "";
-    private final ConcurrentHashMap<String, StorageManager> subProfilers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, StorageManager> childrenProfiler = new ConcurrentHashMap<>();
     @Nullable
-    private StorageManager superProfiler = null;
+    private StorageManager fatherProfiler = null;
 
     protected void concatBaseNameProfiler(@NotNull String fullProfilerName){
         this.fullProfilerName = fullProfilerName;
@@ -33,20 +33,20 @@ public abstract class BaseStorageManager implements StorageManager {
         }
         BaseStorageManager manager = copy();
         manager.concatBaseNameProfiler(getFullProfilerName(subProfilerName));
-        manager.superProfiler = this;
-        subProfilers.putIfAbsent(subProfilerName, manager);
+        manager.fatherProfiler = this;
+        childrenProfiler.putIfAbsent(subProfilerName, manager);
         return manager;
     }
 
     @Override
-    public @NotNull StorageManager getSuperProfiler(){
-        if (superProfiler == null) throw new IsRootProfilerException();
-        return superProfiler;
+    public @NotNull StorageManager getFatherProfiler(){
+        if (fatherProfiler == null) throw new IsRootProfilerException();
+        return fatherProfiler;
     }
 
     @Override
-    public @NotNull Set<StorageManager> getSubProfiler(){
-        return Set.copyOf(subProfilers.values());
+    public @NotNull Set<StorageManager> getChildrenProfiler(){
+        return Set.copyOf(childrenProfiler.values());
     }
 
     @Contract(pure = true, value = "-> new")

@@ -4,8 +4,10 @@ import dev.cerez.titan.log.Log;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -16,13 +18,18 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) {
-        http
+        http.csrf(csrf -> csrf // TODO: Borrar XAPI después del 15 nov
+                        .ignoringRequestMatchers("/xapi/**")
+                        .ignoringRequestMatchers("/xapi")
+                )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/style/**", "/script/**", "/assets/**").permitAll()
+                        .requestMatchers("/style/**", "/script/**", "/assets/**", "/error").permitAll()
                         .requestMatchers("/login", "/auth/login", "/about", "/robots.txt", "/", "/xapi/**").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .requestMatchers("/dashboard/**").authenticated()
                         .requestMatchers("/ws/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/xapi/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/xapi/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form

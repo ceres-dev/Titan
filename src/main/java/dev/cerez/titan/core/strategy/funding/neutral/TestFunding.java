@@ -1,6 +1,7 @@
 package dev.cerez.titan.core.strategy.funding.neutral;
 
 import dev.cerez.titan.connector.model.ConvertConfig;
+import dev.cerez.titan.connector.model.FundingRate;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.connector.model.Symbol;
@@ -104,7 +105,7 @@ public class TestFunding {
 
                 }),
                 new Test("Profit Rate", (b, q) -> {
-                    BinanceConnector.FundingRate fundingRate = connector.fGetFundingRate().get(b + q);
+                    FundingRate fundingRate = connector.fGetFundingRate().get(b + q);
                     double interest = connector.mGetInterest(b).doubleValue() * fundingRate.config().interval();
                     double funding = Math.abs(fundingRate.nextFundingRate().doubleValue());
                     if (interest*10 < funding){

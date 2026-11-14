@@ -87,11 +87,11 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(remaining.toMillis() - TimeUnit.SECONDS.toMillis(60)));
         setStatus(StatusManager.PREPARING);
         callEvent(new EntryWidowEvent(this));
-        CompletableFuture<Map<String, BinanceConnector.FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
+        CompletableFuture<Map<String, FundingRate>> fundingFuture = CompletableFuture.supplyAsync(connector::fGetFundingRate);
         CompletableFuture<RangeTime> remoteFuture = CompletableFuture.supplyAsync(() -> getDeltaClockRemote(TimeUnit.SECONDS, 5));
         CompletableFuture<Map<String, Symbol>> symbolsFuture = CompletableFuture.supplyAsync(connector::fGetAllSymbols);
 
-        Map<String, BinanceConnector.FundingRate> funding = fundingFuture.join();
+        Map<String, FundingRate> funding = fundingFuture.join();
         RangeTime remote = remoteFuture.join();
 
         Map<String, Symbol> symbols = symbolsFuture.join();
@@ -138,9 +138,9 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         }
     }
 
-    private @NotNull Set<SymbolTarget> getTargets(@NotNull Map<String, BinanceConnector.FundingRate> funding, @NotNull Map<String, Symbol> symbols) {
+    private @NotNull Set<SymbolTarget> getTargets(@NotNull Map<String, FundingRate> funding, @NotNull Map<String, Symbol> symbols) {
         long current = System.currentTimeMillis();
-        Map<String, BinanceConnector.FundingRate> fundingRateMap = new HashMap<>();
+        Map<String, FundingRate> fundingRateMap = new HashMap<>();
         funding.values().stream()
                 .filter(f -> (f.nextFundingTime() - current) < TimeUnit.HOURS.toMillis(1))
                 .filter(f -> f.symbol().endsWith("USDT"))
@@ -260,7 +260,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
 
         private final FundingOnTimeManager manager;
         private final Symbol symbol;
-        private final BinanceConnector.FundingRate target;
+        private final FundingRate target;
         private final boolean inverse;
 
         private volatile OrderToClosePosition order;
@@ -385,7 +385,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
     private enum FiltersFunding{
         NORMAL {
             @Override
-            public List<SymbolTarget> getTargets(Map<String, BinanceConnector.FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager) {
+            public List<SymbolTarget> getTargets(Map<String, FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager) {
                 var config = manager.getConfig();
                 var connector = manager.connector;
 
@@ -394,12 +394,12 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                         .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateMin()) > 0)
                         .filter(f -> {
                             DecimalFormat df = new DecimalFormat("###,###,##0.00");
-                            Log.info("symbol=%s volumen=%s funding=%.5f %",
-                                    f.symbol(),
-                                    df.format(volume.get(f.symbol()).quoteVolumen()),
-                                    f.nextFundingRate().multiply(new BigDecimal(100))
-                            );
                             Volume v = connector.fGetVolumen(f.symbol(), TimeUnitMarket.ONE_HOUR);
+                            Log.info("symbol=%s volumen=%s funding=%.7f",
+                                    f.symbol(),
+                                    df.format(v.quoteVolumen()),
+                                    f.nextFundingRate()
+                            );
                             volume.put(f.symbol(), v);
                             return v.quoteVolumen().compareTo(new BigDecimal(config.getMinVolumenQute())) > 0;
                         })
@@ -418,7 +418,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
                                 return book.totalAmountQuoteAsk().compareTo(new BigDecimal(300)) > 0;
                             }
                         })
-                        .map(BinanceConnector.FundingRate::symbol)
+                        .map(FundingRate::symbol)
                         .toList();
                 if (symbolsFiltered.size() < config.getMinAvailableSymbols()){
                     return List.of();
@@ -435,11 +435,11 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         },
         BYPASS {
             @Override
-            public List<SymbolTarget> getTargets(Map<String, BinanceConnector.FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager) {
+            public List<SymbolTarget> getTargets(Map<String, FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager) {
                 var config = manager.getConfig();
                 return funding.values().stream()
                         .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateByPass()) >= 0)
-                        .map(BinanceConnector.FundingRate::symbol)
+                        .map(FundingRate::symbol)
                         .map(fundingSymbol -> {
                             Symbol symbol = symbols.get(fundingSymbol);
                             return new SymbolTarget(manager, symbol, funding.get(fundingSymbol), false);
@@ -448,7 +448,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
             }
         },;
 
-        public abstract List<SymbolTarget> getTargets(Map<String, BinanceConnector.FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager);
+        public abstract List<SymbolTarget> getTargets(Map<String, FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager);
     }
 
 }

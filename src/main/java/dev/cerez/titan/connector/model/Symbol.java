@@ -20,7 +20,6 @@ public class Symbol {
     @NotNull @Getter private final BigDecimal minNotionalBase;
     @NotNull @Getter private final ContractType contractType;
 
-
     public Symbol(@NotNull String symbol,
                   @NotNull Integer quotePrecision,
                   @NotNull String baseAsset,

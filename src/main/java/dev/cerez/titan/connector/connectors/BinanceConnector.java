@@ -2,6 +2,7 @@ package dev.cerez.titan.connector.connectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.gson.JsonArray;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.exception.ApiException;
 import dev.cerez.titan.connector.exception.DefaultApiException;
@@ -18,6 +19,7 @@ import dev.cerez.titan.utils.Provider;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -38,6 +40,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+@Slf4j
 public final class BinanceConnector extends BaseConnector {
 
     private static final String BASE_SPOT_HTTPS = "https://api.binance.com";
@@ -670,18 +673,22 @@ public final class BinanceConnector extends BaseConnector {
                 }
 
             }
-            symbols.put(node.get("symbol").asText(), new Symbol(
-                    node.get("symbol").asText(),
-                    node.get("quotePrecision").asInt(),
-                    node.get("baseAsset").asText(),
-                    node.get("quoteAsset").asText(),
-                    "TRADING".equals(node.get("status").asText()),
-                    stepPrice,
-                    stepsize,
-                    minNotionalQuote,
-                    minNotionalBase,
-                    ContractType.valueOf(node.get("contractType").asText())
-            ));
+            try {
+                symbols.put(node.get("symbol").asText(), new Symbol(
+                        node.get("symbol").asText(),
+                        node.get("quotePrecision").asInt(),
+                        node.get("baseAsset").asText(),
+                        node.get("quoteAsset").asText(),
+                        "TRADING".equals(node.get("status").asText()),
+                        stepPrice,
+                        stepsize,
+                        minNotionalQuote,
+                        minNotionalBase,
+                        ContractType.valueOf(node.get("contractType").asText().split(" ")[0])
+                ));
+            } catch (Exception e) {
+                Log.exception(node.toString(), e);
+            }
         }
         fCachedSymbols.clear();
         fCachedSymbols.putAll(symbols);
@@ -732,17 +739,49 @@ public final class BinanceConnector extends BaseConnector {
     @Contract("_, _ -> new")
     public @NotNull Volume fGetVolumen(@NotNull String symbol, @NotNull TimeUnitMarket timeUnit) {
         Map<String, Object> params = new HashMap<>();
-        params.put("pair", symbol.toUpperCase(Locale.US));
+        params.put("symbol", symbol.toUpperCase(Locale.US));
         params.put("limit", 1);
         params.put("interval", timeUnit.getShortName());
         params.put("contractType", fGetAllSymbols().get(symbol).getContractType());
-        JsonNode node = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v1/continuousKlines", params).iterator().next();
+        JsonNode node = sendSignedRequest(fGetHTTPS(), Method.GET, "/fapi/v1/klines", params).iterator().next();
         return new Volume(
                 symbol.toUpperCase(Locale.US),
                 new BigDecimal(node.get(7).asText()),
                 new BigDecimal(node.get(5).asText())
         );
     }
+
+    @Contract("_, _, _ -> new")
+    public @NotNull List<Candle> fGetCandles(@NotNull String symbol, int limit, @NotNull TimeUnitMarket timeUnit) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("pair", symbol.toUpperCase(Locale.US));
+        params.put("limit", limit);
+        params.put("interval", timeUnit.getShortName());
+        params.put("contractType", fGetAllSymbols().get(symbol).getContractType());
+        JsonNode raw = sendPublicRequest(fGetHTTPS(), Method.GET, "/fapi/v1/continuousKlines", params);
+        LinkedList<Candle> candles = new LinkedList<>();
+        for (JsonNode node : raw) {
+            long open = node.get(0).asLong();
+            long close = node.get(6).asLong();
+            candles.add(new Candle(
+                    symbol.toUpperCase(Locale.US),
+                    new BigDecimal(node.get(1).asText()),
+                    new BigDecimal(node.get(2).asText()),
+                    new BigDecimal(node.get(3).asText()),
+                    new BigDecimal(node.get(4).asText()),
+                    new Volume(
+                            symbol.toUpperCase(Locale.US),
+                            new BigDecimal(node.get(7).asText()),
+                            new BigDecimal(node.get(5).asText())
+                    ),
+                    timeUnit.getDuration()-1 == (close - open),
+                    open,
+                    close
+            ));
+        }
+        return candles;
+    }
+
 
     @Contract(" -> new")
     public @NotNull Map<String, BigDecimal> fGetAllPrices() {
@@ -908,17 +947,26 @@ public final class BinanceConnector extends BaseConnector {
         }), stream);
     }
 
-    @Contract("_, _ -> new")
-    public @NotNull BaseConnector.WebSocketSubscribe wfSubscribeCandle(@NotNull Consumer<Candle> consumer, @NotNull String symbol) {
-        String stream = symbol.toLowerCase(Locale.US) + "@ticker";
+    @Contract("_, _, _ -> new")
+    public @NotNull BaseConnector.WebSocketSubscribe wfSubscribeCandle(@NotNull Consumer<Candle> consumer, @NotNull String symbol, @NotNull TimeUnitMarket timeUnitMarket) {
+        String stream = symbol.toLowerCase(Locale.US) + "@kline_" + timeUnitMarket.getShortName();
         return subscribeStream(fGetWWStream(), (payload -> {
+            JsonNode data = payload.get("k");
             consumer.accept(
                     new Candle(
-                            payload.get("s").asText(),
-                            new BigDecimal(payload.get("c").asText()),
-                            new BigDecimal(payload.get("o").asText()),
-                            new BigDecimal(payload.get("h").asText()),
-                            new BigDecimal(payload.get("l").asText())
+                            data.get("s").asText(),
+                            new BigDecimal(data.get("o").asText()),
+                            new BigDecimal(data.get("h").asText()),
+                            new BigDecimal(data.get("l").asText()),
+                            new BigDecimal(data.get("c").asText()),
+                            new Volume(
+                                    data.get("s").asText(),
+                                    new BigDecimal(data.get("q").asText()),
+                                    new BigDecimal(data.get("v").asText())
+                            ),
+                            data.get("x").asBoolean(),
+                            data.get("t").asLong(),
+                            data.get("T").asLong()
                     )
             );
         }), stream);
@@ -1382,20 +1430,6 @@ public final class BinanceConnector extends BaseConnector {
     }
 
     public record BalanceFuture(@NotNull @Unmodifiable Map<String, BigDecimal> available, @NotNull @Unmodifiable Map<String, BigDecimal> valued) {}
-
-    public record FundingRate(String symbol, FundingConfig config, BigDecimal nextFundingRate, long nextFundingTime) {
-        public @NotNull BigDecimal rate24h(){
-            return nextFundingRate.multiply(BigDecimal.valueOf(24d / config.interval()));
-        }
-
-        public @NotNull BigDecimal rate24hAbs(){
-            return rate24h().abs();
-        }
-
-        public @NotNull BigDecimal nextFundingRateAbs() {
-            return nextFundingRate.abs();
-        }
-    }
 
     public record Transaction(@NotNull String symbol, @NotNull IncomeType incomeType, BigDecimal amount, String asset, long date) {}
 

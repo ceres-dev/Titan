@@ -1,18 +1,21 @@
 package dev.cerez.titan.core.managers;
 
+import dev.cerez.titan.TitanApplication;
 import dev.cerez.titan.command.CommandHander;
-import dev.cerez.titan.command.commands.*;
+import dev.cerez.titan.command.commands.ExitCommand;
 import dev.cerez.titan.command.profilers.FundingOnTimeCommand;
 import dev.cerez.titan.command.profilers.GridCommand;
 import dev.cerez.titan.command.profilers.TriangularCommand;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
+import dev.cerez.titan.connector.model.FundingRate;
 import dev.cerez.titan.connector.model.Symbol;
-import dev.cerez.titan.core.*;
-import dev.cerez.titan.core.event.EventHandler;
+import dev.cerez.titan.core.ConfigNope;
+import dev.cerez.titan.core.Manager;
+import dev.cerez.titan.core.PersistentNope;
+import dev.cerez.titan.core.StrategyManager;
 import dev.cerez.titan.core.event.EventManager;
 import dev.cerez.titan.core.event.EventPriority;
-import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.event.events.manager.ChangeStatusEvent;
 import dev.cerez.titan.core.exception.AlreadySubscribedException;
 import dev.cerez.titan.discord.DiscordConnector;
@@ -28,6 +31,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Function;
@@ -113,6 +117,7 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
             if (this.equals(m.getEnvironmentManager())) return;
             managerMap.put(m.getId(), m);
             Log.info("Manager Registrado: name=%s type=%s".formatted(m.getName(), m.getClass().getSimpleName()));
+            webSocketServer.sendMessage(this.getPort().getStrategy());
         }
     }
 
@@ -145,7 +150,7 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
 
         public List<Position> getPositions() {
             Map<String, Symbol> symbolMap = connector.fGetAllSymbols();
-            Map<String, BinanceConnector.FundingRate> nextFundingMap = connector.fGetFundingRate();
+            Map<String, FundingRate> nextFundingMap = connector.fGetFundingRate();
             return connector.fGetPositions().stream().map((futurePosition -> {
                 Symbol symbol = symbolMap.get(futurePosition.symbol());
                 BigDecimal nextFunding = nextFundingMap.get(futurePosition.symbol()).nextFundingRate();

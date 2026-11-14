@@ -2,15 +2,13 @@ package dev.cerez.titan.storage;
 
 import dev.cerez.titan.core.BaseConfig;
 import dev.cerez.titan.core.BasePersistent;
-import dev.cerez.titan.utils.Provider;
-import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.Set;
 import java.util.UUID;
-
+// TODO: renombrar Profiler -> Path es un nombre más adecuado para lo que hace
 public interface StorageManager {
 
     String DEFAULT_PROFILER_NAME = "default";
@@ -26,11 +24,11 @@ public interface StorageManager {
     @NotNull StorageManager createSubProfiler(@NotNull String subProfilerName);
 
     @Contract(pure = true)
-    @NotNull StorageManager getSuperProfiler();
+    @NotNull StorageManager getFatherProfiler();
 
     @Contract(pure = true)
     @NotNull @Unmodifiable
-    Set<StorageManager> getSubProfiler();
+    Set<StorageManager> getChildrenProfiler();
 
     default <C extends BaseConfig> Storage<C> getConfig(@NotNull Class<C> clazz){
         return getConfig(clazz, getDefaultProfilerName());
