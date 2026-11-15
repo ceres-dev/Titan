@@ -21,44 +21,77 @@ public class PublicApiController {
 
     private final HashMap<String, Municipio> municipios = new HashMap<>();
 
-    @GetMapping("/get")
-    public ResponseEntity<Municipio> get(@RequestParam String name) {
+    @GetMapping("/table/get")
+    public ResponseEntity<Municipio> getTable(@RequestParam String name) {
         if (!municipios.containsKey(name)) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
-        Log.info("GET XAPI");
         return new ResponseEntity<>(municipios.get(name), HttpStatus.OK);
     }
 
     @PutMapping("/table")
-    public ResponseEntity<Void> add(@RequestBody Municipio municipio) {
+    public ResponseEntity<Void> addTable(@RequestBody Municipio municipio) {
         municipios.put(municipio.name, municipio);
-        Log.info("PUT XAPI");
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/table")
-    public ResponseEntity<Void> delete(@RequestParam String name) {
+    public ResponseEntity<Void> deleteTable(@RequestParam String name) {
         municipios.remove(name);
-        Log.info("DELETE XAPI");
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/table")
-    public ResponseEntity<Void> update(@RequestBody Municipio municipio) {
+    public ResponseEntity<Void> updateTable(@RequestBody Municipio municipio) {
         if (!municipios.containsKey(municipio.name)) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
-        Log.info("UPDATE XAPI");
         municipios.put(municipio.name, municipio);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/table")
-    public ResponseEntity<List<Municipio>> getAll() {
-        Log.info("GET ALL XAPI");
+    public ResponseEntity<List<Municipio>> getAllTable() {
         return new ResponseEntity<>(municipios.values().stream().toList(), HttpStatus.OK);
     }
 
+    private final HashMap<String, User> users = new HashMap<>();
+
+    @GetMapping("/user/get")
+    public ResponseEntity<Municipio> getuser(@RequestParam String name) {
+        if (!users.containsKey(name)) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+        return new ResponseEntity<>(municipios.get(name), HttpStatus.OK);
+    }
+
+    @PutMapping("/user")
+    public ResponseEntity<Void> addUser(@RequestBody User municipio) {
+        users.put(municipio.username, municipio);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/user")
+    public ResponseEntity<Void> deleteUser(@RequestParam String name) {
+        users.remove(name);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/user")
+    public ResponseEntity<Void> updateUser(@RequestBody User user) {
+        if (!users.containsKey(user.username)) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+        users.put(user.username, user);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/user")
+    public ResponseEntity<List<User>> getAllUser() {
+        return new ResponseEntity<>(users.values().stream().toList(), HttpStatus.OK);
+    }
+
     public record Municipio(String name, int population, double temperature) {}
+
+    public record User(String username, String password, String email) {}
 }
