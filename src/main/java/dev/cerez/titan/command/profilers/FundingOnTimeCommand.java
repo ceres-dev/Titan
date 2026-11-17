@@ -3,12 +3,10 @@ package dev.cerez.titan.command.profilers;
 import dev.cerez.titan.command.ProfilerSetup;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.command.BaseCommand;
-import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
 import dev.cerez.titan.core.managers.EnvironmentManager;
-import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
+import dev.cerez.titan.core.strategy.financing.timely.TimelyFinancingManager;
 import dev.cerez.titan.storage.StorageManager;
-import dev.cerez.titan.storage.storages.StorageManagerJsonLocal;
 import dev.cerez.titan.storage.storages.StorageManagerMemory;
 import dev.cerez.titan.utils.Utils;
 import org.jetbrains.annotations.NotNull;
@@ -31,10 +29,10 @@ public class FundingOnTimeCommand extends BaseCommand implements ProfilerSetup {
         connector.wuSubscribeEventOrderTradeUpdate((a) -> {
             Log.info(a.toString());
         });
-        FundingOnTimeManager.FundingManagerConfig config = FundingOnTimeManager.FundingManagerConfig.builder()
+        TimelyFinancingManager.FundingManagerConfig config = TimelyFinancingManager.FundingManagerConfig.builder()
                 .sendTrade(true)
                 .build();
-        FundingOnTimeManager fundingManger = new FundingOnTimeManager(storageMemory.saveIfNotExits(config), connector);
+        TimelyFinancingManager fundingManger = new TimelyFinancingManager(storageMemory.saveIfNotExits(config), connector);
         fundingManger.start();
     }
 }

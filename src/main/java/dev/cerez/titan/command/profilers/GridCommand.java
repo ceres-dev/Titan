@@ -8,7 +8,7 @@ import dev.cerez.titan.core.event.Listener;
 import dev.cerez.titan.core.event.events.manager.funding.time.*;
 import dev.cerez.titan.core.managers.BalanceMaxRiskManager;
 import dev.cerez.titan.core.managers.EnvironmentManager;
-import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
+import dev.cerez.titan.core.strategy.financing.timely.TimelyFinancingManager;
 import dev.cerez.titan.core.strategy.grid.GridManager;
 import dev.cerez.titan.core.strategy.grid.model.SideGrid;
 import dev.cerez.titan.discord.DiscordConnector;
@@ -17,6 +17,7 @@ import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 
@@ -35,7 +36,7 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
         GridManager.GridManagerConfig gridConfigDefault = GridManager.GridManagerConfig.builder()
                 .baseAsset("SPY")
                 .quoteAsset("USDT")
-                .stepSizeHighActivity(new BigDecimal("1.2"))
+                .stepSizeHighActivity(new BigDecimal("1"))
                 .stepSizeMediumActivity(new BigDecimal("0.6"))
                 .stepSizeLowActivity(new BigDecimal("0.4"))
                 .sizePerOrderBaseAsset(new BigDecimal("0.01"))
@@ -45,12 +46,12 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
                 .sideGrid(SideGrid.LONG)
                 .build();
 
-        FundingOnTimeManager.FundingManagerConfig fundingConfigDefault = FundingOnTimeManager.FundingManagerConfig.builder()
+        TimelyFinancingManager.FundingManagerConfig fundingConfigDefault = TimelyFinancingManager.FundingManagerConfig.builder()
                 .sendTrade(true)
                 .fundingRateMax(new BigDecimal("1"))
                 .leverage(1)
                 .offsetOpenPositon(500)
-                .offsetClosePositon(500)
+                .offsetClosePositon(850)
                 .fundingRateMin(BigDecimal.valueOf(0.0018))
                 .maxLimitSymbolsCandidate(2)
                 .build();
@@ -65,9 +66,9 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
         gridManager.setName("SPY");
         gridManager.start();
 
-        FundingOnTimeManager fundingOnTimeManager = new FundingOnTimeManager(storageManager.saveConfig(fundingConfigDefault), binanceConnector);
+        TimelyFinancingManager fundingOnTimeManager = new TimelyFinancingManager(storageManager.saveConfig(fundingConfigDefault), binanceConnector);
         fundingOnTimeManager.setName("Funding");
-        fundingOnTimeManager.start();
+//        fundingOnTimeManager.start();
 
         discordConnector.setStatusProfiler(gridManager);
 
@@ -94,7 +95,17 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
                 environmentManager.getExecutor().execute(gridManager::start);
             }
         });
-
-        environmentManager.getPort().addManager(balanceMaxRiskManager, fundingOnTimeManager);
     }
+
+    public record FundingTelemetry(String symbol,
+                                   BigDecimal fundingRate,
+                                   BigInteger quoteAmount2Layer,
+                                   BigInteger quoteAmount4Layer,
+                                   BigInteger quoteAmount6Layer,
+                                   BigDecimal quoteVolumen1Hour,
+                                   BigDecimal quoteVolumen1Minute,
+                                   BigDecimal diffPercentCandle, // Diferencia % en el segundo exacto
+                                   long interval,
+                                   long date
+    ) {}
 }

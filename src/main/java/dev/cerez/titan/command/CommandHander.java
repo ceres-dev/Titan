@@ -113,6 +113,12 @@ public class CommandHander implements Switch {
 
     public void registerCommand(BaseCommand @NotNull ... command) {
         for (BaseCommand c : command) {
+            if (commands.containsKey(c.getName())) {
+                throw new IllegalArgumentException("Command with name %s already exists".formatted(c.getName()));
+            }
+            if (aliases.containsKey(c.getAlias())) {
+                throw new IllegalArgumentException("Command with aliases %s already exists".formatted(c.getName()));
+            }
             commands.put(c.getName(), c);
             aliases.put(c.getAlias(), c.getName());
         }

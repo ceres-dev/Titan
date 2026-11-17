@@ -1,6 +1,5 @@
 package dev.cerez.titan.core.managers;
 
-import dev.cerez.titan.TitanApplication;
 import dev.cerez.titan.command.CommandHander;
 import dev.cerez.titan.command.commands.ExitCommand;
 import dev.cerez.titan.command.profilers.FundingOnTimeCommand;
@@ -18,6 +17,7 @@ import dev.cerez.titan.core.event.EventManager;
 import dev.cerez.titan.core.event.EventPriority;
 import dev.cerez.titan.core.event.events.manager.ChangeStatusEvent;
 import dev.cerez.titan.core.exception.AlreadySubscribedException;
+import dev.cerez.titan.core.exception.AlreadyUnsubscribedException;
 import dev.cerez.titan.discord.DiscordConnector;
 import dev.cerez.titan.infrastructure.model.*;
 import dev.cerez.titan.log.Log;
@@ -28,10 +28,8 @@ import dev.cerez.titan.utils.telemtry.TelemetryCollector;
 import lombok.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Function;
@@ -44,6 +42,9 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
     private final UUID idOwner;
     @Getter(AccessLevel.NONE)
     private final Map<UUID, Manager<?, ?>> managerMap = new HashMap<>();
+    @Getter(AccessLevel.NONE)
+    private final Map<String, Manager<?, ?>> managerByName = new HashMap<>();
+
     private final EnvironmentPort port = new EnvironmentPort();
     private final StorageManager storageManager;
     private final DiscordConnector discordConnector;
@@ -108,26 +109,35 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
         connector.stop();
         commandHandler.stop();
         managerMap.values().forEach(Manager::stop);
+        managerByName.clear();
+        managerMap.clear();
         discordConnector.stop();
-        getPort().unsubscribe(null);
+        getPort().unsubscribeAll();
     }
 
-    public void registerManager(@NotNull Manager<?, ?> @NotNull... manager) {
+    public synchronized void registerManager(@NotNull Manager<?, ?> @NotNull... manager) {
         for (Manager<?, ?> m : manager) {
             if (this.equals(m.getEnvironmentManager())) return;
             managerMap.put(m.getId(), m);
+            managerByName.put(m.getName(), m);
             Log.info("Manager Registrado: name=%s type=%s".formatted(m.getName(), m.getClass().getSimpleName()));
             webSocketServer.sendMessage(this.getPort().getStrategy());
         }
     }
 
-    public void unregisterManager(@NotNull UUID @NotNull... id) {
-        for (UUID i : id) managerMap.remove(i);
+    public synchronized void unregisterManager(@NotNull UUID @NotNull... id) {
+        for (UUID i : id) managerByName.remove(managerMap.remove(i).getName());
+        managerByName.values().removeIf(manager -> managerMap.containsKey(manager.getId()));
     }
 
     @Contract(pure = true)
-    public Manager<?, ?> getManager(@NotNull UUID id) {
+    public synchronized Manager<?, ?> getManager(@NotNull UUID id) {
         return managerMap.get(id);
+    }
+
+    @Contract(pure = true)
+    public synchronized Manager<?, ?> getManager(@NotNull String id) {
+        return managerByName.computeIfAbsent(id, s -> managerByName.values().stream().filter(manager -> manager.getName().equals(s)).findAny().orElse(null));
     }
 
     public class EnvironmentPort {
@@ -247,16 +257,18 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
             subscribe.getSubscribable(EnvironmentManager.this).subscribe();
         }
 
-        public void unsubscribe(@Nullable Subscribe subscribe) {
-            if (subscribe == null) {
-                subscribesLive.forEach(sub -> sub.getSubscribable(EnvironmentManager.this).revoke());
-                subscribesLive.clear();
+        public void unsubscribe(@NotNull Subscribe subscribe) {
+            if (subscribesLive.contains(subscribe)) {
+                subscribe.getSubscribable(EnvironmentManager.this).revoke();
+                subscribesLive.remove(subscribe);
             }else {
-                if (subscribesLive.contains(subscribe)) {
-                    subscribe.getSubscribable(EnvironmentManager.this).revoke();
-                    subscribesLive.remove(subscribe);
-                }
+                throw new AlreadyUnsubscribedException();
             }
+        }
+
+        public void unsubscribeAll() {
+            subscribesLive.forEach(sub -> sub.getSubscribable(EnvironmentManager.this).revoke());
+            subscribesLive.clear();
         }
 
         private final Set<Subscribe> subscribesLive = new HashSet<>();
@@ -291,6 +303,9 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
 
                     @Override
                     public void subscribe() {
+                        if (!revocables.isEmpty()) {
+                            throw new IllegalStateException("Cannot subscribe more than once");
+                        }
                         revocables.addAll(onSubscribe.apply(env));
                     }
                 });

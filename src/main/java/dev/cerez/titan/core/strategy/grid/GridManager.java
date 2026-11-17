@@ -426,7 +426,12 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                             }
                             return 1;
                             // Si la orden ya fue aumenta no lo vuelva a aúmentar
-                        }).addCondicion(c -> c.orderUse().getFirst().getAmountBaseAsset().compareTo(c.context().getConfig().getSizePerOrderBaseAsset()) <= 0),
+                        }).addCondicion(c -> {
+                            if (c.orderUse().isEmpty()){
+                                return false;
+                            }
+                            return c.orderUse().getFirst().getAmountBaseAsset().compareTo(c.context().getConfig().getSizePerOrderBaseAsset()) <= 0;
+                        }),
                         new CallOnUpdate((order, c) -> {
                             // La simulación aplica todos los atributos, pero no debe actualizar
                             // el stepSize/status desde esta llamada anidada.
@@ -452,7 +457,7 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
                                 // Si falla la simulación, mantenemos el stepSize actual y dejamos
                                 // que la actualización normal de órdenes continúe.
                                 estimateSucceeded = false;
-                                Log.warning("No se pudo estimar la cantidad de órdenes para ajustar StepSize: " + exception.getMessage());
+                                Log.exception("No se pudo estimar la cantidad de órdenes para ajustar StepSize", exception);
                             }
 
                             // La decisión siempre se basa en el escenario NORMAL. Así, si el stepSize

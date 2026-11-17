@@ -1,9 +1,9 @@
 package dev.cerez.titan.core.event.events.manager.funding.time;
 
-import dev.cerez.titan.core.strategy.funding.time.FundingOnTimeManager;
+import dev.cerez.titan.core.strategy.financing.timely.TimelyFinancingManager;
 
 public final class OpenPositionEvent extends FundingOnTimeEvent {
-    public OpenPositionEvent(FundingOnTimeManager eventManager) {
+    public OpenPositionEvent(TimelyFinancingManager eventManager) {
         super(eventManager);
     }
 }

@@ -39,7 +39,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
             isClosed = false;
             EnvironmentManager manager = titan.getEnvironmentManager(user.getId());
             WebSocketServer webSocketServer = new WebSocketMessenger(session);
-            webSocketServer.onClose(() -> manager.getPort().unsubscribe(null));
+            webSocketServer.onClose(() -> manager.getPort().unsubscribeAll());
             manager.setWebSocketServer(webSocketServer);
         }else {
             session.close(CloseStatus.NOT_ACCEPTABLE);

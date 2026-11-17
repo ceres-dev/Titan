@@ -1,4 +1,4 @@
-package dev.cerez.titan.core.strategy.funding.time;
+package dev.cerez.titan.core.strategy.financing.timely;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.cerez.titan.connector.BaseConnector;
@@ -32,11 +32,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
-public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeManager.FundingManagerConfig, PersistentNope, BinanceConnector> {
+public final class TimelyFinancingManager extends StrategyManager<TimelyFinancingManager.FundingManagerConfig, PersistentNope, BinanceConnector> {
 
     private final ConcurrentMap<String, SymbolTarget> symbolsPendingForClose = new ConcurrentHashMap<>();
 
-    public FundingOnTimeManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
+    public TimelyFinancingManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
         super(storageManager.getStorageProfiler(FundingManagerConfig.class, PersistentNope.class), connector);
     }
 
@@ -258,7 +258,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
     @EqualsAndHashCode
     public static class SymbolTarget {
 
-        private final FundingOnTimeManager manager;
+        private final TimelyFinancingManager manager;
         private final Symbol symbol;
         private final FundingRate target;
         private final boolean inverse;
@@ -385,7 +385,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
     private enum FiltersFunding{
         NORMAL {
             @Override
-            public List<SymbolTarget> getTargets(Map<String, FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager) {
+            public List<SymbolTarget> getTargets(Map<String, FundingRate> funding, Map<String, Symbol> symbols, TimelyFinancingManager manager) {
                 var config = manager.getConfig();
                 var connector = manager.connector;
 
@@ -435,7 +435,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
         },
         BYPASS {
             @Override
-            public List<SymbolTarget> getTargets(Map<String, FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager) {
+            public List<SymbolTarget> getTargets(Map<String, FundingRate> funding, Map<String, Symbol> symbols, TimelyFinancingManager manager) {
                 var config = manager.getConfig();
                 return funding.values().stream()
                         .filter(f -> f.nextFundingRateAbs().compareTo(config.getFundingRateByPass()) >= 0)
@@ -448,7 +448,7 @@ public final class FundingOnTimeManager extends StrategyManager<FundingOnTimeMan
             }
         },;
 
-        public abstract List<SymbolTarget> getTargets(Map<String, FundingRate> funding, Map<String, Symbol> symbols, FundingOnTimeManager manager);
+        public abstract List<SymbolTarget> getTargets(Map<String, FundingRate> funding, Map<String, Symbol> symbols, TimelyFinancingManager manager);
     }
 
 }
