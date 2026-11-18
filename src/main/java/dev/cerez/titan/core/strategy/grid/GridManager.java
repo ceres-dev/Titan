@@ -244,8 +244,9 @@ public final class GridManager extends StrategyManager<GridManager.GridManagerCo
     }
 
     private int getAmountOrderApprox(@NotNull Context c) {
+        BigDecimal price = c.getPosition() != null ? c.getPosition().entryPriceAvg() : c.getCurrentPrice();
         BigDecimal amountOrderApproximate = c.getBalanceUsdt()
-                .divide(c.getCurrentPrice(), 12, RoundingMode.HALF_EVEN)
+                .divide(price, 12, RoundingMode.HALF_EVEN)
                 .divide(getConfig().getSizePerOrderBaseAsset(), 12, RoundingMode.HALF_EVEN)
                 // Entre dos ya que lo ideal es que tenga la misma cantidad de órdenes de compra y de venta
                 .divide(BigDecimal.TWO, 12, RoundingMode.HALF_EVEN)
