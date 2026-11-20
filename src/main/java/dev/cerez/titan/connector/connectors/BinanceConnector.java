@@ -2,7 +2,6 @@ package dev.cerez.titan.connector.connectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.gson.JsonArray;
 import dev.cerez.titan.connector.BaseConnector;
 import dev.cerez.titan.connector.exception.ApiException;
 import dev.cerez.titan.connector.exception.DefaultApiException;
@@ -40,7 +39,6 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-@Slf4j
 public final class BinanceConnector extends BaseConnector {
 
     private static final String BASE_SPOT_HTTPS = "https://api.binance.com";
@@ -1326,25 +1324,9 @@ public final class BinanceConnector extends BaseConnector {
                         ? endpoint
                         : endpoint + "?" + queryString
         );
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(finalUrl))
-                .method(method.toString(), HttpRequest.BodyPublishers.noBody())
-                .build();
         if (config.isLogsRequest()) Log.info( "Pu https=%s %s", method, finalUrl);
-        String jsonRaw = null;
         if (telemetry != null) telemetry.addRequestConnector(method, finalUrl);
-        try {
-            HttpResponse<String> response = clientHttp.send(request, HttpResponse.BodyHandlers.ofString());
-            onResponseHttps(finalUrl, response);
-            jsonRaw = response.body();
-            JsonNode node = mapper.readTree(jsonRaw);
-            checkResponse(node, request);
-            return node;
-        } catch (IOException | InterruptedException | ApiException e) {
-            Log.error(finalUrl + " @ " + jsonRaw);
-            throw new RuntimeException(e);
-        }
+        return sendRequestHttp(method, finalUrl, Map.of());
     }
 
     @Override
@@ -1362,31 +1344,38 @@ public final class BinanceConnector extends BaseConnector {
         try {
             final String signature = hmacSha256(queryString, config.getSecret());
             final String finalUrl = baseUrl + endpoint + "?" + queryString + "&signature=" + signature;
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(finalUrl))
-                    .header("X-MBX-APIKEY", config.getKey())
-                    .method(method.name(), HttpRequest.BodyPublishers.noBody())
-                    .build();
-            if (config.isLogsRequest()) Log.info("Pr https=%s %s", method, finalUrl);
-            JsonNode jsonRaw = null;
-            try {
-                HttpResponse<String> response = clientHttp.send(request, HttpResponse.BodyHandlers.ofString());
-                onResponseHttps(finalUrl, response);
-                checkResponse(jsonRaw = mapper.readTree(response.body()), request);
-                return jsonRaw;
-            } catch (IOException | InterruptedException e) {
-                Log.exception("Error de IO o Interrupción: %s".formatted(e.getMessage()), e);
-                throw new RuntimeException(e);
-            }catch (DefaultApiException e) {
-                Log.error("%s %s -> %s", method.name(), finalUrl, jsonRaw);
-                throw e;
-            }
+            return sendRequestHttp(method, finalUrl, Map.of("X-MBX-APIKEY", config.getKey()));
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private void onResponseHttps(@NotNull String url, @NotNull HttpResponse<String> response) {
+    private @NotNull JsonNode sendRequestHttp(@NotNull Method method, @NotNull String requestString, @NotNull Map<String, String> header) {
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(requestString))
+                .method(method.name(), HttpRequest.BodyPublishers.noBody());
+        for (Map.Entry<String, String> entry : header.entrySet()) {
+            requestBuilder.header(entry.getKey(), entry.getValue());
+        }
+        HttpRequest request = requestBuilder.build();
+
+        JsonNode jsonRaw = null;
+        if (config.isLogsRequest()) Log.info("https=%s %s", method, requestString);
+        try {
+            HttpResponse<String> response = clientHttp.send(request, HttpResponse.BodyHandlers.ofString());
+            onResponseHttp(requestString, response);
+            checkResponse(jsonRaw = mapper.readTree(response.body()), request);
+            return jsonRaw;
+        } catch (IOException | InterruptedException e) {
+            Log.exception("Error de IO o Interrupción: %s".formatted(e.getMessage()), e);
+            throw new RuntimeException(e);
+        }catch (DefaultApiException e) {
+            Log.error("%s %s -> %s", method.name(), requestString, jsonRaw);
+            throw e;
+        }
+    }
+
+    private void onResponseHttp(@NotNull String url, @NotNull HttpResponse<String> response) {
         if (url.startsWith(fGetHTTPS())) {
             response.headers().firstValueAsLong("X-MBX-USED-WEIGHT-1M").ifPresent(rateLimitFuture::setUse);
         }

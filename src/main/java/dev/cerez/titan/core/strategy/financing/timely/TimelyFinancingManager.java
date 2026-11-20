@@ -1,3 +1,4 @@
+
 package dev.cerez.titan.core.strategy.financing.timely;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -35,6 +36,10 @@ import java.util.concurrent.locks.LockSupport;
 public final class TimelyFinancingManager extends StrategyManager<TimelyFinancingManager.FundingManagerConfig, PersistentNope, BinanceConnector> {
 
     private final ConcurrentMap<String, SymbolTarget> symbolsPendingForClose = new ConcurrentHashMap<>();
+    /** Puente C++ (solo si config.useNative=true y la librería cargó bien). */
+    private volatile NativeConnector nativeConnector;
+    /** true mientras C++ es quien cierra en la ronda actual (el handler Java se desactiva). */
+    private volatile boolean nativeRound;
 
     public TimelyFinancingManager(@NotNull StorageManager storageManager, @NotNull BinanceConnector connector) {
         super(storageManager.getStorageProfiler(FundingManagerConfig.class, PersistentNope.class), connector);
@@ -42,7 +47,10 @@ public final class TimelyFinancingManager extends StrategyManager<TimelyFinancin
 
     @Override
     protected void internalStart() {
+        initNative();
         subscribeLive.add(connector.wuCreateEventAccountUpdate((jsonNode -> {
+            // En modo nativo el cierre lo hace C++; este handler queda como respaldo solo si la ronda NO es nativa
+            if (nativeRound) return;
             JsonNode node = jsonNode.get("a");
             // TODO: Hacer una opción que sea express para ahorra un ms
             if (node.get("m").asText().equals("FUNDING_FEE")){
@@ -72,7 +80,56 @@ public final class TimelyFinancingManager extends StrategyManager<TimelyFinancin
 
     @Override
     protected void internalStop() {
+        NativeConnector nc = nativeConnector;
+        if (nc != null) {
+            nativeConnector = null;
+            nc.close();
+        }
+    }
 
+    private void initNative() {
+        var config = getConfig();
+        if (!config.isUseNative()) return;
+        try {
+            NativeConnector nc = new NativeConnector(connector,
+                    config.getNativeCpu(), config.isNativeRealtime());
+            nc.setLogSink(msg -> Log.info("[native] %s", msg));
+            nc.setListener(this::onNativeCloseResult);
+            nativeConnector = nc;
+            Log.info("Modo nativo (C++) activo para el cierre de posiciones");
+        } catch (Exception e) {
+            Log.exception(e);
+            Log.warning("useNative=true pero fallo la inicializacion: se usa el cierre por Java");
+        } catch (LinkageError e) {
+            Log.warning("useNative=true pero no se pudo cargar libtitan_native (%s): se usa el cierre por Java", e);
+        }
+    }
+
+    /** Se llama desde un hilo nativo: delega al executor y retorna enseguida. */
+    private void onNativeCloseResult(NativeConnector.CloseResult result) {
+        SymbolTarget target = symbolsPendingForClose.remove(result.symbol());
+        if (target == null) return; // el respaldo manual de Java ya lo tomo
+        executor.execute(() -> target.onNativeClosed(result));
+        if (symbolsPendingForClose.isEmpty()) {
+            NativeConnector nc = nativeConnector;
+            if (nc != null) nc.disarm();
+            nativeRound = false;
+        }
+    }
+
+    /** Llamar ANTES de parkUntil(waitFinal). Devuelve true si C++ queda armado para esta ronda. */
+    private boolean prepareNative(@NotNull Set<SymbolTarget> symbols, @NotNull RangeTime remote, long fundingTimeLocal) {
+        NativeConnector nc = nativeConnector;
+        if (nc == null || !getConfig().isSendTrade()) return false;
+        try {
+            List<NativeConnector.ClosePlan> plans = symbols.stream().map(SymbolTarget::closePlan).toList();
+            boolean ready = nc.prepareFunding(plans, remote.avg(), fundingTimeLocal);
+            Log.info("Native prepareFunding: %s", ready ? "LISTO" : "NO LISTO (cierre por Java)");
+            return ready;
+        } catch (Exception e) {
+            Log.exception(e);
+            return false;
+        }
     }
 
     private void searchFunding() {
@@ -131,6 +188,9 @@ public final class TimelyFinancingManager extends StrategyManager<TimelyFinancin
 
             waitForFunding(remote, targets);
         } catch (Exception e) {
+            NativeConnector nc = nativeConnector;
+            if (nc != null) nc.disarm();
+            nativeRound = false;
             callEvent(new AbortEvent(this));
             Log.warning("Abort: Error: %s", e);
         } finally {
@@ -169,6 +229,8 @@ public final class TimelyFinancingManager extends StrategyManager<TimelyFinancin
         }
 
         symbols.forEach(SymbolTarget::prepare);
+        // C++ debe quedar armado (conexiones calientes + payload firmable) ANTES de esperar la apertura
+        nativeRound = prepareNative(symbols, remote, fundingTimeLocal);
         Log.info("Espera final: %.3fs".formatted((waitFinal- currentTimeFinal)/1_000d));
 
         // Esperar hasta el momento de apertura
@@ -251,6 +313,12 @@ public final class TimelyFinancingManager extends StrategyManager<TimelyFinancin
         @Builder.Default private int minAvailableSymbols = 3;
         @Builder.Default private long minVolumenQute = 50_000; // UUSDT
         @Builder.Default private int maxLimitSymbolsCandidate = 5;
+        /** true = el CIERRE lo hace C++ (aperturas y comprobaciones siguen en Java). */
+        @Builder.Default private boolean useNative = false;
+        /** Core donde anclar el hilo IO nativo (-1 = sin anclar). */
+        @Builder.Default private int nativeCpu = -1;
+        /** Intentar SCHED_FIFO para el hilo nativo (requiere privilegios). */
+        @Builder.Default private boolean nativeRealtime = false;
     }
 
     @Getter
@@ -266,11 +334,54 @@ public final class TimelyFinancingManager extends StrategyManager<TimelyFinancin
         private volatile OrderToClosePosition order;
         private volatile BookTick currentBookTick;
         private volatile BaseConnector.WebSocketSubscribe subscribeBookTick;
+        /** Cantidad y lado de cierre calculados en prepare(): los mismos para abrir y para el cierre nativo. */
+        private volatile BigDecimal plannedQuantity;
+        private volatile SideOrder plannedSideClose;
 
         public void prepare(){
             manager.connector.fSetLeverage(target.symbol(), 2);
             subscribeBookTick = manager.connector.wfSubscribeBookTicker(bookTick -> this.currentBookTick = bookTick, target.symbol());
             this.currentBookTick = manager.connector.fGetBookTick(target.symbol());
+            SideOrder sideOpen = sideOpen();
+            this.plannedSideClose = sideOpen.inverse();
+            this.plannedQuantity = computeQuantityBase(sideOpen);
+        }
+
+        private SideOrder sideOpen() {
+            SideOrder sideOriginal = target.nextFundingRate().signum() > 0 ? SideOrder.SELL : SideOrder.BUY;
+            return inverse ? sideOriginal.inverse() : sideOriginal;
+        }
+
+        private BigDecimal computeQuantityBase(SideOrder sideOpen) {
+            return (sideOpen.isBuy()
+                    ? symbol.realMinNotionalBase(currentBookTick.askPrice())
+                    : symbol.realMinNotionalBase(currentBookTick.bidPrice())
+            ).multiply(new BigDecimal("1.1"));
+        }
+
+        NativeConnector.ClosePlan closePlan() {
+            return new NativeConnector.ClosePlan(target.symbol(), plannedSideClose.isBuy(), plannedQuantity);
+        }
+
+        /** Resultado del cierre hecho por C++ (corre en el executor, no en el hilo nativo). */
+        void onNativeClosed(NativeConnector.CloseResult r) {
+            OrderToClosePosition o = order;
+            if (r.ok()) {
+                Log.info("Order status: %d, Delay: %.2fms (%dms) symbol=%s [native]",
+                        r.status(),
+                        r.latencyMicros() / 1000f,
+                        o == null ? -1 : System.currentTimeMillis() - o.openDate(),
+                        target.symbol());
+                order = null;
+                try {
+                    manager.connector.checkWebSockets();
+                } finally {
+                    closePositionCheck();
+                }
+            } else {
+                Log.warning("Cierre nativo fallo status=%d code=%d resp=%s", r.status(), r.errorCode(), r.response());
+                closePosition(); // respaldo por Java (incluye orden de emergencia)
+            }
         }
 
         public void finish(){
@@ -283,10 +394,8 @@ public final class TimelyFinancingManager extends StrategyManager<TimelyFinancin
             SideOrder sideOpen = inverse ? sideOriginal.inverse() : sideOriginal;
             SideOrder sideClose = sideOpen.inverse();
             BigDecimal quantityQuoteMax = config.getMaxQuantityQuote();
-            BigDecimal quantityBase =(sideOpen.isBuy()
-                    ? /*currentBookTick.askQty().min*/(symbol.realMinNotionalBase(currentBookTick.askPrice()))
-                    : /*currentBookTick.bidQty().min*/(symbol.realMinNotionalBase(currentBookTick.bidPrice()))
-            ).multiply(new BigDecimal("1.1"));
+            // Misma cantidad que se le entrego a C++ para el cierre (calculada en prepare())
+            BigDecimal quantityBase = plannedQuantity != null ? plannedQuantity : computeQuantityBase(sideOpen);
             BigDecimal quantityQuote = (sideOpen.isBuy()
                     ? symbol.realMinNotionalQuote(currentBookTick.askPrice())
                     : symbol.realMinNotionalQuote(currentBookTick.bidPrice())
@@ -452,3 +561,4 @@ public final class TimelyFinancingManager extends StrategyManager<TimelyFinancin
     }
 
 }
+ 

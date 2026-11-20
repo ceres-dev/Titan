@@ -1,5 +1,6 @@
 package dev.cerez.titan.core.managers;
 
+import dev.cerez.titan.TitanApplication;
 import dev.cerez.titan.command.CommandHander;
 import dev.cerez.titan.command.commands.ExitCommand;
 import dev.cerez.titan.command.profilers.FundingOnTimeCommand;
@@ -30,6 +31,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Function;
@@ -73,6 +75,12 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
                 new GridCommand(this),
                 new FundingOnTimeCommand(this)
         );
+//        connector.fGetFundingRate().values().stream().filter(f -> f.config().interval() == 4).forEach(f -> System.out.println(f.symbol()));
+        try {
+            new TitanApplication.FundingTelemetryCollector(Path.of("./telemetry.json")).initialize(binanceConnector);
+        } catch (Exception e) {
+            Log.exception(e);
+        }
         discordConnector = new DiscordConnector(storageManager.saveIfNotExits(DiscordConnector.DiscordConfig.builder().build()));
     }
 
