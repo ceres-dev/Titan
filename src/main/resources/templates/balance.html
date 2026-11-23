@@ -65,9 +65,24 @@
                 </li>
             </ul>
         </section>
-        <section class="box">
+        <form class="box" id="formConversion" novalidate>
             <h2>Conversión</h2>
-        </section>
+            <label>
+                <input class="input" type="text" name="fromtAsset" placeholder="De Asset" autocomplete="off" required>
+            </label>
+            <label>
+                <input class="input" type="text" name="toAsset" placeholder="A Asset" autocomplete="off" required>
+            </label>
+            <label>
+                ¿La Cantidad al recibir?
+                <input class="checkBox" type="checkbox" name="fromAmount" required>
+            </label>
+            <label>
+                <input class="input" type="number" name="amount" placeholder="Cantidad" autocomplete="off" required>
+            </label>
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button id="sumitConversion">Convertir</button>
+        </form>
         <section class="box" style="grid-column: 1/4">
             <h2>Rendimiento</h2>
         </section>

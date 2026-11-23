@@ -76,11 +76,11 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
                 new FundingOnTimeCommand(this)
         );
 //        connector.fGetFundingRate().values().stream().filter(f -> f.config().interval() == 4).forEach(f -> System.out.println(f.symbol()));
-        try {
-            new TitanApplication.FundingTelemetryCollector(Path.of("./telemetry.json")).initialize(binanceConnector);
-        } catch (Exception e) {
-            Log.exception(e);
-        }
+//        try {
+//            new TitanApplication.FundingTelemetryCollector(Path.of("./telemetry.json")).initialize(binanceConnector);
+//        } catch (Exception e) {
+//            Log.exception(e);
+//        }
         discordConnector = new DiscordConnector(storageManager.saveIfNotExits(DiscordConnector.DiscordConfig.builder().build()));
     }
 

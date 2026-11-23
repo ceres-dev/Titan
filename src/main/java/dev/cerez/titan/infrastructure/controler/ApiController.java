@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-public class PrivateApiController {
+public class ApiController {
 
     public final TitanApplication titan;
 
@@ -95,10 +95,10 @@ public class PrivateApiController {
                                            @NotNull @RequestParam String fromAsset,
                                            @NotNull @RequestParam String toAsset,
                                            @Nullable @RequestParam BigDecimal amount,
-                                           @Nullable @RequestParam Boolean fromAmount
+                                           @RequestParam boolean fromAmount
     ){
         try {
-            getPort(user).conversion(fromAsset, toAsset, amount, Boolean.TRUE.equals(fromAmount));
+            getPort(user).conversion(fromAsset, toAsset, amount, fromAmount);
         }catch (ApiException e){
             Log.exception(e);
             return ResponseEntity.badRequest().build();

@@ -194,7 +194,12 @@ button:hover {
 button:active {
     filter: brightness(0.7);
 }
-input, select {
+label{
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+}
+.checkBox, input, select {
     border: var(--main-color);
     background: black;
     color: var(--main-color-text);
@@ -202,6 +207,32 @@ input, select {
     padding: 5px 10px;
     width: min-content;
     border: 2px solid var(--main-color);
+}
+.checkBox{
+    cursor: pointer;
+    appearance: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    position: relative;
+    padding: 0;
+}
+.checkBox:checked {
+    background-color: var(--main-color);
+}
+.checkBox:checked::before  {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 5px;
+    height: 10px;
+    border: solid #000000;
+    border-width: 0 3px 3px 0;
+    transform: rotate(45deg);
+}
+.custom-checkbox:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
 }
 select{
     background-color: #000
