@@ -1,5 +1,6 @@
 package dev.cerez.titan.command.profilers;
 
+import dev.cerez.titan.command.Arguments;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.command.ProfilerSetup;
 import dev.cerez.titan.connector.Connector;
@@ -16,7 +17,6 @@ import dev.cerez.titan.utils.Utils;
 import dev.cerez.titan.utils.telemtry.TelemetryCollector;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.List;
 import java.util.Set;
 
 public class TriangularCommand extends BaseCommand implements ProfilerSetup {
@@ -25,7 +25,7 @@ public class TriangularCommand extends BaseCommand implements ProfilerSetup {
     }
 
     @Override
-    public void execute(@NotNull List<String> args) {
+    public void execute(@NotNull Arguments args) {
         Log.info("Starting...");
 
         TelemetryCollector.TelemetryConfig telemetryConfig = TelemetryCollector.TelemetryConfig.builder()

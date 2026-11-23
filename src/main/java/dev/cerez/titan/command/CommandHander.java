@@ -3,6 +3,7 @@ package dev.cerez.titan.command;
 import dev.cerez.titan.command.exception.CommandNameUndefineException;
 import dev.cerez.titan.command.exception.CommandNotFoundException;
 import dev.cerez.titan.command.exception.CommandSetupDispatchPostSetupException;
+import dev.cerez.titan.command.exception.CommandUserException;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.Utils;
@@ -33,17 +34,17 @@ public class CommandHander implements Switch {
             Log.warning("No hay commandos");
             return;
         }
-        CompletableFuture.runAsync(() -> {
-            try {
-                if (args.length > 1) {
-                    command.execute(Arrays.stream(Arrays.copyOfRange(args, 1, args.length)).toList());
-                }else {
-                    command.execute(List.of());
-                }
-            }catch (Exception e){
-                Log.exception(e);
+        try {
+            if (args.length > 1) {
+                command.execute(Arguments.buildArgs(command, Arrays.stream(Arrays.copyOfRange(args, 1, args.length)).toList()));
+            }else {
+                command.execute(Arguments.buildArgsEmpty());
             }
-        }, executor);
+        }catch (CommandUserException e){
+            Log.error("Ops!! command=%s exception=%s reason=%s", command.getClass().getSimpleName(), e.getClass().getSimpleName(), e.getReason());
+        }catch (Exception e){
+            Log.exception(e);
+        }
     }
 
     @Getter

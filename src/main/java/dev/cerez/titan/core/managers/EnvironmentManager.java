@@ -1,8 +1,9 @@
 package dev.cerez.titan.core.managers;
 
-import dev.cerez.titan.TitanApplication;
 import dev.cerez.titan.command.CommandHander;
 import dev.cerez.titan.command.commands.ExitCommand;
+import dev.cerez.titan.command.commands.StartCommand;
+import dev.cerez.titan.command.commands.StopCommand;
 import dev.cerez.titan.command.profilers.FundingOnTimeCommand;
 import dev.cerez.titan.command.profilers.GridCommand;
 import dev.cerez.titan.command.profilers.TriangularCommand;
@@ -31,7 +32,6 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Function;
@@ -71,6 +71,8 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
         connector.setTelemetry(telemetry);
         commandHandler.registerCommand(
                 new ExitCommand(this),
+                new StartCommand(this),
+                new StopCommand(this),
                 new TriangularCommand(this),
                 new GridCommand(this),
                 new FundingOnTimeCommand(this)
@@ -135,7 +137,7 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
 
     public synchronized void unregisterManager(@NotNull UUID @NotNull... id) {
         for (UUID i : id) managerByName.remove(managerMap.remove(i).getName());
-        managerByName.values().removeIf(manager -> managerMap.containsKey(manager.getId()));
+        managerByName.values().removeIf(manager -> !managerMap.containsKey(manager.getId()));
     }
 
     @Contract(pure = true)
@@ -144,8 +146,8 @@ public final class EnvironmentManager extends StrategyManager<ConfigNope, Persis
     }
 
     @Contract(pure = true)
-    public synchronized Manager<?, ?> getManager(@NotNull String id) {
-        return managerByName.computeIfAbsent(id, s -> managerByName.values().stream().filter(manager -> manager.getName().equals(s)).findAny().orElse(null));
+    public synchronized Manager<?, ?> getManager(@NotNull String name) {
+        return managerByName.computeIfAbsent(name, s -> managerByName.values().stream().filter(manager -> manager.getName().equals(s)).findAny().orElse(null));
     }
 
     public class EnvironmentPort {

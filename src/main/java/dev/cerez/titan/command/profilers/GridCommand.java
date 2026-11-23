@@ -1,5 +1,6 @@
 package dev.cerez.titan.command.profilers;
 
+import dev.cerez.titan.command.Arguments;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.command.ProfilerSetup;
 import dev.cerez.titan.connector.connectors.BinanceConnector;
@@ -18,7 +19,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.List;
 import java.util.Map;
 
 @ToString
@@ -28,7 +28,7 @@ public class GridCommand extends BaseCommand implements ProfilerSetup {
     }
 
     @Override
-    public void execute(@NotNull List<String> args) {
+    public void execute(@NotNull Arguments args) {
         StorageManager storageManager = environmentManager.getStorageManager();
         BinanceConnector binanceConnector = environmentManager.getConnector();
         DiscordConnector discordConnector = environmentManager.getDiscordConnector();

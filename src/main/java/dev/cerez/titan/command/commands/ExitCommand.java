@@ -1,11 +1,10 @@
 package dev.cerez.titan.command.commands;
 
 import dev.cerez.titan.TitanApplication;
+import dev.cerez.titan.command.Arguments;
 import dev.cerez.titan.command.BaseCommand;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.List;
 
 public class ExitCommand extends BaseCommand {
 
@@ -14,7 +13,7 @@ public class ExitCommand extends BaseCommand {
     }
 
     @Override
-    public void execute(@NotNull List<String> args) {
+    public void execute(@NotNull Arguments args) {
         TitanApplication.getInstance().stop();
     }
 }
