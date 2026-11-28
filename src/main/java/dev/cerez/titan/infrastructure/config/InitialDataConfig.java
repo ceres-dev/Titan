@@ -12,7 +12,7 @@ public class InitialDataConfig {
     CommandLineRunner createInitialUser(UserService userService) {
         return args -> {
             if (!userService.existsByUsername("root")) {
-                userService.createUser("root", "tu-password");
+                userService.createUser("root", "password");
             }
         };
     }

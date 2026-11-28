@@ -1,21 +1,11 @@
 package dev.cerez.titan;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
-import dev.cerez.titan.command.profilers.GridCommand;
-import dev.cerez.titan.connector.connectors.BinanceConnector;
-import dev.cerez.titan.connector.model.BookTickMultyLayer;
-import dev.cerez.titan.connector.model.Candle;
-import dev.cerez.titan.connector.model.FundingRate;
-import dev.cerez.titan.connector.model.TimeUnitMarket;
 import dev.cerez.titan.core.managers.EnvironmentManager;
 import dev.cerez.titan.log.Log;
 import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.Utils;
 import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.SpringApplication;
@@ -24,22 +14,11 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.math.MathContext;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.*;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 
 @Getter
 @SpringBootApplication

@@ -149,11 +149,11 @@ public class Utils {
     public @NotNull ThreadFactory getThreadFactory(@NotNull Object o, @Nullable UUID idOwner) {
         UUID uuid = idOwner != null ? idOwner : getUserUUUIDByThread();
         if (uuid != null){
-            return Thread.ofVirtual()
+            return Thread.ofPlatform()
                     .name("user:" + Utils.uuidToBase64(uuid) + "-" + o.getClass().getSimpleName() + "-", 0)
                     .factory();
         }else {
-            return Thread.ofVirtual()
+            return Thread.ofPlatform()
                     .name(o.getClass().getSimpleName() + "-", 0)
                     .factory();
         }

@@ -9,12 +9,14 @@ import dev.cerez.titan.utils.Switch;
 import dev.cerez.titan.utils.Utils;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
 public class CommandHander implements Switch {
@@ -94,12 +96,9 @@ public class CommandHander implements Switch {
 
     public void dispatchFromRaw(@NotNull String raw) {
         String[] args = raw.split(";");
-        for (String arg : args) {
-            String[] split = arg.split(" ");
-            if (split.length == 0) {
-                throw new CommandNameUndefineException();
-            }
-            BaseCommand baseCommand = commands.getOrDefault(split[0], commands.get(aliases.get(args[0])));
+        for (String cmd : args) {
+            List<String> arguments = parsingArguments(cmd);
+            BaseCommand baseCommand = commands.getOrDefault(arguments.getFirst(), commands.get(aliases.get(args[0])));
             if (baseCommand == null) {
                 throw new CommandNotFoundException();
             }
@@ -108,8 +107,42 @@ public class CommandHander implements Switch {
                     throw new CommandSetupDispatchPostSetupException();
                 }
             }
-            dispatch(baseCommand, arg.split(" "));
+            dispatch(baseCommand, cmd.split(" "));
         }
+    }
+
+    private static @NotNull List<String> parsingArguments(@NotNull String cmd) {
+        List<String> argumentRaw = new LinkedList<>();
+        for (String arg : List.of(cmd.split(" "))) {
+            if (arg.startsWith("\"")) argumentRaw.add("\"");
+            String[] split = arg.split("\"");
+            for (int i = 0; i < split.length; i++) {
+                argumentRaw.add(split[0]);
+                if (i > 0 && i < split.length-1) argumentRaw.add("\"");
+            }
+            if (arg.endsWith("\"")) argumentRaw.add("\"");
+        }
+
+        argumentRaw.removeIf(String::isBlank);
+
+        List<String> arguments = new LinkedList<>();
+        AtomicBoolean isInQuotationMarks = new AtomicBoolean(false);
+        LinkedList<String> argumentInQuotaMarks = new LinkedList<>();
+        for (String arg : argumentRaw) {
+            if (arg.contains("\"")) {
+                isInQuotationMarks.set(!isInQuotationMarks.get());
+            }
+            argumentInQuotaMarks.add(arg);
+            if (!isInQuotationMarks.get()) {
+                arguments.add(String.join(" ", argumentInQuotaMarks));
+                argumentInQuotaMarks.clear();
+            }
+        }
+
+        if (arguments.isEmpty()) {
+            throw new CommandNameUndefineException();
+        }
+        return arguments;
     }
 
     public void registerCommand(BaseCommand @NotNull ... command) {

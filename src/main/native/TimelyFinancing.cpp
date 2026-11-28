@@ -51,9 +51,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdarg>
-#include <cstdint>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <deque>
 #include <memory>
@@ -830,143 +828,143 @@ std::string toStd(JNIEnv* env, jstring js) {
 
 extern "C" {
 
-JNIEXPORT jboolean JNICALL Java_dev_cerez_titan_core_strategy_financing_timely_NativeConnector_nativeInit(
-    JNIEnv* env, jobject thiz, jstring wsApiUrl, jstring secret, jint cpu, jboolean realtime) {
-    if (g_inited) return JNI_TRUE;
-    env->GetJavaVM(&g_vm);
-    g_obj = env->NewGlobalRef(thiz);
-    jclass cls = env->GetObjectClass(thiz);
-    g_mResult = env->GetMethodID(cls, "onNativeResult", "(Ljava/lang/String;ZIIJLjava/lang/String;)V");
-    g_mLog = env->GetMethodID(cls, "onNativeLog", "(Ljava/lang/String;)V");
-    if (!g_mResult || !g_mLog) return JNI_FALSE;
+    JNIEXPORT jboolean JNICALL Java_dev_cerez_titan_core_strategy_financing_timely_NativeConnector_nativeInit(
+        JNIEnv* env, jobject thiz, jstring wsApiUrl, jstring secret, jint cpu, jboolean realtime) {
+        if (g_inited) return JNI_TRUE;
+        env->GetJavaVM(&g_vm);
+        g_obj = env->NewGlobalRef(thiz);
+        jclass cls = env->GetObjectClass(thiz);
+        g_mResult = env->GetMethodID(cls, "onNativeResult", "(Ljava/lang/String;ZIIJLjava/lang/String;)V");
+        g_mLog = env->GetMethodID(cls, "onNativeLog", "(Ljava/lang/String;)V");
+        if (!g_mResult || !g_mLog) return JNI_FALSE;
 
-    std::string sec = toStd(env, secret);
-    hmacInit(g_hmac, reinterpret_cast<const uint8_t*>(sec.data()), sec.size());
-    std::fill(sec.begin(), sec.end(), '\0');
+        std::string sec = toStd(env, secret);
+        hmacInit(g_hmac, reinterpret_cast<const uint8_t*>(sec.data()), sec.size());
+        std::fill(sec.begin(), sec.end(), '\0');
 
-    OPENSSL_init_ssl(0, nullptr);
-    g_ctx = SSL_CTX_new(TLS_client_method());
-    if (!g_ctx) return JNI_FALSE;
-    SSL_CTX_set_min_proto_version(g_ctx, TLS1_2_VERSION);
-    SSL_CTX_set_options(g_ctx, SSL_OP_NO_COMPRESSION);
-    SSL_CTX_set_mode(g_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-    SSL_CTX_set_default_verify_paths(g_ctx);
-    SSL_CTX_set_verify(g_ctx, SSL_VERIFY_PEER, nullptr);
+        OPENSSL_init_ssl(0, nullptr);
+        g_ctx = SSL_CTX_new(TLS_client_method());
+        if (!g_ctx) return JNI_FALSE;
+        SSL_CTX_set_min_proto_version(g_ctx, TLS1_2_VERSION);
+        SSL_CTX_set_options(g_ctx, SSL_OP_NO_COMPRESSION);
+        SSL_CTX_set_mode(g_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+        SSL_CTX_set_default_verify_paths(g_ctx);
+        SSL_CTX_set_verify(g_ctx, SSL_VERIFY_PEER, nullptr);
 
-    g_ud.name = "userdata";
-    g_api.name = "ws-api";
-    g_cpu = cpu;
-    g_realtime = realtime == JNI_TRUE;
-    {
-        std::lock_guard<std::mutex> lk(g_urlMu);
-        g_apiUrl = toStd(env, wsApiUrl);
+        g_ud.name = "userdata";
+        g_api.name = "ws-api";
+        g_cpu = cpu;
+        g_realtime = realtime == JNI_TRUE;
+        {
+            std::lock_guard<std::mutex> lk(g_urlMu);
+            g_apiUrl = toStd(env, wsApiUrl);
+        }
+        g_running.store(true);
+        g_cbThread = std::thread(cbLoop);
+        g_ioThread = std::thread(ioLoop);
+        g_inited = true;
+        return JNI_TRUE;
     }
-    g_running.store(true);
-    g_cbThread = std::thread(cbLoop);
-    g_ioThread = std::thread(ioLoop);
-    g_inited = true;
-    return JNI_TRUE;
-}
 
-// Firma de prueba: permite a Java verificar que C++ y Connector.hmacSha256 coinciden.
-JNIEXPORT jstring JNICALL Java_dev_cerez_titan_core_strategy_financing_timely_NativeConnector_nativeSign(
-    JNIEnv* env, jobject, jstring data) {
-    if (!g_hmac.ready) return nullptr;
-    std::string d = toStd(env, data);
-    uint8_t mac[32];
-    hmacSign(g_hmac, d.data(), d.size(), mac);
-    char hex[65];
-    toHex(mac, 32, hex);
-    hex[64] = 0;
-    return env->NewStringUTF(hex);
-}
+    // Firma de prueba: permite a Java verificar que C++ y Connector.hmacSha256 coinciden.
+    JNIEXPORT jstring JNICALL Java_dev_cerez_titan_core_strategy_financing_timely_NativeConnector_nativeSign(
+        JNIEnv* env, jobject, jstring data) {
+        if (!g_hmac.ready) return nullptr;
+        std::string d = toStd(env, data);
+        uint8_t mac[32];
+        hmacSign(g_hmac, d.data(), d.size(), mac);
+        char hex[65];
+        toHex(mac, 32, hex);
+        hex[64] = 0;
+        return env->NewStringUTF(hex);
+    }
 
-// Se llama ANTES de parkUntil(waitFinal).
-//  userDataUrl     : resultado de uGetWWS()
-//  symbols[]       : simbolos a vigilar
-//  payloadToClose[]: query string (de buildQueryString) con timestamp=0000000000000
-//  clockDeltaMs    : delta servidor-cliente (se suma al timestamp, igual que sendSignedRequest)
-//  fundingLocalMs  : instante local esperado del funding (nextFundingTime - delta)
-JNIEXPORT jboolean JNICALL Java_dev_cerez_titan_core_strategy_financing_timely_NativeConnector_prepareFunding(
-    JNIEnv* env, jobject, jstring userDataUrl, jobjectArray symbols, jobjectArray payloadToClose, jlong clockDeltaMs,
-    jlong fundingLocalMs) {
-    if (!g_inited) return JNI_FALSE;
-    const jsize n = env->GetArrayLength(symbols);
-    if (n <= 0 || n > 64 || n != env->GetArrayLength(payloadToClose)) {
-        logf("prepareFunding: arrays invalidos (n=%d)", static_cast<int>(n));
+    // Se llama ANTES de parkUntil(waitFinal).
+    //  userDataUrl     : resultado de uGetWWS()
+    //  symbols[]       : simbolos a vigilar
+    //  payloadToClose[]: query string (de buildQueryString) con timestamp=0000000000000
+    //  clockDeltaMs    : delta servidor-cliente (se suma al timestamp, igual que sendSignedRequest)
+    //  fundingLocalMs  : instante local esperado del funding (nextFundingTime - delta)
+    JNIEXPORT jboolean JNICALL Java_dev_cerez_titan_core_strategy_financing_timely_NativeConnector_prepareFunding(
+        JNIEnv* env, jobject, jstring userDataUrl, jobjectArray symbols, jobjectArray payloadToClose, jlong clockDeltaMs,
+        jlong fundingLocalMs) {
+        if (!g_inited) return JNI_FALSE;
+        const jsize n = env->GetArrayLength(symbols);
+        if (n <= 0 || n > 64 || n != env->GetArrayLength(payloadToClose)) {
+            logf("prepareFunding: arrays invalidos (n=%d)", static_cast<int>(n));
+            return JNI_FALSE;
+        }
+        std::unique_ptr<ArmSet> set(new ArmSet());
+        set->n = static_cast<size_t>(n);
+        set->t.reset(new Target[set->n]);
+        for (jsize i = 0; i < n; i++) {
+            std::string sym = toStd(env, static_cast<jstring>(env->GetObjectArrayElement(symbols, i)));
+            std::string pay = toStd(env, static_cast<jstring>(env->GetObjectArrayElement(payloadToClose, i)));
+            std::string err;
+            if (!buildTarget(set->t[i], static_cast<size_t>(i), pay, err)) {
+                logf("prepareFunding: payload[%d] rechazado: %s", static_cast<int>(i), err.c_str());
+                return JNI_FALSE;
+            }
+            if (sym != set->t[i].symbol) {
+                logf("prepareFunding: symbol[%d]=%s no coincide con payload (%s)", static_cast<int>(i), sym.c_str(),
+                     set->t[i].symbol);
+                return JNI_FALSE;
+            }
+        }
+        set->minFireMs = fundingLocalMs - 500;
+        set->spinFromMs = fundingLocalMs - 1500;
+        set->deadlineMs = fundingLocalMs + 20000;
+        g_delta.store(clockDeltaMs);
+
+        const std::string url = toStd(env, userDataUrl);
+        {
+            std::lock_guard<std::mutex> lk(g_urlMu);
+            if (url != g_udUrl) {
+                g_udUrl = url;
+                g_udGen.fetch_add(1, std::memory_order_release);
+            }
+        }
+
+        g_armed.store(false);
+        ArmSet* old = g_cur.exchange(set.release(), std::memory_order_acq_rel);
+        if (old) g_retired.push_back(old);
+        while (g_retired.size() > 2) {  // los mas viejos ya no los lee nadie
+            delete g_retired.front();
+            g_retired.erase(g_retired.begin());
+        }
+        g_armed.store(true, std::memory_order_release);
+
+        // Esperar a que ambas conexiones esten arriba (para no llegar ciegos a la ventana).
+        const int64_t until = realtimeMs() + 4000;
+        while (realtimeMs() < until) {
+            if (g_ud.up.load(std::memory_order_acquire) && g_api.up.load(std::memory_order_acquire)) return JNI_TRUE;
+            usleep(1000);
+        }
+        logf("prepareFunding: conexiones no listas (ud=%d api=%d)", g_ud.up.load() ? 1 : 0, g_api.up.load() ? 1 : 0);
         return JNI_FALSE;
     }
-    std::unique_ptr<ArmSet> set(new ArmSet());
-    set->n = static_cast<size_t>(n);
-    set->t.reset(new Target[set->n]);
-    for (jsize i = 0; i < n; i++) {
-        std::string sym = toStd(env, static_cast<jstring>(env->GetObjectArrayElement(symbols, i)));
-        std::string pay = toStd(env, static_cast<jstring>(env->GetObjectArrayElement(payloadToClose, i)));
-        std::string err;
-        if (!buildTarget(set->t[i], static_cast<size_t>(i), pay, err)) {
-            logf("prepareFunding: payload[%d] rechazado: %s", static_cast<int>(i), err.c_str());
-            return JNI_FALSE;
+
+    JNIEXPORT void JNICALL Java_dev_cerez_titan_core_strategy_financing_timely_NativeConnector_disarm0(JNIEnv*, jobject) {
+        g_armed.store(false, std::memory_order_release);
+    }
+
+    JNIEXPORT void JNICALL Java_dev_cerez_titan_core_strategy_financing_timely_NativeConnector_shutdown(JNIEnv* env,
+                                                                                                        jobject) {
+        if (!g_inited) return;
+        g_armed.store(false);
+        g_running.store(false);
+        g_cbCv.notify_all();
+        if (g_ioThread.joinable()) g_ioThread.join();
+        if (g_cbThread.joinable()) g_cbThread.join();
+        if (g_obj) {
+            env->DeleteGlobalRef(g_obj);
+            g_obj = nullptr;
         }
-        if (sym != set->t[i].symbol) {
-            logf("prepareFunding: symbol[%d]=%s no coincide con payload (%s)", static_cast<int>(i), sym.c_str(),
-                 set->t[i].symbol);
-            return JNI_FALSE;
+        if (g_ctx) {
+            SSL_CTX_free(g_ctx);
+            g_ctx = nullptr;
         }
+        g_inited = false;
     }
-    set->minFireMs = fundingLocalMs - 500;
-    set->spinFromMs = fundingLocalMs - 1500;
-    set->deadlineMs = fundingLocalMs + 20000;
-    g_delta.store(clockDeltaMs);
-
-    const std::string url = toStd(env, userDataUrl);
-    {
-        std::lock_guard<std::mutex> lk(g_urlMu);
-        if (url != g_udUrl) {
-            g_udUrl = url;
-            g_udGen.fetch_add(1, std::memory_order_release);
-        }
-    }
-
-    g_armed.store(false);
-    ArmSet* old = g_cur.exchange(set.release(), std::memory_order_acq_rel);
-    if (old) g_retired.push_back(old);
-    while (g_retired.size() > 2) {  // los mas viejos ya no los lee nadie
-        delete g_retired.front();
-        g_retired.erase(g_retired.begin());
-    }
-    g_armed.store(true, std::memory_order_release);
-
-    // Esperar a que ambas conexiones esten arriba (para no llegar ciegos a la ventana).
-    const int64_t until = realtimeMs() + 4000;
-    while (realtimeMs() < until) {
-        if (g_ud.up.load(std::memory_order_acquire) && g_api.up.load(std::memory_order_acquire)) return JNI_TRUE;
-        usleep(1000);
-    }
-    logf("prepareFunding: conexiones no listas (ud=%d api=%d)", g_ud.up.load() ? 1 : 0, g_api.up.load() ? 1 : 0);
-    return JNI_FALSE;
-}
-
-JNIEXPORT void JNICALL Java_dev_cerez_titan_core_strategy_financing_timely_NativeConnector_disarm0(JNIEnv*, jobject) {
-    g_armed.store(false, std::memory_order_release);
-}
-
-JNIEXPORT void JNICALL Java_dev_cerez_titan_core_strategy_financing_timely_NativeConnector_shutdown(JNIEnv* env,
-                                                                                                    jobject) {
-    if (!g_inited) return;
-    g_armed.store(false);
-    g_running.store(false);
-    g_cbCv.notify_all();
-    if (g_ioThread.joinable()) g_ioThread.join();
-    if (g_cbThread.joinable()) g_cbThread.join();
-    if (g_obj) {
-        env->DeleteGlobalRef(g_obj);
-        g_obj = nullptr;
-    }
-    if (g_ctx) {
-        SSL_CTX_free(g_ctx);
-        g_ctx = nullptr;
-    }
-    g_inited = false;
-}
 
 }  // extern "C"
